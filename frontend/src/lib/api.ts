@@ -1,0 +1,23 @@
+export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(path, {
+    headers: options.body instanceof FormData ? undefined : { "Content-Type": "application/json" },
+    ...options
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error ?? "Request failed");
+  }
+
+  return response.json() as Promise<T>;
+}
+
+export function isoDate(value?: string | null) {
+  if (!value) return "No date";
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+}
+
+export function dateInputValue(value?: string | null) {
+  if (!value) return "";
+  return new Date(value).toISOString().slice(0, 10);
+}

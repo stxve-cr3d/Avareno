@@ -1,0 +1,19 @@
+{
+  "name": "second-memory",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"python3 -m uvicorn app.main:app --app-dir backend --reload --host 0.0.0.0 --port 4000\" \"npm run dev -w frontend\"",
+    "build": "npm run build -w frontend",
+    "db:init": "python3 backend/scripts/seed.py",
+    "db:seed": "python3 backend/scripts/seed.py",
+    "typecheck": "python3 -m compileall -q backend && npm run typecheck -w frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "playwright": "^1.61.0"
+  }
+}
