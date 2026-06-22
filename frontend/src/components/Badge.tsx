@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 const tones = {
-  green: "bg-emerald-50 text-moss ring-emerald-200",
+  green: "bg-leaf/10 text-moss ring-leaf/20",
   amber: "bg-amber-50 text-amber ring-amber-200",
   red: "bg-red-50 text-ember ring-red-200",
   dark: "bg-coal text-white ring-coal",
@@ -11,5 +11,5 @@ const tones = {
 };
 
 export function Badge({ children, tone = "gray" }: { children: ReactNode; tone?: keyof typeof tones }) {
-  return <span className={`rounded-md px-2 py-1 text-xs font-semibold ring-1 ${tones[tone]}`}>{children}</span>;
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-black ring-1 ${tones[tone]}`}>{children}</span>;
 }

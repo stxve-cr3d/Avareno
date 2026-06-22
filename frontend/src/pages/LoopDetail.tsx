@@ -59,7 +59,7 @@ export function LoopDetail() {
 
   return (
     <div className="space-y-5">
-      <Card className="!bg-coal text-white">
+      <Card className="!rounded-3xl !bg-coal text-white">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm font-bold text-white/55">{loop.sourceType}</p>
@@ -67,30 +67,30 @@ export function LoopDetail() {
           </div>
           <Badge tone={loop.status === "DONE" ? "green" : "amber"}>{loop.status}</Badge>
         </div>
-        <p className="mt-4 text-sm text-white/65">{loop.description}</p>
+        <p className="mt-4 text-sm font-semibold leading-6 text-white/65">{loop.description}</p>
         <p className="mt-4 text-sm font-bold text-leaf">Reward: +{loop.xpReward} XP</p>
       </Card>
 
-      {message ? <div className="rounded-lg bg-green-50 p-3 text-sm font-bold text-moss">{message}</div> : null}
+      {message ? <div className="rounded-2xl bg-leaf/10 p-3 text-sm font-black text-moss ring-1 ring-leaf/20">{message}</div> : null}
 
       <Card>
         <h2 className="text-xl font-black text-ink">Reminder timing</h2>
-        <p className="mt-2 text-sm text-ink/55">Due {isoDate(loop.dueDate)}. Reminder {isoDate(loop.reminderAt)}.</p>
+        <p className="mt-2 text-sm font-semibold leading-6 text-muted">Due {isoDate(loop.dueDate)}. Reminder {isoDate(loop.reminderAt)}.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-bold text-ink">
             Due date
-            <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className="mt-1 w-full rounded-lg border border-line p-3 text-sm outline-none focus:border-leaf" />
+            <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className="mt-1 w-full rounded-2xl border border-line p-3 text-sm font-semibold outline-none focus:border-leaf" />
           </label>
           <label className="text-sm font-bold text-ink">
             Reminder date
-            <input type="date" value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} className="mt-1 w-full rounded-lg border border-line p-3 text-sm outline-none focus:border-leaf" />
+            <input type="date" value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} className="mt-1 w-full rounded-2xl border border-line p-3 text-sm font-semibold outline-none focus:border-leaf" />
           </label>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button onClick={saveDates}>Save dates</Button>
           <Button variant="secondary" onClick={snooze}>Snooze</Button>
           <Button onClick={complete} icon={<CheckCircle2 size={18} />} disabled={loop.status === "DONE"}>
-            Mark done
+            Close loop
           </Button>
         </div>
       </Card>

@@ -1,6 +1,6 @@
-# Second Memory MVP
+# Mavora MVP
 
-Second Memory is a mobile-first web app for real-life open loops: receipts, devices, documents, message reminders, warranties, and small life tasks that should not stay in your head.
+Mavora is a mobile-first web app for real-life open loops: receipts, devices, documents, message reminders, warranties, and small life tasks that should not stay in your head.
 
 ## Stack
 

@@ -8,6 +8,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.db import db, init_database  # noqa: E402
+from app.services.product_images import LG_C3_IMAGE_URL  # noqa: E402
 from app.utils import make_id, now_iso  # noqa: E402
 
 
@@ -37,8 +38,8 @@ def main() -> None:
         conn.execute(
             """INSERT INTO "Item"
                (id, userId, name, category, manufacturer, model, purchaseDate, merchant, price, currency,
-                warrantyUntil, location, completenessScore, status, createdAt, updatedAt)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                imageUrl, warrantyUntil, location, completenessScore, status, createdAt, updatedAt)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 item_id,
                 user_id,
@@ -50,6 +51,7 @@ def main() -> None:
                 "MediaMarkt",
                 1499,
                 "EUR",
+                LG_C3_IMAGE_URL,
                 "2027-09-14T12:00:00+00:00",
                 "Wohnzimmer",
                 80,
@@ -156,7 +158,7 @@ def main() -> None:
                 (make_id(), user_id, message_loop_id, None, "create_message_reminder", 10, now),
             ],
         )
-    print("Seeded Second Memory Python backend")
+    print("Seeded Mavora Python backend")
 
 
 if __name__ == "__main__":

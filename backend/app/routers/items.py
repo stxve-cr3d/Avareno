@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import timedelta
 
 from fastapi import APIRouter, HTTPException
@@ -8,6 +9,7 @@ from app.db import db, row_to_dict, rows_to_dicts
 from app.dependencies import get_default_user
 from app.schemas import ItemCreate, ItemPatch
 from app.services.item_service import calculate_completeness_score, missing_fields
+from app.services.product_images import suggest_product_image
 from app.services.xp_service import award_xp
 from app.utils import make_id, normalize_iso, now_iso, parse_iso
 
@@ -26,6 +28,79 @@ def _reminders(conn, item_id: str) -> list[dict]:
     return rows_to_dicts(conn.execute('SELECT * FROM "Reminder" WHERE itemId = ? ORDER BY remindAt ASC', (item_id,)).fetchall())
 
 
+def _space(conn, space_id: str | None) -> dict | None:
+    if not space_id:
+        return None
+    return row_to_dict(conn.execute('SELECT * FROM "Space" WHERE id = ?', (space_id,)).fetchone())
+
+
+def _household(conn, household_id: str | None) -> dict | None:
+    if not household_id:
+        return None
+    return row_to_dict(conn.execute('SELECT * FROM "Household" WHERE id = ?', (household_id,)).fetchone())
+
+
+def _activities(conn, item_id: str) -> list[dict]:
+    return rows_to_dicts(conn.execute('SELECT * FROM "ItemActivity" WHERE itemId = ? ORDER BY createdAt DESC', (item_id,)).fetchall())
+
+
+def _smart_home_devices(conn, item_id: str) -> list[dict]:
+    devices = rows_to_dicts(
+        conn.execute(
+            """SELECT * FROM "SmartHomeDevice"
+               WHERE itemId = ?
+               ORDER BY provider ASC, name ASC""",
+            (item_id,),
+        ).fetchall()
+    )
+    for device in devices:
+        capabilities = device.get("capabilities")
+        if capabilities:
+            try:
+                device["capabilities"] = json.loads(capabilities)
+            except Exception:
+                device["capabilities"] = []
+        else:
+            device["capabilities"] = []
+        raw_json = device.get("rawJson")
+        if raw_json:
+            try:
+                device["rawJson"] = json.loads(raw_json)
+            except Exception:
+                device["rawJson"] = {}
+        else:
+            device["rawJson"] = {}
+    return devices
+
+
+def _default_household_id(conn, user_id: str) -> str | None:
+    household = row_to_dict(conn.execute('SELECT * FROM "Household" WHERE userId = ? ORDER BY createdAt ASC LIMIT 1', (user_id,)).fetchone())
+    return household["id"] if household else None
+
+
+def _resolve_space_id(conn, household_id: str | None, location: str | None, requested_space_id: str | None = None) -> str | None:
+    if requested_space_id:
+        return requested_space_id
+    if not household_id:
+        return None
+    if location:
+        space = row_to_dict(
+            conn.execute(
+                'SELECT * FROM "Space" WHERE householdId = ? AND lower(name) = lower(?) LIMIT 1',
+                (household_id, location),
+            ).fetchone()
+        )
+        if space:
+            return space["id"]
+    space = row_to_dict(
+        conn.execute(
+            'SELECT * FROM "Space" WHERE householdId = ? ORDER BY parentId IS NOT NULL DESC, sortOrder ASC LIMIT 1',
+            (household_id,),
+        ).fetchone()
+    )
+    return space["id"] if space else None
+
+
 def _item_detail(conn, item_id: str) -> dict | None:
     item = row_to_dict(conn.execute('SELECT * FROM "Item" WHERE id = ?', (item_id,)).fetchone())
     if not item:
@@ -34,6 +109,10 @@ def _item_detail(conn, item_id: str) -> dict | None:
     item["documents"] = documents
     item["loops"] = _loops(conn, item_id)
     item["reminders"] = _reminders(conn, item_id)
+    item["space"] = _space(conn, item.get("spaceId"))
+    item["household"] = _household(conn, item.get("householdId"))
+    item["activities"] = _activities(conn, item_id)
+    item["smartHomeDevices"] = _smart_home_devices(conn, item_id)
     item["missingFields"] = missing_fields(item, documents)
     return item
 
@@ -49,6 +128,7 @@ def list_items() -> list[dict]:
             docs = _documents(conn, item["id"])
             item["documents"] = docs
             item["loops"] = _loops(conn, item["id"])
+            item["space"] = _space(conn, item.get("spaceId"))
             item["missingFields"] = missing_fields(item, docs)
         return items
 
@@ -72,6 +152,8 @@ def create_item(payload: ItemCreate) -> dict:
         user = get_default_user(conn)
         now = now_iso()
         item_id = make_id()
+        household_id = payload.householdId or _default_household_id(conn, user["id"])
+        space_id = _resolve_space_id(conn, household_id, payload.location, payload.spaceId)
         receipt_docs = [{"type": "RECEIPT"}] if payload.documentId else []
         item_data = {
             "purchaseDate": normalize_iso(payload.purchaseDate),
@@ -80,19 +162,23 @@ def create_item(payload: ItemCreate) -> dict:
             "manufacturer": payload.manufacturer,
             "model": payload.model,
             "serialNumber": payload.serialNumber,
+            "imageUrl": payload.imageUrl,
             "warrantyUntil": normalize_iso(payload.warrantyUntil),
         }
         score = calculate_completeness_score(item_data, receipt_docs)
 
         conn.execute(
             """INSERT INTO "Item"
-               (id, userId, name, category, manufacturer, model, serialNumber, purchaseDate, merchant, price,
-                currency, warrantyUntil, location, completenessScore, status, createdAt, updatedAt)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               (id, userId, householdId, spaceId, name, itemType, category, manufacturer, model, serialNumber, purchaseDate, merchant, price,
+                currency, imageUrl, warrantyUntil, location, notes, reorderUrl, affiliateUrl, affiliateProvider, visibility, completenessScore, status, createdAt, updatedAt)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 item_id,
                 user["id"],
+                household_id,
+                space_id,
                 payload.name,
+                payload.itemType,
                 payload.category,
                 payload.manufacturer,
                 payload.model,
@@ -101,8 +187,14 @@ def create_item(payload: ItemCreate) -> dict:
                 payload.merchant,
                 payload.price,
                 payload.currency,
+                payload.imageUrl,
                 item_data["warrantyUntil"],
                 payload.location,
+                payload.notes,
+                payload.reorderUrl,
+                payload.affiliateUrl,
+                payload.affiliateProvider,
+                payload.visibility,
                 score,
                 "ACTIVE",
                 now,
@@ -161,7 +253,27 @@ def create_item(payload: ItemCreate) -> dict:
                 )
 
         award_xp(conn, user_id=user["id"], item_id=item_id, action="create_item_from_receipt", points=30)
+        conn.execute(
+            """INSERT INTO "ItemActivity" (id, itemId, userId, type, message, createdAt)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (make_id(), item_id, user["id"], "CREATED", "Item profile created.", now),
+        )
         return _item_detail(conn, item_id) or {}
+
+
+@router.get("/{item_id}/image-suggestion")
+def get_image_suggestion(item_id: str) -> dict:
+    with db() as conn:
+        user = get_default_user(conn)
+        item = row_to_dict(
+            conn.execute('SELECT * FROM "Item" WHERE id = ? AND userId = ?', (item_id, user["id"])).fetchone()
+        )
+        if not item:
+            raise HTTPException(status_code=404, detail="Item not found")
+        suggestion = suggest_product_image(item)
+        if not suggestion:
+            raise HTTPException(status_code=404, detail="No image suggestion found")
+        return suggestion
 
 
 @router.patch("/{item_id}")
@@ -179,6 +291,10 @@ def patch_item(item_id: str, payload: ItemPatch) -> dict:
         for key in ["purchaseDate", "warrantyUntil"]:
             if key in updates:
                 updates[key] = normalize_iso(updates[key])
+        if "location" in updates or "spaceId" in updates or "householdId" in updates:
+            household_id = updates.get("householdId") or item.get("householdId") or _default_household_id(conn, user["id"])
+            updates["householdId"] = household_id
+            updates["spaceId"] = _resolve_space_id(conn, household_id, updates.get("location") or item.get("location"), updates.get("spaceId"))
 
         next_item = {**item, **updates}
         docs = _documents(conn, item_id)
@@ -191,6 +307,11 @@ def patch_item(item_id: str, payload: ItemPatch) -> dict:
 
         if not item.get("serialNumber") and updates.get("serialNumber"):
             award_xp(conn, user_id=user["id"], item_id=item_id, action="add_serial_number", points=25)
+            conn.execute(
+                """INSERT INTO "ItemActivity" (id, itemId, userId, type, message, createdAt)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (make_id(), item_id, user["id"], "UPDATED", "Serial number added.", now_iso()),
+            )
         if int(item["completenessScore"]) < 100 and score == 100:
             award_xp(conn, user_id=user["id"], item_id=item_id, action="complete_item_profile", points=50)
 

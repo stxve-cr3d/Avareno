@@ -3,29 +3,34 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
+  BellRing,
   CalendarCheck2,
+  Clock3,
   FilePlus2,
-  Heart,
+  MapPin,
   MessageCircle,
+  Package,
   PackageCheck,
+  ReceiptText,
   ShieldCheck,
+  Smartphone,
   Sparkles,
-  Trophy
+  Zap
 } from "lucide-react";
-import { api } from "../lib/api";
-import type { Dashboard } from "../lib/types";
-import { XpPill } from "../components/XpPill";
-import { LoopCard } from "../components/LoopCard";
+import { api, isoDate } from "../lib/api";
+import type { Dashboard, Item, Planner, Reminder } from "../lib/types";
 import { ItemCard } from "../components/ItemCard";
-import { EmptyState } from "../components/EmptyState";
-import { Badge } from "../components/Badge";
+import { LoopCard } from "../components/LoopCard";
 
 export function Home() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+  const [planner, setPlanner] = useState<Planner | null>(null);
   const [success, setSuccess] = useState("");
 
   async function load() {
-    setDashboard(await api<Dashboard>("/api/dashboard"));
+    const [dashboardResult, plannerResult] = await Promise.all([api<Dashboard>("/api/dashboard"), api<Planner>("/api/planner")]);
+    setDashboard(dashboardResult);
+    setPlanner(plannerResult);
   }
 
   useEffect(() => {
@@ -38,138 +43,278 @@ export function Home() {
     await load();
   }
 
-  if (!dashboard) return <div className="py-12 text-center text-sm font-semibold text-ink/55">Loading second memory...</div>;
+  if (!dashboard) return <div className="py-12 text-center text-sm font-semibold text-muted">Loading Mavora...</div>;
 
-  const topLoops = dashboard.openLoops.slice(0, 3);
-  const nextLoop = topLoops[0];
+  const heroItem = dashboard.incompleteItems[0];
+  const nextLoop = planner?.nextBest ?? dashboard.openLoops[0] ?? null;
+  const topLoops = (planner?.today.length ? planner.today : dashboard.openLoops).slice(0, 3);
+  const priorityNotifications = planner?.notifications.slice(0, 3) ?? [];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <section className="relative overflow-hidden rounded-lg border border-white/70 bg-paper p-5 shadow-soft md:p-7">
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-leaf via-sky to-coral" />
-        <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr] lg:items-stretch">
-          <div className="flex flex-col justify-between gap-6">
-            <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-black text-moss">
-                <Sparkles size={15} />
-                Today Open
-              </div>
-              <h1 className="max-w-2xl text-4xl font-black leading-[1.04] tracking-normal text-ink md:text-5xl">
-                Hi {dashboard.user.name}. Heute ist schon sortierter.
-              </h1>
-              <p className="mt-4 max-w-xl text-base font-semibold leading-7 text-ink/58">
-                {dashboard.stats.openLoopCount} Dinge sind sicher geparkt. Such dir nur den naechsten leichten Schritt aus.
-              </p>
+    <div className="ozma-home mx-auto max-w-7xl">
+      <section className="ozma-hero overflow-hidden rounded-lg px-5 py-7 md:px-8 md:py-8">
+        <div className="ozma-hero-layout">
+          <div className="relative z-10">
+            <p className="ozma-hero-kicker text-sm font-black uppercase tracking-normal">hello, i am mavora</p>
+            <h1 className="mt-5 max-w-4xl text-[clamp(3rem,7.6vw,7rem)] font-black leading-[0.9] text-ink">
+              a home for the things you live with
+            </h1>
+            <p className="ozma-hero-subcopy mt-6 max-w-xl text-base font-semibold leading-7 md:text-lg">
+              Receipts, rooms, warranty dates, serial numbers, and care tasks in one calm visual library.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link className="ozma-primary-action" to="/capture/receipt">
+                Start with receipt <ArrowRight size={17} />
+              </Link>
+              <Link className="ozma-secondary-action" to="/items">
+                View things
+              </Link>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <MemoryStat value={dashboard.stats.openLoopCount} label="geparkt" icon={<Heart size={16} />} tone="text-coral bg-orange-50" />
-              <MemoryStat value={dashboard.stats.remindersSoonCount} label="sanft bald" icon={<CalendarCheck2 size={16} />} tone="text-sky bg-sky-50" />
-              <MemoryStat value={dashboard.stats.incompleteItemCount} label="fast fertig" icon={<Trophy size={16} />} tone="text-leaf bg-emerald-50" />
+            <div className="ozma-hero-stats mt-10 grid max-w-2xl gap-3 sm:grid-cols-3">
+              <HeroNumber icon={<Package size={17} />} value={dashboard.stats.incompleteItemCount} label="Things" />
+              <HeroNumber icon={<CalendarCheck2 size={17} />} value={dashboard.stats.remindersSoonCount} label="Soon" />
+              <HeroNumber icon={<ShieldCheck size={17} />} value={dashboard.stats.openLoopCount} label="Care" />
             </div>
           </div>
 
-          <div className="rounded-lg border border-line bg-mist p-4">
-            <div className="flex items-center justify-between gap-3">
+          <HeroObject item={heroItem} />
+        </div>
+      </section>
+
+      <section className="mavora-ops">
+        <div className="mavora-ops-focus">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase text-leaf">today's plan</p>
+              <h2 className="mt-2 max-w-2xl text-[clamp(2.35rem,5vw,5.75rem)] font-black leading-[0.92] text-white">
+                {nextLoop ? nextLoop.title : "Nothing needs you right now"}
+              </h2>
+            </div>
+            <span className="mavora-live-pill">
+              <Zap size={15} />
+              live plan
+            </span>
+          </div>
+
+          <div className="mt-8 grid gap-3 md:grid-cols-4">
+            <PlanCount label="overdue" value={planner?.counts.overdue ?? 0} />
+            <PlanCount label="today" value={planner?.counts.today ?? dashboard.stats.openLoopCount} />
+            <PlanCount label="upcoming" value={planner?.counts.upcoming ?? dashboard.stats.remindersSoonCount} />
+            <PlanCount label="open" value={planner?.counts.totalOpen ?? dashboard.stats.openLoopCount} />
+          </div>
+
+          {nextLoop ? (
+            <div className="mavora-next-action">
               <div>
-                <p className="text-xs font-black uppercase text-ink/40">Memory level</p>
-                <p className="mt-1 text-2xl font-black text-ink">Level {dashboard.user.level}</p>
+                <p className="flex items-center gap-2 text-xs font-black uppercase text-white/50">
+                  <Clock3 size={15} />
+                  {isoDate(nextLoop.dueDate ?? nextLoop.reminderAt)}
+                </p>
+                <p className="mt-2 text-lg font-black text-white">{nextLoop.item?.name ?? "General care"}</p>
+                <p className="mt-1 text-sm font-semibold text-white/60">{nextLoop.description ?? "Planned from your saved object memory."}</p>
               </div>
-              <XpPill xp={dashboard.user.xp} level={dashboard.user.level} />
+              <button className="mavora-white-action" type="button" onClick={() => completeLoop(nextLoop.id)}>
+                Close +{nextLoop.xpReward} XP <ArrowRight size={16} />
+              </button>
             </div>
-            <div className="mt-5 rounded-lg bg-white p-4">
-              <div className="flex items-start gap-3">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-coal text-white">
-                  <ShieldCheck size={20} />
-                </div>
+          ) : null}
+        </div>
+
+        <div className="mavora-ops-side">
+          <div className="mavora-notification-head">
+            <div>
+              <p className="text-xs font-black uppercase text-muted">notifications</p>
+              <h3 className="mt-1 text-3xl font-black text-ink">{planner?.notificationCounts.dueNow ?? 0} due now</h3>
+            </div>
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-ink text-white">
+              <BellRing size={20} />
+            </span>
+          </div>
+
+          <div className="mt-5 grid gap-2">
+            {priorityNotifications.length ? (
+              priorityNotifications.map((notification) => <NotificationLine key={notification.id} notification={notification} />)
+            ) : (
+              <div className="mavora-notification-line">
+                <span className="grid h-10 w-10 place-items-center rounded-full bg-leaf/10 text-leaf">
+                  <ShieldCheck size={18} />
+                </span>
                 <div>
-                  <p className="font-black text-ink">Alles ist geparkt.</p>
-                  <p className="mt-1 text-sm font-semibold leading-6 text-ink/55">
-                    Keine Panik-Liste. Nur kleine Erinnerungen, bevor sie wichtig werden.
-                  </p>
+                  <p className="font-black text-ink">All quiet</p>
+                  <p className="text-sm font-semibold text-muted">No active reminders in the next window.</p>
                 </div>
               </div>
+            )}
+          </div>
+
+          <div className="mavora-mobile-sync">
+            <span className="grid h-10 w-10 place-items-center rounded-full bg-white text-ink">
+              <Smartphone size={18} />
+            </span>
+            <div>
+              <p className="text-sm font-black text-white">Mobile sync layer is ready</p>
+              <p className="text-xs font-semibold text-white/60">Bootstrap, device tokens, planner, and notifications.</p>
             </div>
-            {nextLoop ? (
-              <Link
-                to={`/loops/${nextLoop.id}`}
-                className="mt-3 flex items-center justify-between rounded-lg bg-coal px-4 py-3 text-sm font-black text-white transition hover:bg-ink"
-              >
-                <span>Naechster leichter Schritt</span>
-                <ArrowRight size={17} />
-              </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="ozma-section">
+        <div className="ozma-section-heading">
+          <p>what it keeps</p>
+          <h2>The physical details that normally disappear.</h2>
+        </div>
+        <div className="ozma-service-grid">
+          <ServiceBlock icon={<ReceiptText />} title="Proof" text="Receipts, files, and purchase context stay attached to the item." />
+          <ServiceBlock icon={<MapPin />} title="Place" text="Know where the thing lives: room, shelf, office, storage." />
+          <ServiceBlock icon={<ShieldCheck />} title="Care" text="Warranty, repair, return, and service reminders without mental clutter." />
+          <ServiceBlock icon={<PackageCheck />} title="Identity" text="Brand, model, serial number, price, and the story of ownership." />
+        </div>
+      </section>
+
+      <section className="ozma-showcase-grid">
+        <div className="ozma-panel">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="text-sm font-black uppercase text-muted">latest object</p>
+              <h2 className="mt-2 text-4xl font-black text-ink">Object scene</h2>
+            </div>
+            <Link className="ozma-text-link" to="/items">
+              All things <ArrowRight size={16} />
+            </Link>
+          </div>
+          <div className="mt-6">
+            {heroItem ? <ItemCard item={heroItem} /> : <EmptyObject />}
+          </div>
+        </div>
+
+        <div className="ozma-panel">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="text-sm font-black uppercase text-muted">today</p>
+              <h2 className="mt-2 text-4xl font-black text-ink">Care list</h2>
+            </div>
+            {success ? (
+              <span className="inline-flex items-center gap-2 rounded-full bg-leaf/10 px-3 py-2 text-xs font-black text-moss">
+                <Sparkles size={15} />
+                Saved
+              </span>
             ) : null}
           </div>
-        </div>
-        {success ? (
-          <div className="soft-pop mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-black text-moss ring-1 ring-emerald-200">
-            <Sparkles size={16} />
-            Good catch {success.replace("Loop closed", "")}
+          <div className="mt-6 grid gap-3">
+            {topLoops.length ? topLoops.map((loop) => <LoopCard key={loop.id} loop={loop} onComplete={completeLoop} />) : <EmptyObject />}
           </div>
-        ) : null}
-      </section>
-
-      <section className="grid gap-3 sm:grid-cols-3">
-        <QuickAction to="/capture/receipt" icon={<PackageCheck />} title="Beleg merken" helper="Foto rein. Geraetekarte raus." tone="text-leaf bg-emerald-50" />
-        <QuickAction to="/capture/message" icon={<MessageCircle />} title="Nachricht sichern" helper="Aus Zusage wird Erinnerung." tone="text-sky bg-sky-50" />
-        <QuickAction to="/capture/loop" icon={<FilePlus2 />} title="Loop parken" helper="Kurz raus aus dem Kopf." tone="text-coral bg-orange-50" />
-      </section>
-
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-black text-ink">Loops</h2>
-            <p className="text-sm font-semibold text-ink/48">Ruhig, klein, machbar.</p>
-          </div>
-          <Link className="flex items-center gap-1 text-sm font-bold text-moss" to="/capture/loop">
-            Add <ArrowRight size={16} />
-          </Link>
-        </div>
-        <div className="grid gap-3">
-          {topLoops.length ? topLoops.map((loop) => <LoopCard key={loop.id} loop={loop} onComplete={completeLoop} />) : <EmptyState title="Alles frei gerade" />}
         </div>
       </section>
 
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-black text-ink">Memory cards</h2>
-            <p className="text-sm font-semibold text-ink/48">Besitz, Belege und Garantie an einem Ort.</p>
-          </div>
-          <Badge tone="green">{dashboard.warrantyReminders.length} active</Badge>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {dashboard.incompleteItems.slice(0, 2).map((item) => (
-            <ItemCard key={item.id} item={item} />
-          ))}
-        </div>
+      <section className="ozma-journal">
+        <ActionTile to="/capture/receipt" icon={<ReceiptText />} label="Receipt" title="Turn proof into memory" />
+        <ActionTile to="/capture/item" icon={<FilePlus2 />} label="Thing" title="Create a real object profile" />
+        <ActionTile to="/capture/message" icon={<MessageCircle />} label="Message" title="Make context actionable" />
       </section>
     </div>
   );
 }
 
-function MemoryStat({ value, label, icon, tone }: { value: number; label: string; icon: ReactNode; tone: string }) {
+function HeroObject({ item }: { item?: Item }) {
   return (
-    <div className="rounded-lg border border-line bg-white p-3">
-      <div className={`mb-3 grid h-8 w-8 place-items-center rounded-lg ${tone}`}>{icon}</div>
-      <p className="text-2xl font-black text-ink">{value}</p>
-      <p className="text-xs font-black text-ink/45">{label}</p>
-    </div>
-  );
-}
-
-function QuickAction({ to, icon, title, helper, tone }: { to: string; icon: ReactNode; title: string; helper: string; tone: string }) {
-  return (
-    <Link
-      to={to}
-      className="group rounded-lg border border-line bg-paper p-4 shadow-soft transition duration-200 hover:-translate-y-0.5 hover:border-leaf hover:shadow-lift"
-    >
-      <div className={`grid h-11 w-11 place-items-center rounded-lg ${tone}`}>{icon}</div>
-      <p className="mt-4 text-lg font-black text-ink">{title}</p>
-      <p className="mt-1 text-sm font-semibold text-ink/55">{helper}</p>
-      <div className="mt-4 inline-flex items-center gap-1 text-xs font-black text-moss opacity-0 transition group-hover:opacity-100">
-        Starten <ArrowRight size={14} />
+    <div className="ozma-hero-object">
+      <div className="flex items-center justify-between gap-3">
+        <span className="inline-flex items-center gap-2 text-xs font-black uppercase text-muted">
+          <MapPin size={14} />
+          {item?.location ?? "home"}
+        </span>
+        <span className="text-xs font-black uppercase text-muted">{item ? `${item.completenessScore}% saved` : "ready"}</span>
       </div>
+
+      <div className="ozma-hero-object-media">
+        {item?.imageUrl ? <img src={item.imageUrl} alt={item.name} /> : <Package size={54} />}
+      </div>
+
+      <div className="mt-5">
+        <p className="text-xs font-black uppercase text-muted">featured object</p>
+        <h2 className="mt-2 text-2xl font-black leading-tight text-ink">{item?.name ?? "Your first object"}</h2>
+        <p className="mt-2 text-sm font-semibold text-muted">
+          {item ? [item.manufacturer, item.model].filter(Boolean).join(" / ") || item.category : "Start with a receipt or photo."}
+        </p>
+      </div>
+
+      <div className="mt-4 rounded-lg bg-wash p-3">
+        <span className="inline-flex items-center gap-2 text-xs font-black uppercase text-muted">
+          <ReceiptText size={14} />
+          {item ? isoDate(item.purchaseDate) : "proof"}
+        </span>
+        <p className="mt-2 text-sm font-black text-ink">{item ? "Receipt and warranty details attached" : "Add proof to remember it later"}</p>
+      </div>
+    </div>
+  );
+}
+
+function HeroNumber({ icon, value, label }: { icon: ReactNode; value: number; label: string }) {
+  return (
+    <div className="rounded-lg border border-line bg-white/72 p-4 text-left backdrop-blur">
+      <div className="mb-3 text-leaf">{icon}</div>
+      <p className="text-4xl font-black text-ink">{value}</p>
+      <p className="text-xs font-black uppercase text-muted">{label}</p>
+    </div>
+  );
+}
+
+function PlanCount({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="mavora-plan-count">
+      <p>{value}</p>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function NotificationLine({ notification }: { notification: Reminder }) {
+  const target = notification.deepLink ?? (notification.item ? `/items/${notification.item.id}` : "/");
+
+  return (
+    <Link className="mavora-notification-line" to={target}>
+      <span className="grid h-10 w-10 place-items-center rounded-full bg-leaf/10 text-leaf">
+        {notification.kind === "warranty" ? <ShieldCheck size={18} /> : <BellRing size={18} />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-black text-ink">{notification.title}</p>
+        <p className="truncate text-sm font-semibold text-muted">{notification.item?.name ?? notification.message}</p>
+      </div>
+      <span className="text-xs font-black uppercase text-muted">{notification.state?.replace("_", " ") ?? "soon"}</span>
     </Link>
+  );
+}
+
+function ServiceBlock({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
+  return (
+    <div className="ozma-service-block">
+      <span>{icon}</span>
+      <h3>{title}</h3>
+      <p>{text}</p>
+    </div>
+  );
+}
+
+function ActionTile({ to, icon, label, title }: { to: string; icon: ReactNode; label: string; title: string }) {
+  return (
+    <Link className="ozma-journal-card" to={to}>
+      <span className="grid h-11 w-11 place-items-center rounded-full bg-ink text-white">{icon}</span>
+      <p className="mt-8 text-xs font-black uppercase text-muted">{label}</p>
+      <h3 className="mt-2 text-2xl font-black leading-tight text-ink">{title}</h3>
+      <span className="mt-6 inline-flex items-center gap-2 text-sm font-black text-ink">
+        Start <ArrowRight size={15} />
+      </span>
+    </Link>
+  );
+}
+
+function EmptyObject() {
+  return (
+    <div className="rounded-lg border border-dashed border-line bg-white/70 p-6">
+      <p className="text-xl font-black text-ink">Nothing here yet.</p>
+      <p className="mt-2 text-sm font-semibold text-muted">Capture something and it will show up here.</p>
+    </div>
   );
 }
