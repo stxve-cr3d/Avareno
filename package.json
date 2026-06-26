@@ -1,5 +1,5 @@
 {
-  "name": "mavora",
+  "name": "avareno",
   "private": true,
   "version": "0.1.0",
   "workspaces": [
@@ -8,6 +8,9 @@
   "scripts": {
     "dev": "concurrently \"python3 -m uvicorn app.main:app --app-dir backend --reload --host 0.0.0.0 --port 4000\" \"npm run dev -w frontend\"",
     "build": "npm run build -w frontend",
+    "cf:whoami": "npx wrangler whoami",
+    "pages:preview": "npm run build && npx wrangler pages dev frontend/dist",
+    "pages:deploy": "npm run build && npx wrangler pages deploy frontend/dist --project-name avareno",
     "db:init": "python3 backend/scripts/seed.py",
     "db:seed": "python3 backend/scripts/seed.py",
     "typecheck": "python3 -m compileall -q backend && npm run typecheck -w frontend"

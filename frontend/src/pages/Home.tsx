@@ -3,318 +3,404 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
-  BellRing,
-  CalendarCheck2,
+  Check,
   Clock3,
-  FilePlus2,
-  MapPin,
-  MessageCircle,
+  FileText,
+  FolderLock,
+  Hammer,
+  Home as HomeIcon,
+  LifeBuoy,
+  Link2,
+  ListChecks,
   Package,
-  PackageCheck,
+  Plus,
   ReceiptText,
+  Search,
   ShieldCheck,
-  Smartphone,
   Sparkles,
-  Zap
+  UserRound,
+  UsersRound,
+  Wrench
 } from "lucide-react";
-import { api, isoDate } from "../lib/api";
-import type { Dashboard, Item, Planner, Reminder } from "../lib/types";
-import { ItemCard } from "../components/ItemCard";
-import { LoopCard } from "../components/LoopCard";
+import { api } from "../lib/api";
+import type { Dashboard, Item, Loop, Planner } from "../lib/types";
+import { MarketingFooter, MarketingHeader } from "../components/MarketingShell";
+import { ProgressBar } from "../components/ProgressBar";
+import homeMemoryCube from "../assets/generated/avareno-home-memory-cube-dark.png";
+
+const proofPoints = ["Dinge", "Belege", "Garantien", "Offene Aufgaben"];
+
+const memoryNodes = [
+  { icon: <Package size={19} />, label: "Product", text: "LG TV" },
+  { icon: <ReceiptText size={19} />, label: "Invoice", text: "Proof saved" },
+  { icon: <ShieldCheck size={19} />, label: "Warranty", text: "Still protected" },
+  { icon: <Wrench size={19} />, label: "Repair history", text: "What changed" },
+  { icon: <LifeBuoy size={19} />, label: "Support case", text: "Ready packet" },
+  { icon: <Clock3 size={19} />, label: "Reminder", text: "Before it matters" },
+  { icon: <UsersRound size={19} />, label: "Family member", text: "Shared context" }
+];
+
+const modules = [
+  {
+    icon: <Package size={20} />,
+    title: "Product Memory",
+    text: "Model, serial number, purchase context, location and ownership details stay attached to the thing itself."
+  },
+  {
+    icon: <ShieldCheck size={20} />,
+    title: "Warranty Timeline",
+    text: "Know what is protected, what proof is missing and what expires before the deadline gets quiet."
+  },
+  {
+    icon: <FolderLock size={20} />,
+    title: "Document Vault",
+    text: "Invoices, manuals, drivers, software links and insurance documents sit where you actually need them."
+  },
+  {
+    icon: <Hammer size={20} />,
+    title: "Repair Log",
+    text: "Track what broke, who fixed it, what it cost and which part was replaced last time."
+  },
+  {
+    icon: <UsersRound size={20} />,
+    title: "Family Vault",
+    text: "Household knowledge becomes shared memory for family, roommates or anyone responsible for the same things."
+  },
+  {
+    icon: <LifeBuoy size={20} />,
+    title: "Support Autopilot",
+    text: "Avareno prepares the support story with product details, proof, history and attachments already in order."
+  },
+  {
+    icon: <ListChecks size={20} />,
+    title: "Open Loop Reminders",
+    text: "Returns, promises, missing documents and warranty checks stay visible until they are actually done."
+  },
+  {
+    icon: <UserRound size={20} />,
+    title: "Personal Profile Vault",
+    text: "Important identity, household and ownership details become a calm profile for real-life administration."
+  }
+];
+
+const workflow = [
+  {
+    title: "Capture anything",
+    text: "Start with a receipt, product photo, message, PDF or loose commitment."
+  },
+  {
+    title: "Avareno understands it",
+    text: "The important facts are extracted into product, document, warranty and loop context."
+  },
+  {
+    title: "It connects to your life",
+    text: "Related proof, people, rooms, repairs and support cases live around the same object."
+  },
+  {
+    title: "It reminds you before it matters",
+    text: "Deadlines, missing details and unresolved promises surface while they can still be handled."
+  }
+];
+
+const useCases = [
+  "Where is the invoice for the TV?",
+  "Is this still under warranty?",
+  "What model is our router?",
+  "Who promised to send me that document?",
+  "What did the repair shop replace last time?"
+];
 
 export function Home() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [planner, setPlanner] = useState<Planner | null>(null);
-  const [success, setSuccess] = useState("");
-
-  async function load() {
-    const [dashboardResult, plannerResult] = await Promise.all([api<Dashboard>("/api/dashboard"), api<Planner>("/api/planner")]);
-    setDashboard(dashboardResult);
-    setPlanner(plannerResult);
-  }
 
   useEffect(() => {
+    async function load() {
+      try {
+        const [dashboardResult, plannerResult] = await Promise.all([api<Dashboard>("/api/dashboard"), api<Planner>("/api/planner")]);
+        setDashboard(dashboardResult);
+        setPlanner(plannerResult);
+      } catch {
+        setDashboard(null);
+        setPlanner(null);
+      }
+    }
+
     void load();
   }, []);
 
-  async function completeLoop(id: string) {
-    const result = await api<{ message: string }>(`/api/loops/${id}/complete`, { method: "POST" });
-    setSuccess(result.message);
-    await load();
-  }
+  useEffect(() => {
+    if (!window.location.hash) return;
+    const target = document.getElementById(window.location.hash.slice(1));
+    if (!target) return;
+    window.requestAnimationFrame(() => target.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }, []);
 
-  if (!dashboard) return <div className="py-12 text-center text-sm font-semibold text-muted">Loading Mavora...</div>;
-
-  const heroItem = dashboard.incompleteItems[0];
-  const nextLoop = planner?.nextBest ?? dashboard.openLoops[0] ?? null;
-  const topLoops = (planner?.today.length ? planner.today : dashboard.openLoops).slice(0, 3);
-  const priorityNotifications = planner?.notifications.slice(0, 3) ?? [];
+  const previewItem = dashboard?.incompleteItems[0] ?? null;
+  const nextLoop = planner?.nextBest ?? dashboard?.openLoops[0] ?? null;
+  const openLoops = dashboard?.stats.openLoopCount ?? 7;
+  const remindersSoon = dashboard?.stats.remindersSoonCount ?? 3;
 
   return (
-    <div className="ozma-home mx-auto max-w-7xl">
-      <section className="ozma-hero overflow-hidden rounded-lg px-5 py-7 md:px-8 md:py-8">
-        <div className="ozma-hero-layout">
-          <div className="relative z-10">
-            <p className="ozma-hero-kicker text-sm font-black uppercase tracking-normal">hello, i am mavora</p>
-            <h1 className="mt-5 max-w-4xl text-[clamp(3rem,7.6vw,7rem)] font-black leading-[0.9] text-ink">
-              a home for the things you live with
-            </h1>
-            <p className="ozma-hero-subcopy mt-6 max-w-xl text-base font-semibold leading-7 md:text-lg">
-              Receipts, rooms, warranty dates, serial numbers, and care tasks in one calm visual library.
+    <div className="avareno-page">
+      <MarketingHeader />
+
+      <main>
+        <section className="avareno-hero" id="product" aria-labelledby="avareno-title">
+          <div className="avareno-hero-content">
+            <h1 id="avareno-title">Dein zweites Gedächtnis für Zuhause.</h1>
+            <p>
+              Dinge, Belege, Garantien und offene Aufgaben bleiben verbunden. Avareno macht aus deinem Zuhause eine ruhige, durchsuchbare Erinnerung.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link className="ozma-primary-action" to="/capture/receipt">
-                Start with receipt <ArrowRight size={17} />
+            <div className="avareno-hero-actions" aria-label="Primary actions">
+              <Link className="avareno-primary-cta" to="/app">
+                Jetzt starten <ArrowRight size={17} />
               </Link>
-              <Link className="ozma-secondary-action" to="/items">
-                View things
-              </Link>
+              <a className="avareno-secondary-cta" href="#memory-graph">
+                Mehr erfahren
+              </a>
             </div>
-
-            <div className="ozma-hero-stats mt-10 grid max-w-2xl gap-3 sm:grid-cols-3">
-              <HeroNumber icon={<Package size={17} />} value={dashboard.stats.incompleteItemCount} label="Things" />
-              <HeroNumber icon={<CalendarCheck2 size={17} />} value={dashboard.stats.remindersSoonCount} label="Soon" />
-              <HeroNumber icon={<ShieldCheck size={17} />} value={dashboard.stats.openLoopCount} label="Care" />
-            </div>
-          </div>
-
-          <HeroObject item={heroItem} />
-        </div>
-      </section>
-
-      <section className="mavora-ops">
-        <div className="mavora-ops-focus">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-black uppercase text-leaf">today's plan</p>
-              <h2 className="mt-2 max-w-2xl text-[clamp(2.35rem,5vw,5.75rem)] font-black leading-[0.92] text-white">
-                {nextLoop ? nextLoop.title : "Nothing needs you right now"}
-              </h2>
-            </div>
-            <span className="mavora-live-pill">
-              <Zap size={15} />
-              live plan
-            </span>
-          </div>
-
-          <div className="mt-8 grid gap-3 md:grid-cols-4">
-            <PlanCount label="overdue" value={planner?.counts.overdue ?? 0} />
-            <PlanCount label="today" value={planner?.counts.today ?? dashboard.stats.openLoopCount} />
-            <PlanCount label="upcoming" value={planner?.counts.upcoming ?? dashboard.stats.remindersSoonCount} />
-            <PlanCount label="open" value={planner?.counts.totalOpen ?? dashboard.stats.openLoopCount} />
-          </div>
-
-          {nextLoop ? (
-            <div className="mavora-next-action">
-              <div>
-                <p className="flex items-center gap-2 text-xs font-black uppercase text-white/50">
-                  <Clock3 size={15} />
-                  {isoDate(nextLoop.dueDate ?? nextLoop.reminderAt)}
-                </p>
-                <p className="mt-2 text-lg font-black text-white">{nextLoop.item?.name ?? "General care"}</p>
-                <p className="mt-1 text-sm font-semibold text-white/60">{nextLoop.description ?? "Planned from your saved object memory."}</p>
-              </div>
-              <button className="mavora-white-action" type="button" onClick={() => completeLoop(nextLoop.id)}>
-                Close +{nextLoop.xpReward} XP <ArrowRight size={16} />
-              </button>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="mavora-ops-side">
-          <div className="mavora-notification-head">
-            <div>
-              <p className="text-xs font-black uppercase text-muted">notifications</p>
-              <h3 className="mt-1 text-3xl font-black text-ink">{planner?.notificationCounts.dueNow ?? 0} due now</h3>
-            </div>
-            <span className="grid h-12 w-12 place-items-center rounded-full bg-ink text-white">
-              <BellRing size={20} />
-            </span>
-          </div>
-
-          <div className="mt-5 grid gap-2">
-            {priorityNotifications.length ? (
-              priorityNotifications.map((notification) => <NotificationLine key={notification.id} notification={notification} />)
-            ) : (
-              <div className="mavora-notification-line">
-                <span className="grid h-10 w-10 place-items-center rounded-full bg-leaf/10 text-leaf">
-                  <ShieldCheck size={18} />
+            <div className="avareno-proof-line" aria-label="Key benefits">
+              {proofPoints.map((point) => (
+                <span key={point}>
+                  <Check size={15} />
+                  {point}
                 </span>
-                <div>
-                  <p className="font-black text-ink">All quiet</p>
-                  <p className="text-sm font-semibold text-muted">No active reminders in the next window.</p>
-                </div>
+              ))}
+            </div>
+          </div>
+
+          <ProductPassportPreview item={previewItem} loop={nextLoop} openLoops={openLoops} remindersSoon={remindersSoon} />
+        </section>
+
+        <section className="avareno-memory-section" id="memory-graph" aria-labelledby="memory-graph-title">
+          <div className="avareno-section-intro">
+            <h2 id="memory-graph-title">Everything important, connected around the thing.</h2>
+            <p>
+              Avareno is not another to-do list. It turns the objects, documents, promises and people in your real life into one calm memory network.
+            </p>
+          </div>
+          <div className="avareno-network-canvas" aria-label="Avareno memory graph">
+            {memoryNodes.map((node, index) => (
+              <div className="avareno-network-node" key={node.label}>
+                <span className="avareno-node-index">{String(index + 1).padStart(2, "0")}</span>
+                <span className="avareno-node-icon">{node.icon}</span>
+                <strong>{node.label}</strong>
+                <small>{node.text}</small>
               </div>
-            )}
+            ))}
           </div>
+        </section>
 
-          <div className="mavora-mobile-sync">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-white text-ink">
-              <Smartphone size={18} />
-            </span>
-            <div>
-              <p className="text-sm font-black text-white">Mobile sync layer is ready</p>
-              <p className="text-xs font-semibold text-white/60">Bootstrap, device tokens, planner, and notifications.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="ozma-section">
-        <div className="ozma-section-heading">
-          <p>what it keeps</p>
-          <h2>The physical details that normally disappear.</h2>
-        </div>
-        <div className="ozma-service-grid">
-          <ServiceBlock icon={<ReceiptText />} title="Proof" text="Receipts, files, and purchase context stay attached to the item." />
-          <ServiceBlock icon={<MapPin />} title="Place" text="Know where the thing lives: room, shelf, office, storage." />
-          <ServiceBlock icon={<ShieldCheck />} title="Care" text="Warranty, repair, return, and service reminders without mental clutter." />
-          <ServiceBlock icon={<PackageCheck />} title="Identity" text="Brand, model, serial number, price, and the story of ownership." />
-        </div>
-      </section>
-
-      <section className="ozma-showcase-grid">
-        <div className="ozma-panel">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <p className="text-sm font-black uppercase text-muted">latest object</p>
-              <h2 className="mt-2 text-4xl font-black text-ink">Object scene</h2>
-            </div>
-            <Link className="ozma-text-link" to="/items">
-              All things <ArrowRight size={16} />
+        <section className="avareno-modules-section" id="modules" aria-labelledby="modules-title">
+          <div className="avareno-modules-copy">
+            <h2 id="modules-title">Intelligent modules, not random folders.</h2>
+            <p>
+              Each module has one job: make the practical details of ownership easier to find, share and act on when life gets messy.
+            </p>
+            <Link className="avareno-text-link" to="/app/items">
+              Open product memory <ArrowRight size={16} />
             </Link>
           </div>
-          <div className="mt-6">
-            {heroItem ? <ItemCard item={heroItem} /> : <EmptyObject />}
+          <div className="avareno-module-list">
+            {modules.map((module, index) => (
+              <ModuleRow key={module.title} index={index + 1} {...module} />
+            ))}
           </div>
-        </div>
+        </section>
 
-        <div className="ozma-panel">
-          <div className="flex items-end justify-between gap-4">
+        <section className="avareno-workflow-section" id="how-it-works" aria-labelledby="workflow-title">
+          <div className="avareno-section-intro">
+            <h2 id="workflow-title">How Avareno works.</h2>
+            <p>Capture once. Let Avareno structure the details. Come back when real life asks for an answer.</p>
+          </div>
+          <div className="avareno-workflow-rail">
+            {workflow.map((step, index) => (
+              <article className="avareno-workflow-step" key={step.title}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <h3>{step.title}</h3>
+                <p>{step.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="avareno-usecase-section" aria-labelledby="usecase-title">
+          <div>
+            <h2 id="usecase-title">The questions real life keeps asking.</h2>
+            <p>Avareno keeps the answer close, even when the drawer, chat thread or memory does not.</p>
+          </div>
+          <div className="avareno-question-list">
+            {useCases.map((question) => (
+              <div className="avareno-question" key={question}>
+                <Search size={18} />
+                <span>{question}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="avareno-final-panel" aria-labelledby="final-title">
+          <div>
+            <h2 id="final-title">Stop trying to remember everything.</h2>
+            <p>Let Avareno hold the details.</p>
+          </div>
+          <Link className="avareno-primary-cta" to="/app/capture">
+            Start organizing <ArrowRight size={17} />
+          </Link>
+        </section>
+      </main>
+      <MarketingFooter />
+    </div>
+  );
+}
+
+function ProductPassportPreview({ item, loop, openLoops, remindersSoon }: { item: Item | null; loop: Loop | null; openLoops: number; remindersSoon: number }) {
+  const itemName = item?.name ?? "LG OLED C3";
+  const completeness = item?.completenessScore ?? 72;
+  const documentCount = item?.documents?.length ?? 18;
+  const loopTitle = loop?.title ?? "Garantie läuft bald ab";
+
+  return (
+    <aside className="avareno-product-canvas" aria-label="Avareno mobile app preview">
+      <div className="avareno-phone-showcase">
+        <div className="avareno-phone avareno-phone-primary">
+          <div className="avareno-phone-status">
+            <span>9:41</span>
+            <span>100</span>
+          </div>
+          <div className="avareno-phone-head">
             <div>
-              <p className="text-sm font-black uppercase text-muted">today</p>
-              <h2 className="mt-2 text-4xl font-black text-ink">Care list</h2>
+              <h2>Zuhause</h2>
+              <p><span /> Online</p>
             </div>
-            {success ? (
-              <span className="inline-flex items-center gap-2 rounded-full bg-leaf/10 px-3 py-2 text-xs font-black text-moss">
-                <Sparkles size={15} />
-                Saved
-              </span>
-            ) : null}
+            <div>
+              <BellIcon />
+              <Plus size={20} />
+            </div>
           </div>
-          <div className="mt-6 grid gap-3">
-            {topLoops.length ? topLoops.map((loop) => <LoopCard key={loop.id} loop={loop} onComplete={completeLoop} />) : <EmptyObject />}
+          <div className="avareno-mobile-stage">
+            <MobileStat className="stat-docs" icon={<FileText size={18} />} label="Dokumente" value={documentCount} />
+            <MobileStat className="stat-loops" icon={<ListChecks size={18} />} label="Offene Loops" value={openLoops} />
+            <MobileStat className="stat-warranty" icon={<ShieldCheck size={18} />} label="Garantien" value={4} />
+            <MobileStat className="stat-rooms" icon={<HomeIcon size={18} />} label="Räume" value={6} />
+            <img src={homeMemoryCube} alt="" />
+          </div>
+          <div className="avareno-phone-section-row">
+            <h3>Heute wichtig</h3>
+            <span>Alle anzeigen</span>
+          </div>
+          <div className="avareno-reminder-card">
+            <span><ShieldCheck size={21} /></span>
+            <div>
+              <strong>{loopTitle}</strong>
+              <p>{itemName} · endet in 45 Tagen</p>
+              <ProgressBar value={completeness} />
+            </div>
+            <em>{completeness}%</em>
+          </div>
+          <div className="avareno-match-card">
+            <span><Package size={22} /></span>
+            <div>
+              <strong>{itemName}</strong>
+              <p>94% Match · {documentCount} Dokumente</p>
+            </div>
+          </div>
+          <div className="avareno-mobile-tile-row">
+            <PreviewTile icon={<FolderLock size={17} />} label="Dokumente" value={`${documentCount} Dateien`} />
+            <PreviewTile icon={<PlugIcon />} label="Geräte" value="7 online" />
+            <PreviewTile icon={<Wrench size={17} />} label="Reparaturen" value="2 Historien" />
           </div>
         </div>
-      </section>
 
-      <section className="ozma-journal">
-        <ActionTile to="/capture/receipt" icon={<ReceiptText />} label="Receipt" title="Turn proof into memory" />
-        <ActionTile to="/capture/item" icon={<FilePlus2 />} label="Thing" title="Create a real object profile" />
-        <ActionTile to="/capture/message" icon={<MessageCircle />} label="Message" title="Make context actionable" />
-      </section>
+        <div className="avareno-phone avareno-phone-secondary">
+          <div className="avareno-phone-status">
+            <span>9:41</span>
+            <span>100</span>
+          </div>
+          <h3>Dokumente</h3>
+          {["MediaMarkt Rechnung", "Garantie LG OLED C3", "Versicherung Hausrat", "Bedienungsanleitung"].map((entry) => (
+            <div className="avareno-doc-row" key={entry}>
+              <FileText size={18} />
+              <span>{entry}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function MobileStat({ className, icon, label, value }: { className: string; icon: ReactNode; label: string; value: number }) {
+  return (
+    <div className={`avareno-mobile-stat ${className}`}>
+      {icon}
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
   );
 }
 
-function HeroObject({ item }: { item?: Item }) {
-  return (
-    <div className="ozma-hero-object">
-      <div className="flex items-center justify-between gap-3">
-        <span className="inline-flex items-center gap-2 text-xs font-black uppercase text-muted">
-          <MapPin size={14} />
-          {item?.location ?? "home"}
-        </span>
-        <span className="text-xs font-black uppercase text-muted">{item ? `${item.completenessScore}% saved` : "ready"}</span>
-      </div>
-
-      <div className="ozma-hero-object-media">
-        {item?.imageUrl ? <img src={item.imageUrl} alt={item.name} /> : <Package size={54} />}
-      </div>
-
-      <div className="mt-5">
-        <p className="text-xs font-black uppercase text-muted">featured object</p>
-        <h2 className="mt-2 text-2xl font-black leading-tight text-ink">{item?.name ?? "Your first object"}</h2>
-        <p className="mt-2 text-sm font-semibold text-muted">
-          {item ? [item.manufacturer, item.model].filter(Boolean).join(" / ") || item.category : "Start with a receipt or photo."}
-        </p>
-      </div>
-
-      <div className="mt-4 rounded-lg bg-wash p-3">
-        <span className="inline-flex items-center gap-2 text-xs font-black uppercase text-muted">
-          <ReceiptText size={14} />
-          {item ? isoDate(item.purchaseDate) : "proof"}
-        </span>
-        <p className="mt-2 text-sm font-black text-ink">{item ? "Receipt and warranty details attached" : "Add proof to remember it later"}</p>
-      </div>
-    </div>
-  );
+function BellIcon() {
+  return <span className="avareno-mini-bell" aria-hidden="true" />;
 }
 
-function HeroNumber({ icon, value, label }: { icon: ReactNode; value: number; label: string }) {
-  return (
-    <div className="rounded-lg border border-line bg-white/72 p-4 text-left backdrop-blur">
-      <div className="mb-3 text-leaf">{icon}</div>
-      <p className="text-4xl font-black text-ink">{value}</p>
-      <p className="text-xs font-black uppercase text-muted">{label}</p>
-    </div>
-  );
+function PlugIcon() {
+  return <Sparkles size={17} />;
 }
 
-function PlanCount({ label, value }: { label: string; value: number }) {
+function PreviewNav({ active = false, icon, label }: { active?: boolean; icon: ReactNode; label: string }) {
   return (
-    <div className="mavora-plan-count">
-      <p>{value}</p>
+    <div className={active ? "avareno-preview-nav is-active" : "avareno-preview-nav"}>
+      {icon}
       <span>{label}</span>
     </div>
   );
 }
 
-function NotificationLine({ notification }: { notification: Reminder }) {
-  const target = notification.deepLink ?? (notification.item ? `/items/${notification.item.id}` : "/");
-
+function PreviewTile({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <Link className="mavora-notification-line" to={target}>
-      <span className="grid h-10 w-10 place-items-center rounded-full bg-leaf/10 text-leaf">
-        {notification.kind === "warranty" ? <ShieldCheck size={18} /> : <BellRing size={18} />}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-black text-ink">{notification.title}</p>
-        <p className="truncate text-sm font-semibold text-muted">{notification.item?.name ?? notification.message}</p>
-      </div>
-      <span className="text-xs font-black uppercase text-muted">{notification.state?.replace("_", " ") ?? "soon"}</span>
-    </Link>
-  );
-}
-
-function ServiceBlock({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
-  return (
-    <div className="ozma-service-block">
+    <div className="avareno-preview-tile">
       <span>{icon}</span>
-      <h3>{title}</h3>
-      <p>{text}</p>
+      <div>
+        <p>{label}</p>
+        <strong>{value}</strong>
+      </div>
     </div>
   );
 }
 
-function ActionTile({ to, icon, label, title }: { to: string; icon: ReactNode; label: string; title: string }) {
+function TimelinePoint({ label, value }: { label: string; value: string }) {
   return (
-    <Link className="ozma-journal-card" to={to}>
-      <span className="grid h-11 w-11 place-items-center rounded-full bg-ink text-white">{icon}</span>
-      <p className="mt-8 text-xs font-black uppercase text-muted">{label}</p>
-      <h3 className="mt-2 text-2xl font-black leading-tight text-ink">{title}</h3>
-      <span className="mt-6 inline-flex items-center gap-2 text-sm font-black text-ink">
-        Start <ArrowRight size={15} />
-      </span>
-    </Link>
+    <div className="avareno-timeline-point">
+      <span />
+      <div>
+        <p>{label}</p>
+        <strong>{value}</strong>
+      </div>
+    </div>
   );
 }
 
-function EmptyObject() {
+function MiniStat({ value, label }: { value: number; label: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-line bg-white/70 p-6">
-      <p className="text-xl font-black text-ink">Nothing here yet.</p>
-      <p className="mt-2 text-sm font-semibold text-muted">Capture something and it will show up here.</p>
+    <div>
+      <strong>{value}</strong>
+      <span>{label}</span>
     </div>
+  );
+}
+
+function ModuleRow({ icon, title, text, index }: { icon: ReactNode; title: string; text: string; index: number }) {
+  return (
+    <article className="avareno-module-row">
+      <span className="avareno-module-number">{String(index).padStart(2, "0")}</span>
+      <span className="avareno-module-icon">{icon}</span>
+      <div>
+        <h3>{title}</h3>
+        <p>{text}</p>
+      </div>
+      <Link2 size={17} aria-hidden="true" />
+    </article>
   );
 }

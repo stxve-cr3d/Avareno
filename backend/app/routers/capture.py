@@ -1,16 +1,25 @@
 from __future__ import annotations
 
+import re
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter
 
 from app.db import db, row_to_dict
 from app.dependencies import get_default_user
-from app.schemas import MessageCapture, UniversalCaptureRequest
+from app.schemas import CaptureDropRequest, MessageCapture, UniversalCaptureRequest
+from app.services.item_service import calculate_completeness_score
 from app.services.message_parser import parse_message_reminder
 from app.services.product_images import suggest_product_image
 from app.services.xp_service import award_xp
 from app.utils import make_id, now_iso
 
 router = APIRouter()
+
+
+def _default_household_id(conn, user_id: str) -> str | None:
+    household = row_to_dict(conn.execute('SELECT * FROM "Household" WHERE userId = ? ORDER BY createdAt ASC LIMIT 1', (user_id,)).fetchone())
+    return household["id"] if household else None
 
 
 def _guess_item_type(text: str) -> str:
@@ -80,6 +89,175 @@ def _guess_location(conn, text: str, user_id: str, requested_space_id: str | Non
     return None, None
 
 
+def _capture_kind(kind: str, text: str) -> str:
+    requested = kind.upper()
+    if requested != "AUTO":
+        return requested
+    lowered = text.lower()
+    if any(word in lowered for word in ["antwort", "reply", "melden", "schreiben", "anrufen"]):
+        return "MESSAGE"
+    if any(word in lowered for word in ["rechnung", "beleg", "receipt", "garantie", "eur", "€"]):
+        return "RECEIPT"
+    if any(word in lowered for word in ["vertrag", "deadline", "frist", "pruefen", "prüfen", "kuendigen", "kündigen"]):
+        return "LOOP"
+    return "ITEM"
+
+
+def _extract_price(text: str) -> float | None:
+    match = re.search(r"(\d+(?:[.,]\d{1,2})?)\s*(?:eur|€)", text, flags=re.IGNORECASE)
+    if not match:
+        return None
+    try:
+        return float(match.group(1).replace(",", "."))
+    except ValueError:
+        return None
+
+
+def _extract_merchant(text: str) -> str | None:
+    lowered = text.lower()
+    for merchant in ["MediaMarkt", "Saturn", "Amazon", "Apple", "Ikea", "OBI", "Bauhaus"]:
+        if merchant.lower() in lowered:
+            return merchant
+    return None
+
+
+def _fallback_due_date(text: str) -> str | None:
+    lowered = text.lower()
+    now = datetime.now(timezone.utc)
+    if "morgen" in lowered or "tomorrow" in lowered:
+        return (now + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0).isoformat()
+    if "naechsten monat" in lowered or "nächsten monat" in lowered or "next month" in lowered:
+        return (now + timedelta(days=30)).replace(hour=9, minute=0, second=0, microsecond=0).isoformat()
+    if any(word in lowered for word in ["freitag", "friday"]):
+        parsed = parse_message_reminder(text)
+        return parsed["dueDate"]
+    return None
+
+
+def _create_loop_drop(conn, user_id: str, text: str, kind: str, contact_name: str | None = None) -> dict:
+    now = now_iso()
+    parsed = parse_message_reminder(text, contact_name) if kind == "MESSAGE" else None
+    loop_id = make_id()
+    due_date = parsed["dueDate"] if parsed else _fallback_due_date(text)
+    reminder_at = parsed["reminderAt"] if parsed else due_date
+    title = (parsed["title"] if parsed else text[:72]).strip() or "New reminder"
+    source_type = "MESSAGE" if kind == "MESSAGE" else "DOCUMENT" if kind == "DOCUMENT" else "MANUAL"
+    conn.execute(
+        """INSERT INTO "Loop"
+           (id, userId, title, description, sourceType, priority, status, dueDate, reminderAt, xpReward, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            loop_id,
+            user_id,
+            title,
+            parsed["description"] if parsed else text,
+            source_type,
+            parsed["priority"] if parsed else "MEDIUM",
+            "OPEN",
+            due_date,
+            reminder_at,
+            parsed["xpReward"] if parsed else 25,
+            now,
+            now,
+        ),
+    )
+    if reminder_at:
+        conn.execute(
+            """INSERT INTO "Reminder"
+               (id, userId, loopId, title, message, remindAt, status, createdAt, updatedAt)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                make_id(),
+                user_id,
+                loop_id,
+                title,
+                "Avareno reminder created from capture.",
+                reminder_at,
+                "ACTIVE",
+                now,
+                now,
+            ),
+        )
+    award_xp(conn, user_id=user_id, loop_id=loop_id, action=f"capture_{kind.lower()}", points=10)
+    return {
+        "id": loop_id,
+        "kind": kind,
+        "title": title,
+        "summary": "Loop and reminder created." if reminder_at else "Loop created.",
+        "route": f"/app/loops/{loop_id}",
+    }
+
+
+def _create_item_drop(conn, user_id: str, text: str, kind: str) -> dict:
+    item_type = _guess_item_type(text)
+    category = _guess_category(text, item_type)
+    manufacturer, model = _guess_brand_model(text)
+    space_id, location = _guess_location(conn, text, user_id)
+    household_id = _default_household_id(conn, user_id)
+    draft = {
+        "name": _guess_name(text, manufacturer, model, category),
+        "category": category,
+        "itemType": item_type,
+        "manufacturer": manufacturer,
+        "model": model,
+        "spaceId": space_id,
+        "location": location,
+        "merchant": _extract_merchant(text),
+        "price": _extract_price(text),
+        "currency": "EUR",
+        "notes": text,
+        "visibility": "HOUSEHOLD",
+    }
+    image_suggestion = suggest_product_image(draft)
+    if image_suggestion:
+        draft["imageUrl"] = image_suggestion["imageUrl"]
+    documents = [{"type": "RECEIPT"}] if kind == "RECEIPT" else []
+    score = calculate_completeness_score(draft, documents)
+    now = now_iso()
+    item_id = make_id()
+    conn.execute(
+        """INSERT INTO "Item"
+           (id, userId, householdId, spaceId, name, itemType, category, manufacturer, model, merchant, price, currency,
+            imageUrl, location, notes, visibility, completenessScore, status, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            item_id,
+            user_id,
+            household_id,
+            space_id,
+            draft["name"],
+            draft["itemType"],
+            draft["category"],
+            draft["manufacturer"],
+            draft["model"],
+            draft["merchant"],
+            draft["price"],
+            draft["currency"],
+            draft.get("imageUrl"),
+            draft["location"],
+            draft["notes"],
+            draft["visibility"],
+            score,
+            "ACTIVE",
+            now,
+            now,
+        ),
+    )
+    conn.execute(
+        """INSERT INTO "ItemActivity" (id, itemId, userId, type, message, createdAt)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (make_id(), item_id, user_id, "CAPTURED", f"{kind.title()} capture created item profile.", now),
+    )
+    award_xp(conn, user_id=user_id, item_id=item_id, action=f"capture_{kind.lower()}", points=20 if kind == "RECEIPT" else 10)
+    return {
+        "id": item_id,
+        "kind": kind,
+        "title": draft["name"],
+        "summary": f"{category} profile created with {score}% completeness.",
+        "route": f"/app/items/{item_id}",
+    }
+
+
 @router.post("/universal")
 def universal_capture(payload: UniversalCaptureRequest) -> dict:
     with db() as conn:
@@ -128,6 +306,17 @@ def universal_capture(payload: UniversalCaptureRequest) -> dict:
                 "Set warranty reminder",
             ],
         }
+
+
+@router.post("/drop", status_code=201)
+def capture_drop(payload: CaptureDropRequest) -> dict:
+    text = payload.text.strip()
+    kind = _capture_kind(payload.kind, text)
+    with db() as conn:
+        user = get_default_user(conn)
+        if kind in {"MESSAGE", "LOOP", "DOCUMENT"}:
+            return _create_loop_drop(conn, user["id"], text, kind, payload.contactName)
+        return _create_item_drop(conn, user["id"], text, kind if kind in {"RECEIPT", "ITEM"} else "ITEM")
 
 
 @router.post("/message", status_code=201)

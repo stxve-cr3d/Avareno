@@ -16,6 +16,8 @@ export type Item = {
   manufacturer?: string | null;
   model?: string | null;
   serialNumber?: string | null;
+  barcode?: string | null;
+  barcodeFormat?: string | null;
   purchaseDate?: string | null;
   merchant?: string | null;
   price?: number | null;
@@ -24,6 +26,11 @@ export type Item = {
   warrantyUntil?: string | null;
   location?: string | null;
   notes?: string | null;
+  manualUrl?: string | null;
+  driverUrl?: string | null;
+  softwareUrl?: string | null;
+  supportUrl?: string | null;
+  supportContact?: string | null;
   reorderUrl?: string | null;
   affiliateUrl?: string | null;
   affiliateProvider?: string | null;
@@ -35,6 +42,7 @@ export type Item = {
   activities?: ItemActivity[];
   smartHomeDevices?: SmartHomeDevice[];
   documents?: Document[];
+  repairLogs?: RepairLog[];
   loops?: Loop[];
   reminders?: Reminder[];
   missingFields?: string[];
@@ -195,6 +203,100 @@ export type ItemActivity = {
   type: string;
   message: string;
   createdAt: string;
+};
+
+export type RepairLog = {
+  id: string;
+  userId: string;
+  itemId: string;
+  date: string;
+  problem: string;
+  resolution?: string | null;
+  cost?: number | null;
+  status: "OPEN" | "WAITING" | "RESOLVED" | string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SupportDraftChecklistItem = {
+  label: string;
+  status: "ready" | "missing" | string;
+  detail: string;
+};
+
+export type SupportDraftAttachment = {
+  id: string;
+  type: string;
+  fileName: string;
+  filePath?: string | null;
+};
+
+export type SupportDraftMissingInfo = {
+  id: string;
+  label: string;
+  action: string;
+};
+
+export type SupportDraft = {
+  to: string;
+  subject: string;
+  body: string;
+  checklist: SupportDraftChecklistItem[];
+  attachments: SupportDraftAttachment[];
+  missingInfo: SupportDraftMissingInfo[];
+  readyScore: number;
+  issueSummary: string;
+};
+
+export type CaptureKind = "AUTO" | "RECEIPT" | "MESSAGE" | "DOCUMENT" | "ITEM" | "LOOP";
+
+export type CaptureDropResult = {
+  id: string;
+  kind: CaptureKind | string;
+  title: string;
+  summary: string;
+  route: string;
+};
+
+export type BarcodeLookupProduct = {
+  barcode: string;
+  barcodeFormat: string;
+  name?: string | null;
+  category?: string | null;
+  manufacturer?: string | null;
+  model?: string | null;
+  imageUrl?: string | null;
+  sourceName: string;
+  sourceUrl?: string | null;
+  confidence: number;
+};
+
+export type BarcodeLookup = {
+  barcode: string;
+  barcodeFormat: string;
+  status: "LOCAL_MATCH" | "FOUND" | "NOT_FOUND" | string;
+  source?: string | null;
+  item?: Item | null;
+  product?: BarcodeLookupProduct | null;
+  canCreate: boolean;
+  message?: string;
+};
+
+export type SearchResultType = "ITEM" | "LOOP" | "DOCUMENT" | "REMINDER";
+
+export type SearchResult = {
+  id: string;
+  type: SearchResultType;
+  title: string;
+  subtitle: string;
+  meta?: string | null;
+  route: string;
+  status?: string | null;
+};
+
+export type SearchPayload = {
+  query: string;
+  results: SearchResult[];
 };
 
 export type PlanSubscription = {

@@ -51,7 +51,7 @@ def _matches_question(item: dict, question: str) -> bool:
 
 
 @router.post("/ask")
-def ask_mavora(payload: AssistantAskRequest) -> dict:
+def ask_avareno(payload: AssistantAskRequest) -> dict:
     question = payload.question.strip().lower()
     with db() as conn:
         user = get_default_user(conn)

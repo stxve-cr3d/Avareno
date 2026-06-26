@@ -100,7 +100,7 @@ export function Items() {
       <section className="things-command rounded-lg">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)] lg:items-end">
           <div>
-            <p className="text-xs font-black uppercase text-leaf">Mavora inventory</p>
+            <p className="text-xs font-black uppercase text-leaf">Avareno inventory</p>
             <h1 className="mt-3 max-w-3xl text-[clamp(2.8rem,7vw,6.7rem)] font-black leading-[0.9] text-white">
               alles was du besitzt, sauber sortiert
             </h1>

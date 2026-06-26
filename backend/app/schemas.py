@@ -18,6 +18,8 @@ class ItemCreate(BaseModel):
     manufacturer: str | None = None
     model: str | None = None
     serialNumber: str | None = None
+    barcode: str | None = None
+    barcodeFormat: str | None = None
     purchaseDate: str | None = None
     merchant: str | None = None
     price: float | None = None
@@ -26,6 +28,11 @@ class ItemCreate(BaseModel):
     warrantyUntil: str | None = None
     location: str | None = None
     notes: str | None = None
+    manualUrl: str | None = None
+    driverUrl: str | None = None
+    softwareUrl: str | None = None
+    supportUrl: str | None = None
+    supportContact: str | None = None
     reorderUrl: str | None = None
     affiliateUrl: str | None = None
     affiliateProvider: str | None = None
@@ -42,6 +49,8 @@ class ItemPatch(BaseModel):
     manufacturer: str | None = None
     model: str | None = None
     serialNumber: str | None = None
+    barcode: str | None = None
+    barcodeFormat: str | None = None
     purchaseDate: str | None = None
     merchant: str | None = None
     price: float | None = None
@@ -50,11 +59,24 @@ class ItemPatch(BaseModel):
     warrantyUntil: str | None = None
     location: str | None = None
     notes: str | None = None
+    manualUrl: str | None = None
+    driverUrl: str | None = None
+    softwareUrl: str | None = None
+    supportUrl: str | None = None
+    supportContact: str | None = None
     reorderUrl: str | None = None
     affiliateUrl: str | None = None
     affiliateProvider: str | None = None
     visibility: str | None = None
     status: str | None = None
+
+
+class RepairLogCreate(BaseModel):
+    date: str | None = None
+    problem: str = Field(min_length=1)
+    resolution: str | None = None
+    cost: float | None = None
+    status: str = "OPEN"
 
 
 class LoopCreate(BaseModel):
@@ -188,6 +210,12 @@ class UniversalCaptureRequest(BaseModel):
     text: str = Field(min_length=1)
     spaceId: str | None = None
     itemType: str | None = None
+
+
+class CaptureDropRequest(BaseModel):
+    text: str = Field(min_length=1)
+    kind: str = "AUTO"
+    contactName: str | None = None
 
 
 class AssistantAskRequest(BaseModel):

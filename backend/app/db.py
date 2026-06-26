@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
+from threading import Lock
 from typing import Iterator
 
 from app.utils import make_id, now_iso
@@ -11,6 +12,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = BACKEND_ROOT.parent
 DB_PATH = BACKEND_ROOT / "second_memory.db"
 SCHEMA_PATH = BACKEND_ROOT / "schema.sql"
+_SCHEMA_LOCK = Lock()
 
 
 def connection() -> sqlite3.Connection:
@@ -18,7 +20,14 @@ def connection() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    ensure_runtime_schema(conn)
+    conn.execute("PRAGMA busy_timeout = 5000")
+    with _SCHEMA_LOCK:
+        try:
+            ensure_runtime_schema(conn)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
     return conn
 
 
@@ -33,7 +42,14 @@ def ensure_runtime_schema(conn: sqlite3.Connection) -> None:
         "householdId": "TEXT",
         "spaceId": "TEXT",
         "itemType": "TEXT NOT NULL DEFAULT 'THING'",
+        "barcode": "TEXT",
+        "barcodeFormat": "TEXT",
         "notes": "TEXT",
+        "manualUrl": "TEXT",
+        "driverUrl": "TEXT",
+        "softwareUrl": "TEXT",
+        "supportUrl": "TEXT",
+        "supportContact": "TEXT",
         "reorderUrl": "TEXT",
         "affiliateUrl": "TEXT",
         "affiliateProvider": "TEXT",
@@ -42,6 +58,8 @@ def ensure_runtime_schema(conn: sqlite3.Connection) -> None:
     for name, definition in item_columns.items():
         if columns and name not in columns:
             conn.execute(f'ALTER TABLE "Item" ADD COLUMN "{name}" {definition}')
+    if columns:
+        conn.execute('CREATE INDEX IF NOT EXISTS "Item_userId_barcode_idx" ON "Item" ("userId", "barcode")')
     device_columns = {row["name"] for row in conn.execute('PRAGMA table_info("DeviceToken")').fetchall()}
     if not device_columns:
         conn.execute(
@@ -170,6 +188,22 @@ def _ensure_product_tables(conn: sqlite3.Connection) -> None:
           FOREIGN KEY ("itemId") REFERENCES "Item" ("id") ON DELETE SET NULL
         )"""
     )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS "RepairLog" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "userId" TEXT NOT NULL,
+          "itemId" TEXT NOT NULL,
+          "date" TEXT NOT NULL,
+          "problem" TEXT NOT NULL,
+          "resolution" TEXT,
+          "cost" REAL,
+          "status" TEXT NOT NULL DEFAULT 'OPEN',
+          "createdAt" TEXT NOT NULL,
+          "updatedAt" TEXT NOT NULL,
+          FOREIGN KEY ("userId") REFERENCES "User" ("id"),
+          FOREIGN KEY ("itemId") REFERENCES "Item" ("id") ON DELETE CASCADE
+        )"""
+    )
 
 
 def _ensure_smart_home_tables(conn: sqlite3.Connection) -> None:
@@ -223,16 +257,16 @@ def _ensure_default_product_structure(conn: sqlite3.Connection) -> None:
         return
 
     now = now_iso()
-    partner = conn.execute('SELECT id FROM "AffiliatePartner" WHERE slug = ?', ("mavora-reorder",)).fetchone()
+    partner = conn.execute('SELECT id FROM "AffiliatePartner" WHERE slug = ?', ("avareno-reorder",)).fetchone()
     if not partner:
         conn.execute(
-            """INSERT INTO "AffiliatePartner"
+            """INSERT OR IGNORE INTO "AffiliatePartner"
                (id, name, slug, baseUrl, commissionNote, status, createdAt, updatedAt)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 make_id(),
-                "Mavora Reorder Network",
-                "mavora-reorder",
+                "Avareno Reorder Network",
+                "avareno-reorder",
                 "https://example.com/reorder",
                 "Demo partner slot for future affiliate tracking.",
                 "ACTIVE",
@@ -406,7 +440,7 @@ def _ensure_default_smart_home_devices(conn: sqlite3.Connection) -> None:
                     '["switch","audioVolume","audioMute","mediaInputSource"]',
                     "ONLINE",
                     "off",
-                    '{"demo":true,"source":"Mavora seed"}',
+                    '{"demo":true,"source":"Avareno seed"}',
                     now,
                     now,
                     now,

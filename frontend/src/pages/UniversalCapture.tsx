@@ -55,7 +55,7 @@ export function UniversalCapture() {
             ein Eingang fuer alles
           </h1>
           <p className="mt-5 max-w-2xl text-base font-semibold leading-7 text-white/62">
-            Schreib, fotografiere oder scanne. Mavora macht daraus ein Objektprofil, ohne dass User Datenbank-Felder denken muessen.
+            Schreib, fotografiere oder scanne. Avareno macht daraus ein Objektprofil, ohne dass User Datenbank-Felder denken muessen.
           </p>
         </div>
         <div className="capture-mode-grid">
@@ -70,7 +70,7 @@ export function UniversalCapture() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase text-muted">Input</p>
-              <h2 className="mt-1 text-3xl font-black text-ink">Sag Mavora was da ist.</h2>
+              <h2 className="mt-1 text-3xl font-black text-ink">Sag Avareno was da ist.</h2>
             </div>
             <span className="grid h-11 w-11 place-items-center rounded-full bg-ink text-white">
               <Wand2 size={18} />
@@ -145,7 +145,7 @@ export function UniversalCapture() {
             </div>
           ) : (
             <div className="mt-5 rounded-lg border border-dashed border-line bg-white/70 p-6 text-sm font-bold text-muted">
-              The draft appears here after Mavora reads your input.
+              The draft appears here after Avareno reads your input.
             </div>
           )}
         </div>

@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 from datetime import timedelta
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.db import db, row_to_dict, rows_to_dicts
 from app.dependencies import get_default_user
-from app.schemas import ItemCreate, ItemPatch
+from app.schemas import ItemCreate, ItemPatch, RepairLogCreate
+from app.services.barcode_lookup import barcode_format, lookup_barcode, normalize_barcode
 from app.services.item_service import calculate_completeness_score, missing_fields
 from app.services.product_images import suggest_product_image
 from app.services.xp_service import award_xp
@@ -42,6 +43,32 @@ def _household(conn, household_id: str | None) -> dict | None:
 
 def _activities(conn, item_id: str) -> list[dict]:
     return rows_to_dicts(conn.execute('SELECT * FROM "ItemActivity" WHERE itemId = ? ORDER BY createdAt DESC', (item_id,)).fetchall())
+
+
+def _repair_logs(conn, item_id: str) -> list[dict]:
+    return rows_to_dicts(conn.execute('SELECT * FROM "RepairLog" WHERE itemId = ? ORDER BY date DESC, createdAt DESC', (item_id,)).fetchall())
+
+
+def _has_document(documents: list[dict], document_type: str) -> bool:
+    return any((document.get("type") or "").upper() == document_type for document in documents)
+
+
+def _document_attachments(documents: list[dict]) -> list[dict]:
+    support_types = {"RECEIPT", "WARRANTY", "MANUAL", "DRIVER", "SOFTWARE", "OTHER"}
+    attachments = []
+    for document in documents:
+        document_type = (document.get("type") or "OTHER").upper()
+        if document_type not in support_types:
+            continue
+        attachments.append(
+            {
+                "id": document.get("id"),
+                "type": document_type,
+                "fileName": document.get("fileName") or "Document",
+                "filePath": document.get("filePath"),
+            }
+        )
+    return attachments
 
 
 def _smart_home_devices(conn, item_id: str) -> list[dict]:
@@ -112,6 +139,7 @@ def _item_detail(conn, item_id: str) -> dict | None:
     item["space"] = _space(conn, item.get("spaceId"))
     item["household"] = _household(conn, item.get("householdId"))
     item["activities"] = _activities(conn, item_id)
+    item["repairLogs"] = _repair_logs(conn, item_id)
     item["smartHomeDevices"] = _smart_home_devices(conn, item_id)
     item["missingFields"] = missing_fields(item, documents)
     return item
@@ -131,6 +159,16 @@ def list_items() -> list[dict]:
             item["space"] = _space(conn, item.get("spaceId"))
             item["missingFields"] = missing_fields(item, docs)
         return items
+
+
+@router.get("/lookup/barcode")
+def lookup_item_barcode(code: str = Query(min_length=4)) -> dict:
+    with db() as conn:
+        user = get_default_user(conn)
+        try:
+            return lookup_barcode(conn, user["id"], code)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/{item_id}")
@@ -155,6 +193,10 @@ def create_item(payload: ItemCreate) -> dict:
         household_id = payload.householdId or _default_household_id(conn, user["id"])
         space_id = _resolve_space_id(conn, household_id, payload.location, payload.spaceId)
         receipt_docs = [{"type": "RECEIPT"}] if payload.documentId else []
+        try:
+            normalized_barcode = normalize_barcode(payload.barcode) if payload.barcode else None
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         item_data = {
             "purchaseDate": normalize_iso(payload.purchaseDate),
             "merchant": payload.merchant,
@@ -162,7 +204,14 @@ def create_item(payload: ItemCreate) -> dict:
             "manufacturer": payload.manufacturer,
             "model": payload.model,
             "serialNumber": payload.serialNumber,
+            "barcode": normalized_barcode,
+            "barcodeFormat": payload.barcodeFormat or (barcode_format(normalized_barcode) if normalized_barcode else None),
             "imageUrl": payload.imageUrl,
+            "manualUrl": payload.manualUrl,
+            "driverUrl": payload.driverUrl,
+            "softwareUrl": payload.softwareUrl,
+            "supportUrl": payload.supportUrl,
+            "supportContact": payload.supportContact,
             "warrantyUntil": normalize_iso(payload.warrantyUntil),
         }
         score = calculate_completeness_score(item_data, receipt_docs)
@@ -170,8 +219,9 @@ def create_item(payload: ItemCreate) -> dict:
         conn.execute(
             """INSERT INTO "Item"
                (id, userId, householdId, spaceId, name, itemType, category, manufacturer, model, serialNumber, purchaseDate, merchant, price,
-                currency, imageUrl, warrantyUntil, location, notes, reorderUrl, affiliateUrl, affiliateProvider, visibility, completenessScore, status, createdAt, updatedAt)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                barcode, barcodeFormat, currency, imageUrl, warrantyUntil, location, notes, manualUrl, driverUrl, softwareUrl, supportUrl, supportContact,
+                reorderUrl, affiliateUrl, affiliateProvider, visibility, completenessScore, status, createdAt, updatedAt)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 item_id,
                 user["id"],
@@ -186,11 +236,18 @@ def create_item(payload: ItemCreate) -> dict:
                 item_data["purchaseDate"],
                 payload.merchant,
                 payload.price,
+                item_data["barcode"],
+                item_data["barcodeFormat"],
                 payload.currency,
                 payload.imageUrl,
                 item_data["warrantyUntil"],
                 payload.location,
                 payload.notes,
+                payload.manualUrl,
+                payload.driverUrl,
+                payload.softwareUrl,
+                payload.supportUrl,
+                payload.supportContact,
                 payload.reorderUrl,
                 payload.affiliateUrl,
                 payload.affiliateProvider,
@@ -288,6 +345,13 @@ def patch_item(item_id: str, payload: ItemPatch) -> dict:
 
         updates = payload.model_dump(exclude_unset=True)
         updates.pop("documentId", None)
+        if "barcode" in updates:
+            try:
+                updates["barcode"] = normalize_barcode(updates["barcode"]) if updates["barcode"] else None
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            if updates["barcode"] and not updates.get("barcodeFormat"):
+                updates["barcodeFormat"] = barcode_format(updates["barcode"])
         for key in ["purchaseDate", "warrantyUntil"]:
             if key in updates:
                 updates[key] = normalize_iso(updates[key])
@@ -316,3 +380,181 @@ def patch_item(item_id: str, payload: ItemPatch) -> dict:
             award_xp(conn, user_id=user["id"], item_id=item_id, action="complete_item_profile", points=50)
 
         return _item_detail(conn, item_id) or {}
+
+
+@router.post("/{item_id}/repairs", status_code=201)
+def create_repair_log(item_id: str, payload: RepairLogCreate) -> dict:
+    with db() as conn:
+        user = get_default_user(conn)
+        item = row_to_dict(
+            conn.execute('SELECT * FROM "Item" WHERE id = ? AND userId = ?', (item_id, user["id"])).fetchone()
+        )
+        if not item:
+            raise HTTPException(status_code=404, detail="Item not found")
+
+        now = now_iso()
+        repair_id = make_id()
+        repair_date = normalize_iso(payload.date) or now
+        status = payload.status.upper()
+        conn.execute(
+            """INSERT INTO "RepairLog"
+               (id, userId, itemId, date, problem, resolution, cost, status, createdAt, updatedAt)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                repair_id,
+                user["id"],
+                item_id,
+                repair_date,
+                payload.problem,
+                payload.resolution,
+                payload.cost,
+                status,
+                now,
+                now,
+            ),
+        )
+        conn.execute(
+            """INSERT INTO "ItemActivity" (id, itemId, userId, type, message, createdAt)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (make_id(), item_id, user["id"], "REPAIR", f"Repair log added: {payload.problem}", now),
+        )
+        if status in {"OPEN", "WAITING"}:
+            loop_id = make_id()
+            conn.execute(
+                """INSERT INTO "Loop"
+                   (id, userId, itemId, title, description, sourceType, priority, status, dueDate, reminderAt, xpReward, createdAt, updatedAt)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    loop_id,
+                    user["id"],
+                    item_id,
+                    f"Repair follow-up: {item['name']}",
+                    payload.problem,
+                    "DEVICE",
+                    "MEDIUM",
+                    "OPEN",
+                    None,
+                    None,
+                    25,
+                    now,
+                    now,
+                ),
+            )
+        award_xp(conn, user_id=user["id"], item_id=item_id, action="add_repair_log", points=15)
+        return _item_detail(conn, item_id) or {}
+
+
+@router.post("/{item_id}/support-draft")
+def create_support_draft(item_id: str) -> dict:
+    with db() as conn:
+        user = get_default_user(conn)
+        item = row_to_dict(
+            conn.execute('SELECT * FROM "Item" WHERE id = ? AND userId = ?', (item_id, user["id"])).fetchone()
+        )
+        if not item:
+            raise HTTPException(status_code=404, detail="Item not found")
+
+        documents = _documents(conn, item_id)
+        repairs = _repair_logs(conn, item_id)
+        latest_repair = repairs[0] if repairs else None
+        attachments = _document_attachments(documents)
+        has_receipt = _has_document(documents, "RECEIPT")
+        has_warranty = _has_document(documents, "WARRANTY")
+        has_manual = _has_document(documents, "MANUAL") or bool(item.get("manualUrl"))
+        support_target = item.get("supportContact") or item.get("supportUrl") or "support team"
+        identity = " ".join(part for part in [item.get("manufacturer"), item.get("model")] if part) or item["name"]
+        subject = f"Support request for {identity}"
+
+        checklist = [
+            {
+                "label": "Product identity",
+                "status": "ready" if item.get("manufacturer") or item.get("model") else "missing",
+                "detail": identity if item.get("manufacturer") or item.get("model") else "Add manufacturer or model.",
+            },
+            {
+                "label": "Serial number",
+                "status": "ready" if item.get("serialNumber") else "missing",
+                "detail": item.get("serialNumber") or "Add the serial number before sending.",
+            },
+            {
+                "label": "Receipt",
+                "status": "ready" if has_receipt else "missing",
+                "detail": "Receipt attached." if has_receipt else "Attach receipt or proof of purchase.",
+            },
+            {
+                "label": "Warranty proof",
+                "status": "ready" if item.get("warrantyUntil") or has_warranty else "missing",
+                "detail": item.get("warrantyUntil") or ("Warranty document attached." if has_warranty else "Add warranty date or warranty document."),
+            },
+            {
+                "label": "Issue history",
+                "status": "ready" if latest_repair else "missing",
+                "detail": latest_repair.get("problem") if latest_repair else "Add a Repair Log entry with the current problem.",
+            },
+            {
+                "label": "Support target",
+                "status": "ready" if item.get("supportContact") or item.get("supportUrl") else "missing",
+                "detail": item.get("supportContact") or item.get("supportUrl") or "Add support email, phone, or portal URL.",
+            },
+            {
+                "label": "Manual",
+                "status": "ready" if has_manual else "missing",
+                "detail": "Manual available." if has_manual else "Optional, but useful for model-specific support.",
+            },
+        ]
+        missing_info = [
+            {"id": entry["label"].lower().replace(" ", "-"), "label": entry["label"], "action": entry["detail"]}
+            for entry in checklist
+            if entry["status"] == "missing"
+        ]
+        ready_score = round((sum(1 for entry in checklist if entry["status"] == "ready") / len(checklist)) * 100)
+        issue_summary = latest_repair.get("problem") if latest_repair else item.get("notes") or "No issue note yet"
+
+        body_lines = [
+            f"Hello {support_target},",
+            "",
+            f"I need help with my {item['name']}.",
+            f"Product: {identity}",
+            f"Serial number: {item.get('serialNumber') or 'not available yet'}",
+            f"Purchased at: {item.get('merchant') or 'unknown'}",
+            f"Purchase date: {item.get('purchaseDate') or 'unknown'}",
+            f"Warranty until: {item.get('warrantyUntil') or 'unknown'}",
+        ]
+        if latest_repair:
+            body_lines.extend(
+                [
+                    "",
+                    "Latest repair / issue:",
+                    f"- Date: {latest_repair.get('date')}",
+                    f"- Problem: {latest_repair.get('problem')}",
+                    f"- Status: {latest_repair.get('status')}",
+                ]
+            )
+            if latest_repair.get("resolution"):
+                body_lines.append(f"- Notes: {latest_repair['resolution']}")
+        if item.get("notes"):
+            body_lines.extend(["", f"Additional notes: {item['notes']}"])
+        if attachments:
+            body_lines.extend(["", "Prepared attachments:"])
+            body_lines.extend(f"- {attachment['fileName']} ({attachment['type']})" for attachment in attachments)
+        if missing_info:
+            body_lines.extend(["", "Still missing before sending:"])
+            body_lines.extend(f"- {entry['label']}: {entry['action']}" for entry in missing_info)
+        body_lines.extend(["", "Please let me know the next steps.", "", f"Best, {user['name']}"])
+
+        now = now_iso()
+        conn.execute(
+            """INSERT INTO "ItemActivity" (id, itemId, userId, type, message, createdAt)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (make_id(), item_id, user["id"], "SUPPORT_DRAFT", "Support request draft prepared.", now),
+        )
+        return {
+            "to": support_target,
+            "subject": subject,
+            "body": "\n".join(body_lines),
+            "checklist": checklist,
+            "attachments": attachments,
+            "missingInfo": missing_info,
+            "readyScore": ready_score,
+            "issueSummary": issue_summary,
+        }

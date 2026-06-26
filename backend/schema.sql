@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS "XpTransaction";
 DROP TABLE IF EXISTS "Reminder";
 DROP TABLE IF EXISTS "DeviceToken";
 DROP TABLE IF EXISTS "Loop";
+DROP TABLE IF EXISTS "RepairLog";
 DROP TABLE IF EXISTS "Document";
 DROP TABLE IF EXISTS "Item";
 DROP TABLE IF EXISTS "SmartHomeConnection";
@@ -114,6 +115,8 @@ CREATE TABLE "Item" (
   "manufacturer" TEXT,
   "model" TEXT,
   "serialNumber" TEXT,
+  "barcode" TEXT,
+  "barcodeFormat" TEXT,
   "purchaseDate" TEXT,
   "merchant" TEXT,
   "price" REAL,
@@ -122,6 +125,11 @@ CREATE TABLE "Item" (
   "warrantyUntil" TEXT,
   "location" TEXT,
   "notes" TEXT,
+  "manualUrl" TEXT,
+  "driverUrl" TEXT,
+  "softwareUrl" TEXT,
+  "supportUrl" TEXT,
+  "supportContact" TEXT,
   "reorderUrl" TEXT,
   "affiliateUrl" TEXT,
   "affiliateProvider" TEXT,
@@ -149,6 +157,21 @@ CREATE TABLE "Document" (
   "updatedAt" TEXT NOT NULL,
   FOREIGN KEY ("userId") REFERENCES "User" ("id"),
   FOREIGN KEY ("itemId") REFERENCES "Item" ("id") ON DELETE SET NULL
+);
+
+CREATE TABLE "RepairLog" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "itemId" TEXT NOT NULL,
+  "date" TEXT NOT NULL,
+  "problem" TEXT NOT NULL,
+  "resolution" TEXT,
+  "cost" REAL,
+  "status" TEXT NOT NULL DEFAULT 'OPEN',
+  "createdAt" TEXT NOT NULL,
+  "updatedAt" TEXT NOT NULL,
+  FOREIGN KEY ("userId") REFERENCES "User" ("id"),
+  FOREIGN KEY ("itemId") REFERENCES "Item" ("id") ON DELETE CASCADE
 );
 
 CREATE TABLE "Loop" (

@@ -1,6 +1,6 @@
-# Mavora MVP
+# Avareno MVP
 
-Mavora is a mobile-first web app for real-life open loops: receipts, devices, documents, message reminders, warranties, and small life tasks that should not stay in your head.
+Avareno is a mobile-first web app for real-life open loops: receipts, devices, documents, message reminders, warranties, and small life tasks that should not stay in your head.
 
 ## Stack
 
@@ -23,6 +23,26 @@ npm run dev
 Frontend: http://localhost:5173  
 Backend: http://localhost:4000
 API docs: http://localhost:4000/docs
+
+## Cloudflare Pages
+
+Recommended project settings:
+
+- Project name: `avareno`
+- Production domain: `avareno.app`
+- Build command: `npm run build`
+- Build output directory: `frontend/dist`
+- Root directory: repository root
+
+Useful commands:
+
+```bash
+npm run cf:whoami
+npm run pages:preview
+npm run pages:deploy
+```
+
+The current Cloudflare setup deploys the React frontend to Pages. The Python/FastAPI backend still uses local SQLite and local uploads, so production API hosting needs a second step: either host the backend separately and set `VITE_API_ORIGIN`, or migrate the API/storage to Cloudflare Workers, D1, and R2.
 
 ## MVP Flows
 

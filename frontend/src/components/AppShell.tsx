@@ -1,76 +1,89 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Archive, Bot, FileCheck2, FileText, Gift, Home, ListChecks, MessageSquareText, Package, PenLine, PlugZap, Plus, ReceiptText, X } from "lucide-react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Archive, Bot, FileCheck2, FileText, Gift, Home, ListChecks, MessageSquareText, Package, PenLine, PlugZap, Plus, ReceiptText, UserRound, X } from "lucide-react";
 import { useState } from "react";
-import primaryLogo from "../assets/primary-logo.svg";
+import avarenoMark from "../assets/avareno-mark.svg";
 
 const nav = [
-  { to: "/", label: "Home", icon: Home },
-  { to: "/items", label: "Things", icon: Archive },
-  { to: "/ask", label: "Ask", icon: Bot },
-  { to: "/smart-home", label: "Smart", icon: PlugZap },
-  { to: "/capture", label: "Drop", icon: Plus },
-  { to: "/reports/home-binder", label: "Binder", icon: FileCheck2 },
-  { to: "/capture/loop", label: "Care", icon: ListChecks },
-  { to: "/rewards", label: "Progress", icon: Gift }
+  { to: "/app", label: "Home", icon: Home },
+  { to: "/app/items", label: "Dinge", icon: Archive },
+  { to: "/app/ask", label: "Ask", icon: Bot },
+  { to: "/app/smart-home", label: "Smart", icon: PlugZap },
+  { to: "/app/capture", label: "Capture", icon: Plus },
+  { to: "/app/reports/home-binder", label: "Binder", icon: FileCheck2 },
+  { to: "/app/capture/loop", label: "Care", icon: ListChecks },
+  { to: "/app/rewards", label: "Progress", icon: Gift }
 ];
 
 const captureOptions = [
-  { label: "Smart Capture", helper: "One flow for photo, receipt, text, barcode", to: "/capture", icon: Plus },
-  { label: "Receipt", helper: "Proof, warranty, item card", to: "/capture/receipt", icon: ReceiptText },
-  { label: "Thing", helper: "Start a profile for a physical object", to: "/capture/item", icon: Package },
-  { label: "Message", helper: "Context into a reminder", to: "/capture/message", icon: MessageSquareText },
-  { label: "Document", helper: "Store and connect later", to: "/capture/receipt", icon: FileText },
-  { label: "Care", helper: "Warranty, repair, service, return", to: "/capture/loop", icon: PenLine }
+  { label: "Smart Capture", helper: "One flow for photo, receipt, text, barcode", to: "/app/capture", icon: Plus },
+  { label: "Receipt", helper: "Proof, warranty, item card", to: "/app/capture/receipt", icon: ReceiptText },
+  { label: "Thing", helper: "Start a profile for a physical object", to: "/app/capture/item", icon: Package },
+  { label: "Message", helper: "Context into a reminder", to: "/app/capture/message", icon: MessageSquareText },
+  { label: "Document", helper: "Store and connect later", to: "/app/capture/receipt", icon: FileText },
+  { label: "Care", helper: "Warranty, repair, service, return", to: "/app/capture/loop", icon: PenLine }
 ];
 
 export function AppShell() {
   const [open, setOpen] = useState(false);
+  const location = useLocation();
   const navigate = useNavigate();
+  const isMarketingSurface = ["/", "/pricing", "/impressum", "/datenschutz", "/cookies"].includes(location.pathname);
+
+  if (isMarketingSurface) {
+    return (
+      <main className="avareno-landing-main">
+        <Outlet />
+      </main>
+    );
+  }
+
+  const isSmartSurface = location.pathname === "/smart-home" || location.pathname === "/app" || location.pathname === "/app/smart-home";
 
   return (
-    <div className="ozma-shell min-h-screen">
-      <header className="sticky top-0 z-30 px-4 py-3 backdrop-blur-xl md:py-5">
-        <div className="ozma-nav mx-auto flex max-w-7xl items-center justify-between gap-3 rounded-lg px-3 py-3">
-          <button className="flex min-w-0 items-center gap-3 text-left" onClick={() => navigate("/")}>
-            <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-md bg-leaf">
-              <img src={primaryLogo} alt="" className="h-full w-full object-contain" aria-hidden="true" />
+    <div className="avareno-app-shell min-h-screen">
+      <header className="avareno-app-topbar">
+        <div className="avareno-app-topbar-inner">
+          <button className="avareno-app-brand" onClick={() => navigate("/app")} aria-label="Avareno App Home">
+            <span className="avareno-app-brand-symbol" aria-hidden="true">
+              <img src={avarenoMark} alt="" />
             </span>
-            <span className="hidden min-w-0 sm:block">
-              <span className="block text-lg font-black leading-tight text-ink">Mavora</span>
-              <span className="block truncate text-xs font-bold text-muted">your things, close by</span>
-            </span>
+            <span className="avareno-app-brand-text">avareno</span>
           </button>
 
-          <nav className="no-scrollbar flex flex-1 justify-center overflow-auto">
-            <div className="flex items-center gap-1 rounded-full bg-white/72 p-1 ring-1 ring-line/80">
-              {nav.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    className={({ isActive }) =>
-                      `inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full px-3 text-sm font-black transition ${
-                        isActive ? "bg-ink text-white" : "text-muted hover:bg-white hover:text-ink"
-                      }`
-                    }
-                  >
-                    <Icon size={15} />
-                    <span className="hidden sm:inline">{item.label}</span>
-                  </NavLink>
-                );
-              })}
-            </div>
+          <nav className="avareno-app-nav no-scrollbar">
+            {nav.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === "/app"}
+                  className={({ isActive }) => (isActive ? "is-active" : "")}
+                >
+                  <Icon size={17} />
+                  <span>{item.label}</span>
+                </NavLink>
+              );
+            })}
           </nav>
 
-          <button className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-ink px-4 text-sm font-black text-white shadow-soft transition hover:-translate-y-0.5" onClick={() => setOpen(true)}>
-            <Plus size={17} />
-            <span className="hidden sm:inline">Capture</span>
-          </button>
+          <div className="avareno-app-actions">
+            <Link className="avareno-app-website-link" to="/">
+              Website
+            </Link>
+            <button className="avareno-app-user" type="button" aria-label="User profile">
+              <UserRound size={17} />
+              <span>Steve</span>
+            </button>
+            <button className="avareno-app-capture" onClick={() => setOpen(true)}>
+              <Plus size={17} />
+              <span>Capture</span>
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className="px-4 pb-24 pt-2 md:pb-10">
+      <main className={isSmartSurface ? "avareno-app-content is-smart-surface" : "avareno-app-content"}>
         <Outlet />
       </main>
 
@@ -81,7 +94,7 @@ export function AppShell() {
               <div>
                 <p className="text-xs font-black uppercase text-muted">Capture</p>
                 <h2 className="mt-1 text-3xl font-black text-ink">Add something real.</h2>
-                <p className="mt-2 max-w-lg text-sm font-semibold leading-6 text-muted">Choose a source. Mavora turns it into an object, proof, or care reminder.</p>
+                <p className="mt-2 max-w-lg text-sm font-semibold leading-6 text-muted">Choose a source. Avareno turns it into an object, proof, or care reminder.</p>
               </div>
               <button className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted hover:bg-wash hover:text-ink" onClick={() => setOpen(false)}>
                 <X size={18} />

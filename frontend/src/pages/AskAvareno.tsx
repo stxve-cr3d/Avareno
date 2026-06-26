@@ -13,7 +13,7 @@ const prompts = [
   "Was kann ich nachkaufen?"
 ];
 
-export function AskMavora() {
+export function AskAvareno() {
   const [question, setQuestion] = useState(prompts[0]);
   const [answer, setAnswer] = useState<AssistantAnswer | null>(null);
   const [busy, setBusy] = useState(false);
@@ -37,12 +37,12 @@ export function AskMavora() {
     <div className="ask-page mx-auto max-w-7xl space-y-5">
       <section className="ask-hero rounded-lg">
         <div>
-          <p className="text-xs font-black uppercase text-leaf">Ask Mavora</p>
+          <p className="text-xs font-black uppercase text-leaf">Ask Avareno</p>
           <h1 className="mt-3 max-w-4xl text-[clamp(3rem,7vw,7rem)] font-black leading-[0.9] text-white">
             frag deine dinge
           </h1>
           <p className="mt-5 max-w-2xl text-base font-semibold leading-7 text-white/62">
-            Kein normaler Chat. Mavora antwortet aus deinen Objekten, Belegen, Raeumen, Garantien und fehlenden Daten.
+            Kein normaler Chat. Avareno antwortet aus deinen Objekten, Belegen, Raeumen, Garantien und fehlenden Daten.
           </p>
         </div>
         <div className="ask-signal">

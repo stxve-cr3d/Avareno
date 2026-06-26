@@ -56,7 +56,7 @@ def bambu_lab_configured() -> bool:
 
 
 def local_discovery_enabled() -> bool:
-    return os.environ.get("MAVORA_ENABLE_LAN_DISCOVERY") == "1"
+    return os.environ.get("AVARENO_ENABLE_LAN_DISCOVERY") == "1"
 
 
 def smart_home_payload(conn: sqlite3.Connection, user_id: str) -> dict:
@@ -157,7 +157,7 @@ def smart_home_payload(conn: sqlite3.Connection, user_id: str) -> dict:
                 "mode": "LAN" if local_discovery_enabled() else "DEMO",
                 "status": _provider_status(connections, LOCAL_DISCOVERY_PROVIDER),
                 "tokenConfigured": local_discovery_enabled(),
-                "authNote": "Opt-in local search. Demo by default; set MAVORA_ENABLE_LAN_DISCOVERY=1 for limited LAN probes.",
+                "authNote": "Opt-in local search. Demo by default; set AVARENO_ENABLE_LAN_DISCOVERY=1 for limited LAN probes.",
             },
         ],
         "devices": devices,
@@ -173,7 +173,7 @@ def smart_home_payload(conn: sqlite3.Connection, user_id: str) -> dict:
         ],
         "wow": {
             "label": "Object Control",
-            "promise": "Smart devices become real Mavora objects with proof, warranty, room, state, and safe controls in one place.",
+            "promise": "Smart devices become real Avareno objects with proof, warranty, room, state, and safe controls in one place.",
         },
         "localDiscovery": {
             "mode": "LAN" if local_discovery_enabled() else "DEMO",
@@ -832,7 +832,7 @@ def _smart_home_insights(conn: sqlite3.Connection, user_id: str, devices: list[d
                     device,
                     item_name,
                     "Print finish alerts",
-                    "Turn Bambu status into Mavora notifications for done, paused, failed and attention-needed prints.",
+                    "Turn Bambu status into Avareno notifications for done, paused, failed and attention-needed prints.",
                     f"Set Bambu alerts: {item_name}",
                     "Set print-finished, paused, failed and attention-needed notification rules for this Bambu printer.",
                     due_in_days=1,
@@ -925,7 +925,7 @@ def _smart_home_insights(conn: sqlite3.Connection, user_id: str, devices: list[d
                     device.get("name") or "Bambu Lab printer",
                     "Bambu setup checklist",
                     "Prepare LAN/dev mode, serial number, access code, filament watch and print-finish notifications.",
-                    f"Set up Bambu in Mavora: {device.get('name') or '3D Printer'}",
+                    f"Set up Bambu in Avareno: {device.get('name') or '3D Printer'}",
                     "Add printer model, room, serial/access-code notes, filament preferences and print-finish notification rules.",
                     due_in_days=1,
                     priority="HIGH",
@@ -940,7 +940,7 @@ def _smart_home_insights(conn: sqlite3.Connection, user_id: str, devices: list[d
                 "deviceId": device["id"],
                 "itemId": None,
                 "title": "Match to physical product",
-                "subtitle": f"{device['name']} is controllable, but not yet connected to a Mavora object.",
+                "subtitle": f"{device['name']} is controllable, but not yet connected to an Avareno object.",
                 "signal": "Needs product identity",
                 "priority": "HIGH",
                 "actionType": "LINK_ITEM",
@@ -964,7 +964,7 @@ def _smart_home_insights(conn: sqlite3.Connection, user_id: str, devices: list[d
                 "deviceId": None,
                 "itemId": None,
                 "title": "Home Assistant bridge",
-                "subtitle": "One local bridge can make Samsung, Alexa, Matter and LAN devices feel like one Mavora layer later.",
+                "subtitle": "One local bridge can make Samsung, Alexa, Matter and LAN devices feel like one Avareno layer later.",
                 "signal": "Future local-first control",
                 "priority": "MEDIUM",
                 "actionType": "DISCOVER_LOCAL",
@@ -1097,7 +1097,7 @@ def _upsert_device(
         "deviceType": _infer_device_type(source_device, capabilities),
         "capabilities": json.dumps(capabilities),
         "status": "ONLINE",
-        "rawJson": json.dumps({**source_device, "mavoraSource": source}),
+        "rawJson": json.dumps({**source_device, "avarenoSource": source}),
         "lastSeenAt": now,
         "updatedAt": now,
     }
@@ -1291,9 +1291,9 @@ def _lan_candidates() -> list[dict]:
         return []
     candidates: list[dict] = []
     ports = LAN_DISCOVERY_PORTS
-    host_limit = max(16, min(512, int(os.environ.get("MAVORA_LAN_SCAN_LIMIT", "254"))))
+    host_limit = max(16, min(512, int(os.environ.get("AVARENO_LAN_SCAN_LIMIT", "254"))))
     hosts = [str(host) for host in list(subnet.hosts())[:host_limit]]
-    workers = max(16, min(128, int(os.environ.get("MAVORA_LAN_SCAN_WORKERS", "96"))))
+    workers = max(16, min(128, int(os.environ.get("AVARENO_LAN_SCAN_WORKERS", "96"))))
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(_open_ports, host, ports): host for host in hosts}
@@ -1679,7 +1679,7 @@ def _candidate_fingerprint(host: str, open_ports: list[int]) -> dict:
         "capabilities": ["networkPresence"],
         "identity": {
             "label": "Unknown LAN device",
-            "evidence": ["Mavora only knows that the host answered"],
+            "evidence": ["Avareno only knows that the host answered"],
         },
         "connectHint": "Import only after matching it with a product or router client name.",
         "recommendedAction": "Identify first",
@@ -1762,7 +1762,7 @@ def _bambu_diagnostic_steps(status: str, host: str) -> list[str]:
     if status == "LAN_READY":
         return [
             "Enter the printer serial number and LAN access code from the Bambu printer screen.",
-            "Prepare the Bambu object in Mavora.",
+            "Prepare the Bambu object in Avareno.",
             "Use print alerts to turn finished/paused/failed jobs into reminders.",
         ]
     if status == "PRINTER_SEEN":

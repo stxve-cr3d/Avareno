@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -7,13 +8,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.db import PROJECT_ROOT
-from app.routers import assistant, capture, dashboard, documents, extract, items, loops, me, mobile, notifications, planner, reports, rewards, smart_home, structure
+from app.routers import assistant, capture, dashboard, documents, extract, items, loops, me, mobile, notifications, planner, reports, rewards, search, smart_home, structure
 
-app = FastAPI(title="Mavora API")
+app = FastAPI(title="Avareno API")
+
+
+def _cors_origins() -> list[str]:
+    configured = os.environ.get("AVARENO_CORS_ORIGINS")
+    if configured:
+        return [origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip()]
+    return [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+    ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=_cors_origins(),
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1):\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,6 +51,7 @@ app.include_router(mobile.router, prefix="/api/mobile", tags=["mobile"])
 app.include_router(structure.router, prefix="/api/structure", tags=["structure"])
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(assistant.router, prefix="/api/assistant", tags=["assistant"])
+app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(smart_home.router, prefix="/api/smart-home", tags=["smart-home"])
 
 

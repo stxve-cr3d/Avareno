@@ -28,6 +28,7 @@ def main() -> None:
         user_id = make_id()
         item_id = make_id()
         document_id = make_id()
+        repair_id = make_id()
         warranty_loop_id = make_id()
         message_loop_id = make_id()
 
@@ -38,8 +39,9 @@ def main() -> None:
         conn.execute(
             """INSERT INTO "Item"
                (id, userId, name, category, manufacturer, model, purchaseDate, merchant, price, currency,
-                imageUrl, warrantyUntil, location, completenessScore, status, createdAt, updatedAt)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                imageUrl, warrantyUntil, location, manualUrl, driverUrl, softwareUrl, supportUrl, supportContact,
+                completenessScore, status, createdAt, updatedAt)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 item_id,
                 user_id,
@@ -54,6 +56,11 @@ def main() -> None:
                 LG_C3_IMAGE_URL,
                 "2027-09-14T12:00:00+00:00",
                 "Wohnzimmer",
+                "https://www.lg.com/support/product/lg-OLED65C3",
+                "https://www.lg.com/support/software-firmware",
+                "https://www.lg.com/support/software-firmware",
+                "https://www.lg.com/support/contact",
+                "LG Support",
                 80,
                 "ACTIVE",
                 now,
@@ -74,6 +81,23 @@ def main() -> None:
                 "application/pdf",
                 "MediaMarkt LG OLED65C3 1499 EUR",
                 '{"merchant":"MediaMarkt","manufacturer":"LG","model":"OLED65C3","price":1499}',
+                now,
+                now,
+            ),
+        )
+        conn.execute(
+            """INSERT INTO "RepairLog"
+               (id, userId, itemId, date, problem, resolution, cost, status, createdAt, updatedAt)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                repair_id,
+                user_id,
+                item_id,
+                "2026-01-20T10:00:00+00:00",
+                "HDMI cable caused intermittent signal drop.",
+                "Cable replaced and input renamed.",
+                19.99,
+                "RESOLVED",
                 now,
                 now,
             ),
@@ -158,7 +182,7 @@ def main() -> None:
                 (make_id(), user_id, message_loop_id, None, "create_message_reminder", 10, now),
             ],
         )
-    print("Seeded Mavora Python backend")
+    print("Seeded Avareno Python backend")
 
 
 if __name__ == "__main__":

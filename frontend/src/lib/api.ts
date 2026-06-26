@@ -1,5 +1,6 @@
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
+  const apiOrigin = import.meta.env.VITE_API_ORIGIN?.replace(/\/$/, "") ?? "";
+  const response = await fetch(`${apiOrigin}${path}`, {
     headers: options.body instanceof FormData ? undefined : { "Content-Type": "application/json" },
     ...options
   });

@@ -49,7 +49,7 @@ WOW_FEATURES = [
     {
         "id": "REORDER_INTELLIGENCE",
         "label": "Reorder Intelligence",
-        "description": "Mavora findet passende Ersatzteile, Verbrauchsmaterial, neue Modelle und Shop-Links.",
+        "description": "Avareno findet passende Ersatzteile, Verbrauchsmaterial, neue Modelle und Shop-Links.",
     },
     {
         "id": "HOME_ASSISTANT_IMPORT",
