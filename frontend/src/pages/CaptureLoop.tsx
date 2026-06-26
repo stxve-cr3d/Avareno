@@ -1,10 +1,16 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { ListChecks } from "lucide-react";
+import { CalendarClock, CheckCircle2, ChevronRight, FileText, ShieldCheck } from "lucide-react";
 import { api } from "../lib/api";
 import type { Loop } from "../lib/types";
-import { Card } from "../components/Card";
-import { Button } from "../components/Button";
+
+const priorityOptions: { label: string; value: Loop["priority"] }[] = [
+  { label: "Niedrig", value: "LOW" },
+  { label: "Normal", value: "MEDIUM" },
+  { label: "Wichtig", value: "HIGH" },
+  { label: "Kritisch", value: "BOSS" }
+];
 
 export function CaptureLoop() {
   const navigate = useNavigate();
@@ -26,48 +32,75 @@ export function CaptureLoop() {
         xpReward: priority === "BOSS" ? 100 : priority === "HIGH" ? 50 : priority === "LOW" ? 10 : 25
       })
     });
-    navigate(`/loops/${loop.id}`);
+    navigate(`/app/loops/${loop.id}`);
   }
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-3xl border border-white/80 bg-paper p-5 shadow-soft ring-1 ring-line/60">
-        <div className="flex items-start gap-3">
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-orange-50 text-coral">
-            <ListChecks size={22} />
-          </div>
-          <div>
-            <h1 className="text-3xl font-black text-ink">Park a loop</h1>
-            <p className="mt-2 text-sm font-semibold leading-6 text-muted">Name the thing, choose the weight, and let it stop floating around.</p>
-          </div>
+    <main className="care-page">
+      <section className="care-hero">
+        <div>
+          <h1>Care</h1>
+          <p>Alles, was nicht vergessen werden darf: Garantien, Rückgaben, Reparaturen und offene Zusagen.</p>
         </div>
-      </div>
-      <Card>
-        <label className="text-sm font-bold text-ink">
-          Title
-          <input value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 w-full rounded-2xl border border-line p-3 text-sm font-semibold outline-none focus:border-leaf" />
+      </section>
+
+      <section className="care-focus">
+        <div>
+          <span>Neue Erinnerung</span>
+          <h2>Ein offener Punkt reicht.</h2>
+          <p>Halte nur fest, was wirklich wieder auftauchen muss. Details kannst du später ergänzen.</p>
+        </div>
+        <button className="care-primary-action" disabled={!title.trim()} onClick={createLoop} type="button">
+          Erinnerung anlegen
+          <ChevronRight size={16} />
+        </button>
+      </section>
+
+      <section className="care-form-panel">
+        <label>
+          Titel
+          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="z.B. Garantie für Fernseher prüfen" />
         </label>
-        <label className="mt-4 block text-sm font-bold text-ink">
-          Description
-          <textarea value={description} onChange={(event) => setDescription(event.target.value)} className="mt-1 min-h-28 w-full rounded-2xl border border-line p-4 text-sm font-semibold leading-6 outline-none focus:border-leaf" />
+        <label>
+          Notiz
+          <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Was soll Avareno später wieder hochholen?" />
         </label>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <label className="text-sm font-bold text-ink">
-            Priority
-            <select value={priority} onChange={(event) => setPriority(event.target.value as Loop["priority"])} className="mt-1 w-full rounded-2xl border border-line p-3 text-sm font-semibold outline-none focus:border-leaf">
-              <option>LOW</option>
-              <option>MEDIUM</option>
-              <option>HIGH</option>
-              <option>BOSS</option>
+        <div className="care-form-grid">
+          <label>
+            Wichtigkeit
+            <select value={priority} onChange={(event) => setPriority(event.target.value as Loop["priority"])}>
+              {priorityOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </label>
-          <label className="text-sm font-bold text-ink">
-            Due date
-            <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className="mt-1 w-full rounded-2xl border border-line p-3 text-sm font-semibold outline-none focus:border-leaf" />
+          <label>
+            Fällig am
+            <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
           </label>
         </div>
-        <Button className="mt-5 w-full" disabled={!title} onClick={createLoop}>Park loop</Button>
-      </Card>
+      </section>
+
+      <section className="care-preview-list" aria-label="Care Beispiele">
+        <CarePreview icon={<ShieldCheck size={18} />} label="Garantie" body="Ablaufdatum, Beleg und Produkt bleiben verbunden." />
+        <CarePreview icon={<CalendarClock size={18} />} label="Rückgabe" body="Fristen und fehlende Nachweise werden sichtbar." />
+        <CarePreview icon={<FileText size={18} />} label="Reparatur" body="Service, Kosten und Ergebnis landen im Produktpass." />
+      </section>
+    </main>
+  );
+}
+
+function CarePreview({ body, icon, label }: { body: string; icon: ReactNode; label: string }) {
+  return (
+    <div className="care-preview-row">
+      <span>{icon}</span>
+      <div>
+        <strong>{label}</strong>
+        <small>{body}</small>
+      </div>
+      <CheckCircle2 size={17} />
     </div>
   );
 }

@@ -7,7 +7,8 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.error ?? "Request failed");
+    const detail = Array.isArray(body.detail) ? body.detail.map((entry: { msg?: string }) => entry.msg).filter(Boolean).join(", ") : body.detail;
+    throw new Error(body.error ?? detail ?? "Request failed");
   }
 
   return response.json() as Promise<T>;

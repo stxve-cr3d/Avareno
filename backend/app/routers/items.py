@@ -11,6 +11,7 @@ from app.schemas import ItemCreate, ItemPatch, RepairLogCreate
 from app.services.barcode_lookup import barcode_format, lookup_barcode, normalize_barcode
 from app.services.item_service import calculate_completeness_score, missing_fields
 from app.services.product_images import suggest_product_image
+from app.services.providers.compatibility_provider import build_provider_preview
 from app.services.xp_service import award_xp
 from app.utils import make_id, normalize_iso, now_iso, parse_iso
 
@@ -331,6 +332,18 @@ def get_image_suggestion(item_id: str) -> dict:
         if not suggestion:
             raise HTTPException(status_code=404, detail="No image suggestion found")
         return suggestion
+
+
+@router.get("/{item_id}/compatibility/provider-preview")
+def get_compatibility_provider_preview(item_id: str) -> dict:
+    with db() as conn:
+        user = get_default_user(conn)
+        item = row_to_dict(
+            conn.execute('SELECT * FROM "Item" WHERE id = ? AND userId = ?', (item_id, user["id"])).fetchone()
+        )
+        if not item:
+            raise HTTPException(status_code=404, detail="Item not found")
+        return build_provider_preview(item, user["id"])
 
 
 @router.patch("/{item_id}")

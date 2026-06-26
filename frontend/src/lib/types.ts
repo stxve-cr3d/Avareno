@@ -6,6 +6,43 @@ export type User = {
   level: number;
 };
 
+export type XPEvent = {
+  id: string;
+  label: string;
+  points: number;
+  createdAt: string;
+};
+
+export type XPRule = {
+  action: string;
+  points: number;
+};
+
+export type FreezeDayState = {
+  active: boolean;
+  title: string;
+  body: string;
+};
+
+export type MotivationSummary = {
+  motivationEnabled: boolean;
+  streakTrackingEnabled: boolean;
+  gentleNudgesEnabled: boolean;
+  currentStreakDays: number;
+  longestStreakDays: number;
+  freezeDaysAvailable: number;
+  weeklyXP: number;
+  totalXP: number;
+  levelName: string;
+  levelProgress: number;
+  statusText: string;
+  nudgeText: string;
+  pauseText: string;
+  freezeState: FreezeDayState;
+  recentXPEvents: XPEvent[];
+  xpRules: XPRule[];
+};
+
 export type Item = {
   id: string;
   householdId?: string | null;
@@ -46,6 +83,196 @@ export type Item = {
   loops?: Loop[];
   reminders?: Reminder[];
   missingFields?: string[];
+};
+
+export type ProductIdentifierSet = {
+  gtin?: string | null;
+  ean?: string | null;
+  upc?: string | null;
+  mpn?: string | null;
+  sku?: string | null;
+  serialNumber?: string | null;
+  serialPrefix?: string | null;
+};
+
+export type ProductIdentity = {
+  id: string;
+  brand?: string | null;
+  productName: string;
+  category?: string | null;
+  modelName?: string | null;
+  modelNumber?: string | null;
+  variant?: string | null;
+  generation?: string | null;
+  releaseYear?: number | null;
+  canonicalModelId?: string | null;
+  identifiers: ProductIdentifierSet;
+};
+
+export type ProductPassport = ProductIdentity & {
+  sourceItemId?: string | null;
+  identityConfidence?: number | null;
+  needsModelConfirmation?: boolean;
+};
+
+export type CompatibilityRelationType =
+  | "accessory"
+  | "spare_part"
+  | "upgrade"
+  | "consumable"
+  | "manual"
+  | "known_issue"
+  | "ticket"
+  | "printable_model";
+
+export type CompatibilityLevel = "exact_match" | "family_match" | "unverified" | "not_compatible";
+
+export type CompatibilitySource =
+  | "manufacturer"
+  | "manual"
+  | "gs1"
+  | "icecat"
+  | "retailer"
+  | "invoice"
+  | "barcode"
+  | "user_confirmed"
+  | "community_confirmed"
+  | "ai_suggested"
+  | "printable_platform"
+  | "avareno_verified";
+
+export type CompatibilityEdge = {
+  id: string;
+  sourceProductId: string;
+  sourceCanonicalModelId?: string | null;
+  targetProductId: string;
+  targetCanonicalModelId?: string | null;
+  relationType: CompatibilityRelationType;
+  compatibilityLevel: CompatibilityLevel;
+  confidence: number;
+  source: CompatibilitySource;
+  evidenceText: string;
+  verifiedAt?: string | null;
+};
+
+export type CompatibleItem = {
+  id: string;
+  name: string;
+  identity: ProductIdentity;
+  edge: CompatibilityEdge;
+  description: string;
+};
+
+export type ProviderCandidate = {
+  id: string;
+  provider: CompatibilitySource;
+  rawTitle: string;
+  brand?: string | null;
+  detectedModel?: string | null;
+  detectedIdentifiers: ProductIdentifierSet;
+  relationType: CompatibilityRelationType;
+  sourceUrl?: string | null;
+  evidenceText: string;
+  rawConfidence: number;
+  normalizedTargetProductId?: string | null;
+  normalizedTargetCanonicalModelId?: string | null;
+};
+
+export type AvailabilityStatus = "in_stock" | "limited" | "out_of_stock" | "unknown";
+export type ReturnPolicyQuality = "good" | "average" | "poor" | "unknown";
+
+export type PriceAvailability = {
+  id: string;
+  targetProductId: string;
+  retailerName: string;
+  price: number;
+  currency: string;
+  availability: AvailabilityStatus;
+  deliveryEstimate?: string | null;
+  returnPolicyQuality: ReturnPolicyQuality;
+  sellerTrustScore: number;
+  lastCheckedAt: string;
+  source: CompatibilitySource;
+};
+
+export type PrintableSource = "thingiverse" | "printables" | "makerworld" | "thangs" | "github" | "avareno_user" | "manufacturer";
+export type PrintableFileType = "stl" | "3mf" | "step" | "obj" | "f3d";
+export type PrintablePartType = "accessory" | "spare_part" | "upgrade" | "mount" | "holder" | "cover" | "adapter" | "tool" | "organizer";
+export type PrintTechnology = "fdm" | "resin" | "sls" | "unknown";
+export type PrintMaterial = "PLA" | "PETG" | "ABS" | "ASA" | "TPU" | "Nylon" | "resin" | "unknown";
+export type PrintDifficulty = "easy" | "medium" | "hard";
+export type PrintSafetyCategory = "non_critical" | "cosmetic" | "functional_low_risk" | "functional_medium_risk" | "safety_critical" | "electrical" | "heat_critical" | "load_bearing";
+
+export type PrintRequirement = {
+  technology: PrintTechnology;
+  materials: PrintMaterial[];
+  minBuildVolumeMm: { x: number; y: number; z: number };
+  nozzle?: 0.4 | 0.6 | 0.8 | null;
+  layerHeight?: number | null;
+  supportsRequired: boolean;
+  difficulty: PrintDifficulty;
+  safetyCategory: PrintSafetyCategory;
+};
+
+export type PrintableModel = {
+  id: string;
+  title: string;
+  source: PrintableSource;
+  sourceUrl?: string | null;
+  creatorName: string;
+  fileTypes: PrintableFileType[];
+  license: string;
+  detectedBrand?: string | null;
+  detectedModel?: string | null;
+  detectedCanonicalModelId?: string | null;
+  detectedPartType: PrintablePartType;
+  compatibilityLevel: CompatibilityLevel;
+  evidenceText: string;
+  printRequirements: PrintRequirement;
+  qualitySignals: {
+    makesCount: number;
+    rating: number;
+    downloads: number;
+    lastUpdated: string;
+    hasPhotos: boolean;
+    hasAssemblyInstructions: boolean;
+    userFitConfirmations: number;
+    exactModelFitConfirmations: number;
+  };
+};
+
+export type PrintableProviderCandidate = Omit<PrintableModel, "compatibilityLevel"> & {
+  rawConfidence: number;
+};
+
+export type UserPrinter = {
+  id: string;
+  name: string;
+  technology: PrintTechnology;
+  buildVolumeMm: { x: number; y: number; z: number };
+  supportedMaterials: PrintMaterial[];
+  nozzleSizes: number[];
+  hasMultiMaterial: boolean;
+  experienceLevel: "beginner" | "intermediate" | "advanced";
+};
+
+export type UserFabricationCapability = {
+  has3DPrinter: true | false | "unknown";
+  printers: UserPrinter[];
+};
+
+export type UserCapabilityStatus = "available" | "unavailable" | "unknown" | "not_suitable";
+export type ProcurementOptionType = "buy" | "print" | "help";
+
+export type ProcurementOption = {
+  id: string;
+  partId: string;
+  optionType: ProcurementOptionType;
+  compatibilityLevel: CompatibilityLevel;
+  userCapabilityStatus: UserCapabilityStatus;
+  recommendationScore: number;
+  source: CompatibilitySource | PrintableSource;
+  reason: string;
 };
 
 export type SmartHomeProvider = {

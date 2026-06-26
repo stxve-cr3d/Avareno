@@ -1,9 +1,10 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, BookOpen, CalendarClock, LifeBuoy, PackagePlus, ReceiptText, ScanBarcode, ShieldCheck, Tag } from "lucide-react";
+import { ArrowRight, BookOpen, Camera, LifeBuoy, PackagePlus, ReceiptText, ScanBarcode, ShieldCheck, Tag } from "lucide-react";
 import { api } from "../lib/api";
 import type { BarcodeLookup, Item } from "../lib/types";
+import { BarcodeScannerDialog } from "../components/BarcodeScannerDialog";
 import { Button } from "../components/Button";
 
 type PassportForm = {
@@ -54,6 +55,7 @@ export function CaptureItem() {
   const [busy, setBusy] = useState(false);
   const [lookupBusy, setLookupBusy] = useState(false);
   const [lookupResult, setLookupResult] = useState<BarcodeLookup | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [error, setError] = useState("");
 
   function updateField(field: keyof PassportForm, value: string) {
@@ -100,15 +102,17 @@ export function CaptureItem() {
     }
   }
 
-  async function lookupBarcode() {
-    if (!form.barcode.trim()) return;
+  const lookupBarcode = useCallback(async (barcodeValue = form.barcode) => {
+    const value = barcodeValue.trim();
+    if (!value) return;
     setLookupBusy(true);
     setLookupResult(null);
     setError("");
     try {
-      const result = await api<BarcodeLookup>(`/api/items/lookup/barcode?code=${encodeURIComponent(form.barcode.trim())}`);
+      const result = await api<BarcodeLookup>(`/api/items/lookup/barcode?code=${encodeURIComponent(value)}`);
       setLookupResult(result);
       if (result.item) {
+        setForm((current) => ({ ...current, barcode: result.barcode, barcodeFormat: result.barcodeFormat }));
         return;
       }
       if (result.product) {
@@ -130,15 +134,26 @@ export function CaptureItem() {
     } finally {
       setLookupBusy(false);
     }
-  }
+  }, [form.barcode]);
+
+  const handleBarcodeDetected = useCallback(
+    (value: string) => {
+      setScannerOpen(false);
+      setForm((current) => ({ ...current, barcode: value }));
+      void lookupBarcode(value);
+    },
+    [lookupBarcode]
+  );
 
   return (
     <form className="mx-auto max-w-6xl space-y-5" onSubmit={createItem}>
+      <BarcodeScannerDialog onClose={() => setScannerOpen(false)} onDetected={handleBarcodeDetected} open={scannerOpen} />
+
       <section className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
         <div className="grid gap-5 bg-[#101111] p-5 text-white md:grid-cols-[minmax(0,1fr)_18rem] md:p-7">
           <div>
-            <p className="text-xs font-black uppercase text-white/50">Product Passport</p>
-            <h1 className="mt-3 max-w-3xl text-[clamp(2.6rem,7vw,5.8rem)] font-black leading-[0.92]">Create a memory for a real thing</h1>
+            <p className="text-xs font-bold uppercase text-white/50">Product Passport</p>
+            <h1 className="mt-3 max-w-3xl text-[clamp(2.6rem,7vw,5.8rem)] font-semibold leading-[0.94]">Create a memory for a real thing</h1>
             <p className="mt-5 max-w-xl text-base font-semibold leading-7 text-white/62">
               Start with what you know now. Scan or paste a barcode, then complete anything missing later.
             </p>
@@ -157,12 +172,22 @@ export function CaptureItem() {
           <PassportSection icon={<PackagePlus size={19} />} eyebrow="Step 1" title="Identity">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                   <Field label="Barcode / GTIN" value={form.barcode} onChange={(value) => updateField("barcode", value)} placeholder="EAN, UPC or GTIN" inputMode="numeric" />
                   <button
-                    className="mt-7 inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-ink px-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    className="mt-7 inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 text-sm font-bold text-ink transition hover:border-leaf hover:text-leaf"
+                    data-testid="barcode-scan-open"
+                    onClick={() => setScannerOpen(true)}
+                    type="button"
+                  >
+                    <Camera size={17} />
+                    Scan
+                  </button>
+                  <button
+                    className="mt-7 inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-ink px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    data-testid="barcode-lookup"
                     disabled={!form.barcode.trim() || lookupBusy}
-                    onClick={lookupBarcode}
+                    onClick={() => void lookupBarcode()}
                     type="button"
                   >
                     <ScanBarcode size={17} />

@@ -1,26 +1,22 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Archive, Bot, FileCheck2, FileText, Gift, Home, ListChecks, MessageSquareText, Package, PenLine, PlugZap, Plus, ReceiptText, UserRound, X } from "lucide-react";
+import { Archive, FileText, Home, LifeBuoy, MessageSquareText, Package, PenLine, Plus, ReceiptText, UserRound, X } from "lucide-react";
 import { useState } from "react";
 import avarenoMark from "../assets/avareno-mark.svg";
 
 const nav = [
-  { to: "/app", label: "Home", icon: Home },
+  { to: "/app", label: "Zuhause", icon: Home },
   { to: "/app/items", label: "Dinge", icon: Archive },
-  { to: "/app/ask", label: "Ask", icon: Bot },
-  { to: "/app/smart-home", label: "Smart", icon: PlugZap },
-  { to: "/app/capture", label: "Capture", icon: Plus },
-  { to: "/app/reports/home-binder", label: "Binder", icon: FileCheck2 },
-  { to: "/app/capture/loop", label: "Care", icon: ListChecks },
-  { to: "/app/rewards", label: "Progress", icon: Gift }
+  { to: "/app/resolve", label: "Resolve", icon: LifeBuoy },
+  { to: "/app/rewards", label: "Ich", icon: UserRound }
 ];
 
 const captureOptions = [
-  { label: "Smart Capture", helper: "One flow for photo, receipt, text, barcode", to: "/app/capture", icon: Plus },
-  { label: "Receipt", helper: "Proof, warranty, item card", to: "/app/capture/receipt", icon: ReceiptText },
-  { label: "Thing", helper: "Start a profile for a physical object", to: "/app/capture/item", icon: Package },
-  { label: "Message", helper: "Context into a reminder", to: "/app/capture/message", icon: MessageSquareText },
-  { label: "Document", helper: "Store and connect later", to: "/app/capture/receipt", icon: FileText },
-  { label: "Care", helper: "Warranty, repair, service, return", to: "/app/capture/loop", icon: PenLine }
+  { label: "Smart erfassen", helper: "Ein Flow für Foto, Beleg, Text und Barcode", to: "/app/capture", icon: Plus },
+  { label: "Beleg", helper: "Nachweis, Garantie und Produktkarte", to: "/app/capture/receipt", icon: ReceiptText },
+  { label: "Ding", helper: "Produktpass für ein echtes Objekt starten", to: "/app/capture/item", icon: Package },
+  { label: "Nachricht", helper: "Kontext in Erinnerung verwandeln", to: "/app/capture/message", icon: MessageSquareText },
+  { label: "Dokument", helper: "Speichern und später verbinden", to: "/app/capture/receipt", icon: FileText },
+  { label: "Care", helper: "Garantie, Reparatur, Service, Rückgabe", to: "/app/capture/loop", icon: PenLine }
 ];
 
 export function AppShell() {
@@ -71,13 +67,9 @@ export function AppShell() {
             <Link className="avareno-app-website-link" to="/">
               Website
             </Link>
-            <button className="avareno-app-user" type="button" aria-label="User profile">
-              <UserRound size={17} />
-              <span>Steve</span>
-            </button>
             <button className="avareno-app-capture" onClick={() => setOpen(true)}>
               <Plus size={17} />
-              <span>Capture</span>
+              <span>Erfassen</span>
             </button>
           </div>
         </div>
@@ -92,9 +84,9 @@ export function AppShell() {
           <div className="ozma-modal mx-auto mt-8 max-w-2xl rounded-lg p-4 md:mt-24" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-black uppercase text-muted">Capture</p>
-                <h2 className="mt-1 text-3xl font-black text-ink">Add something real.</h2>
-                <p className="mt-2 max-w-lg text-sm font-semibold leading-6 text-muted">Choose a source. Avareno turns it into an object, proof, or care reminder.</p>
+                <p className="text-xs font-black uppercase text-muted">Erfassen</p>
+                <h2 className="mt-1 text-3xl font-black text-ink">Etwas Echtes hinzufügen.</h2>
+                <p className="mt-2 max-w-lg text-sm font-semibold leading-6 text-muted">Wähle eine Quelle. Avareno macht daraus ein Ding, einen Nachweis oder eine Care-Erinnerung.</p>
               </div>
               <button className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted hover:bg-wash hover:text-ink" onClick={() => setOpen(false)}>
                 <X size={18} />

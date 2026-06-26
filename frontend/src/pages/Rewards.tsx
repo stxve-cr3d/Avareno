@@ -1,64 +1,126 @@
 import { useEffect, useState } from "react";
-import { Award, LockKeyhole } from "lucide-react";
+import type { ReactNode } from "react";
+import { Archive, CheckCircle2, ChevronRight, FileText, ShieldCheck, Sparkles, UserRound } from "lucide-react";
+import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { Card } from "../components/Card";
-import { XpPill } from "../components/XpPill";
-import type { User } from "../lib/types";
+import { RewardsOverview } from "../components/Motivation";
+import type { MotivationSummary, User } from "../lib/types";
 
 type RewardsPayload = {
   user: User;
   completedLoopsThisWeek: number;
   completionRate: number;
+  motivation: MotivationSummary;
   badges: { name: string; earned: boolean }[];
   transactions: { id: string; action: string; points: number; createdAt: string }[];
 };
 
+type MotivationPreferences = {
+  gentleNudgesEnabled?: boolean;
+  motivationEnabled?: boolean;
+};
+
+const preferenceKey = "avareno-motivation-preferences";
+
 export function Rewards() {
-  const [rewards, setRewards] = useState<RewardsPayload | null>(null);
+  const [profile, setProfile] = useState<RewardsPayload | null>(null);
+  const [preferences, setPreferences] = useState<MotivationPreferences>(() => readMotivationPreferences());
 
   useEffect(() => {
-    api<RewardsPayload>("/api/rewards").then(setRewards).catch(console.error);
+    api<RewardsPayload>("/api/rewards").then(setProfile).catch(console.error);
   }, []);
 
-  if (!rewards) return <div className="py-12 text-center text-sm font-semibold text-ink/55">Loading rewards...</div>;
+  const motivation = profile
+    ? {
+      ...profile.motivation,
+      gentleNudgesEnabled: preferences.gentleNudgesEnabled ?? profile.motivation.gentleNudgesEnabled,
+      motivationEnabled: preferences.motivationEnabled ?? profile.motivation.motivationEnabled
+    }
+    : null;
+
+  if (!profile || !motivation) return <div className="profile-loading">Profil wird geladen...</div>;
+
+  function updatePreferences(next: MotivationPreferences) {
+    setPreferences((current) => {
+      const merged = { ...current, ...next };
+      window.localStorage.setItem(preferenceKey, JSON.stringify(merged));
+      return merged;
+    });
+  }
 
   return (
-    <div className="space-y-5">
-      <Card className="!rounded-3xl !bg-coal text-white">
-        <p className="text-sm font-bold text-white/55">Progress</p>
-        <h1 className="mt-1 text-3xl font-black">Progress that feels like relief.</h1>
-        <div className="mt-5 flex flex-wrap gap-3">
-          <XpPill xp={rewards.user.xp} level={rewards.user.level} />
-          <div className="rounded-full bg-white/10 px-3 py-2 text-sm font-bold">{rewards.completedLoopsThisWeek} closed this week</div>
-          <div className="rounded-full bg-white/10 px-3 py-2 text-sm font-bold">{rewards.completionRate}% completion</div>
+    <main className="profile-page">
+      <section className="profile-hero">
+        <div className="profile-avatar" aria-hidden="true">
+          {profile.user.name.slice(0, 1).toUpperCase()}
         </div>
-      </Card>
-
-      <section>
-        <h2 className="mb-3 text-xl font-black text-ink">Badges</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {rewards.badges.map((badge) => (
-            <div key={badge.name} className={`rounded-2xl border p-4 shadow-soft ${badge.earned ? "border-leaf/20 bg-leaf/10" : "border-line bg-white"}`}>
-              <div className="flex items-center gap-3">
-                {badge.earned ? <Award className="text-leaf" /> : <LockKeyhole className="text-ink/35" />}
-                <p className="font-black text-ink">{badge.name}</p>
-              </div>
-            </div>
-          ))}
+        <div>
+          <h1>Ich</h1>
+          <p>{profile.user.name}</p>
+          <span>{profile.user.email}</span>
         </div>
       </section>
 
-      <section>
-        <h2 className="mb-3 text-xl font-black text-ink">XP log</h2>
-        <div className="grid gap-2">
-          {rewards.transactions.slice(0, 8).map((transaction) => (
-            <div key={transaction.id} className="flex items-center justify-between rounded-2xl border border-line bg-white p-3 text-sm shadow-soft">
-              <span className="font-bold text-ink">{transaction.action.replace(/_/g, " ")}</span>
-              <span className="font-black text-leaf">+{transaction.points}</span>
-            </div>
-          ))}
+      <section className="profile-focus">
+        <div>
+          <span>Motivation</span>
+          <h2>{motivation.motivationEnabled ? "Weiter so, ohne Druck." : "Motivation ist pausiert."}</h2>
+          <p>{motivation.motivationEnabled ? motivation.nudgeText : "Avareno funktioniert auch ohne Fortschrittsanzeige ganz normal weiter."}</p>
         </div>
+        <Link className="profile-primary-action" to="/app/items">
+          Kleine Aktion
+          <ChevronRight size={16} />
+        </Link>
       </section>
+
+      <section className="profile-stats" aria-label="Profil Überblick">
+        <ProfileStat icon={<Sparkles size={18} />} label="Woche" value={`${motivation.weeklyXP} XP`} />
+        <ProfileStat icon={<UserRound size={18} />} label="Level" value={motivation.levelName} />
+        <ProfileStat icon={<CheckCircle2 size={18} />} label="Streak" value={`${motivation.currentStreakDays} Tage`} />
+      </section>
+
+      <RewardsOverview
+        motivation={motivation}
+        onMotivationChange={(enabled) => updatePreferences({ motivationEnabled: enabled })}
+        onNudgeChange={(enabled) => updatePreferences({ gentleNudgesEnabled: enabled })}
+      />
+
+      <section className="profile-links" aria-label="Profil Bereiche">
+        <ProfileLink icon={<Archive size={18} />} label="Meine Dinge" body="Produkte, Belege und Garantien" to="/app/items" />
+        <ProfileLink icon={<ShieldCheck size={18} />} label="Care" body="Erinnerungen und offene Punkte" to="/app/capture/loop" />
+        <ProfileLink icon={<FileText size={18} />} label="Dokumente" body="Gesicherte Nachweise und Dateien" to="/app/reports/home-binder" />
+      </section>
+    </main>
+  );
+}
+
+function ProfileStat({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <div className="profile-stat">
+      <span>{icon}</span>
+      <small>{label}</small>
+      <strong>{value}</strong>
     </div>
   );
+}
+
+function ProfileLink({ body, icon, label, to }: { body: string; icon: ReactNode; label: string; to: string }) {
+  return (
+    <Link className="profile-link" to={to}>
+      <span>{icon}</span>
+      <div>
+        <strong>{label}</strong>
+        <small>{body}</small>
+      </div>
+      <ChevronRight size={17} />
+    </Link>
+  );
+}
+
+function readMotivationPreferences(): MotivationPreferences {
+  try {
+    return JSON.parse(window.localStorage.getItem(preferenceKey) ?? "{}") as MotivationPreferences;
+  } catch {
+    return {};
+  }
 }

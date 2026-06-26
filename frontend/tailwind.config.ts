@@ -9,9 +9,9 @@ export default {
         muted: "#66706d",
         mist: "#eef2f0",
         line: "#d9dfdc",
-        leaf: "#197BBD",
-        moss: "#0f4f7a",
-        sky: "#5B85AA",
+        leaf: "#34A0A4",
+        moss: "#236B70",
+        sky: "#7DBFC2",
         coral: "#f06b54",
         amber: "#d97706",
         ember: "#dc2626",
@@ -21,8 +21,8 @@ export default {
       },
       boxShadow: {
         soft: "0 18px 50px rgba(23, 35, 29, 0.08)",
-        lift: "0 20px 70px rgba(25, 123, 189, 0.18)",
-        glow: "0 14px 38px rgba(25, 123, 189, 0.22)"
+        lift: "0 20px 70px rgba(52, 160, 164, 0.18)",
+        glow: "0 14px 38px rgba(52, 160, 164, 0.22)"
       }
     }
   },

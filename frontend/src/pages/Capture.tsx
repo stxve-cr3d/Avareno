@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 import type { CaptureDropResult, CaptureKind } from "../lib/types";
 
 const kinds: { value: CaptureKind; label: string; helper: string; icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
-  { value: "AUTO", label: "Auto", helper: "Movara sortiert", icon: Sparkles },
+  { value: "AUTO", label: "Auto", helper: "avareno sortiert", icon: Sparkles },
   { value: "RECEIPT", label: "Beleg", helper: "Kauf & Garantie", icon: ReceiptText },
   { value: "MESSAGE", label: "Nachricht", helper: "Antwort merken", icon: MessageSquareText },
   { value: "DOCUMENT", label: "Dokument", helper: "Sicher ablegen", icon: FileText },
@@ -53,7 +53,7 @@ export function Capture() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-black text-moss">Universal-Einwurf</p>
-              <h1 className="mt-2 max-w-2xl text-3xl font-black leading-tight md:text-5xl">Wirf es rein. Movara macht daraus Erinnerung.</h1>
+              <h1 className="mt-2 max-w-2xl text-3xl font-black leading-tight md:text-5xl">Wirf es rein. avareno macht daraus Erinnerung.</h1>
             </div>
             <span className="hidden h-16 w-16 place-items-center rounded-full bg-leaf text-white shadow-lift md:grid">
               <UploadCloud size={28} />
@@ -111,7 +111,7 @@ export function Capture() {
               onClick={submit}
               disabled={!text.trim() || busy}
             >
-              {busy ? "Movara sortiert..." : "Einwurf sichern"}
+              {busy ? "avareno sortiert..." : "Einwurf sichern"}
               <ArrowRight size={17} />
             </button>
             <Link to="/capture/receipt" className="text-sm font-black text-moss">
@@ -140,7 +140,7 @@ export function Capture() {
           <div className="rounded-[1.5rem] bg-[#fffaf2] p-5 shadow-soft">
             <h2 className="font-serif text-3xl italic leading-tight">Ein Satz reicht.</h2>
             <p className="mt-3 text-sm font-bold leading-6 text-ink/58">
-              Movara erkennt erstmal lokal und regelbasiert, was du meinst. Spaeter haengt hier echte AI dran.
+              avareno erkennt erstmal lokal und regelbasiert, was du meinst. Spaeter haengt hier echte AI dran.
             </p>
           </div>
 

@@ -27,6 +27,7 @@ import {
   Save,
   ScanBarcode,
   Send,
+  ShieldAlert,
   ShieldCheck,
   Store,
   Thermometer,
@@ -46,6 +47,24 @@ type ImageSuggestion = {
   imageUrl: string;
   sourceName: string;
   sourceUrl: string;
+};
+
+type RecommendationTab = "spare" | "buy" | "print" | "check";
+
+type ProductRecommendation = {
+  id: string;
+  tab: RecommendationTab;
+  title: string;
+  subtitle: string;
+  imageUrl: string;
+  sourceName: string;
+  sourceUrl: string;
+  actionLabel: string;
+  priceLabel?: string;
+  availabilityLabel: string;
+  confidenceLabel: string;
+  note: string;
+  verification: "exact" | "check";
 };
 
 const documentTypes = ["RECEIPT", "WARRANTY", "MANUAL", "DRIVER", "SOFTWARE", "OTHER"] as const;
@@ -77,6 +96,7 @@ export function ItemDetail() {
   const [supportDraft, setSupportDraft] = useState<SupportDraft | null>(null);
   const [detailMessage, setDetailMessage] = useState("");
   const [busy, setBusy] = useState("");
+  const [recommendationTab, setRecommendationTab] = useState<RecommendationTab>("spare");
 
   async function load() {
     if (!id) return;
@@ -139,7 +159,7 @@ export function ItemDetail() {
       body: JSON.stringify(cleaned)
     });
     setItem(updated);
-    setDetailMessage("Product Passport saved");
+    setDetailMessage("Produktpass gespeichert");
   }
 
   async function uploadPassportDocument() {
@@ -152,7 +172,7 @@ export function ItemDetail() {
       data.append("itemId", item.id);
       await api("/api/documents/upload", { method: "POST", body: data });
       setDocumentFile(null);
-      setDetailMessage(`${documentType.toLowerCase()} uploaded`);
+      setDetailMessage(`${documentType.toLowerCase()} hochgeladen`);
       await load();
     } finally {
       setBusy("");
@@ -179,7 +199,7 @@ export function ItemDetail() {
       cost: "",
       status: "OPEN"
     });
-    setDetailMessage("Repair log added");
+    setDetailMessage("Reparatur gespeichert");
   }
 
   async function prepareSupportDraft() {
@@ -203,7 +223,7 @@ export function ItemDetail() {
       body: JSON.stringify({
         itemId: item.id,
         title: reminderTitle,
-        description: `Open loop for ${item.name}`,
+        description: `Offener Punkt für ${item.name}`,
         sourceType: "DEVICE",
         priority: "MEDIUM",
         dueDate: due.toISOString(),
@@ -237,10 +257,10 @@ export function ItemDetail() {
     });
     await api(`/api/structure/items/${item.id}/activity`, {
       method: "POST",
-      body: JSON.stringify({ type: "COMMERCE", message: "Reorder and shop links updated." })
+      body: JSON.stringify({ type: "COMMERCE", message: "Nachkauf and shop links updated." })
     });
     setItem(updated);
-    setDetailMessage("Shop links saved");
+    setDetailMessage("Shop links gespeichert");
   }
 
   async function smartCommand(deviceId: string, command: string) {
@@ -250,26 +270,26 @@ export function ItemDetail() {
         method: "POST",
         body: JSON.stringify({ command })
       });
-      setDetailMessage(`Smart command: ${command.replace("_", " ")}`);
+      setDetailMessage(`Smart-Befehl: ${command.replace("_", " ")}`);
       await load();
     } finally {
       setBusy("");
     }
   }
 
-  async function recordBambuEvent(deviceId: string, eventType: string) {
+  async function recordBambuEvent(deviceId: string, eventTyp: string) {
     if (!item) return;
-    setBusy(`${deviceId}-event-${eventType}`);
+    setBusy(`${deviceId}-event-${eventTyp}`);
     try {
       const result = await api<{ message: string }>("/api/smart-home/bambu/events", {
         method: "POST",
         body: JSON.stringify({
           deviceId,
-          eventType,
-          jobName: eventType === "FILAMENT_LOW" ? "Loaded spool" : `${item.name} print`,
-          filamentRemaining: eventType === "FILAMENT_LOW" ? 8 : undefined,
-          nozzleTemp: eventType === "STARTED" ? 218 : eventType === "FINISHED" ? 38 : undefined,
-          bedTemp: eventType === "STARTED" ? 62 : eventType === "FINISHED" ? 31 : undefined
+          eventTyp,
+          jobName: eventTyp === "FILAMENT_LOW" ? "Loaded spool" : `${item.name} print`,
+          filamentRemaining: eventTyp === "FILAMENT_LOW" ? 8 : undefined,
+          nozzleTemp: eventTyp === "STARTED" ? 218 : eventTyp === "FINISHED" ? 38 : undefined,
+          bedTemp: eventTyp === "STARTED" ? 62 : eventTyp === "FINISHED" ? 31 : undefined
         })
       });
       setDetailMessage(result.message);
@@ -332,23 +352,23 @@ export function ItemDetail() {
                 <div className="relative z-10 grid min-h-[18rem] place-items-center rounded-lg bg-white/70 text-muted">
                   <div className="text-center">
                     <ImageOff className="mx-auto" size={34} />
-                    <p className="mt-3 text-sm font-black uppercase">Looking for product photo</p>
+                    <p className="mt-3 text-sm font-black uppercase">Produktfoto wird gesucht</p>
                   </div>
                 </div>
               )}
             </div>
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/70 pt-4">
-              <SmallFact icon={<Home size={16} />} label="Place" value={item.location ?? "Add room"} />
-              <SmallFact icon={<Store size={16} />} label="Bought at" value={item.merchant ?? "Unknown"} />
-              <SmallFact icon={<ReceiptText size={16} />} label="Papers" value={`${documents.length} saved`} />
+              <SmallFact icon={<Home size={16} />} label="Ort" value={item.location ?? "Raum fehlt"} />
+              <SmallFact icon={<Store size={16} />} label="Gekauft bei" value={item.merchant ?? "Unbekannt"} />
+              <SmallFact icon={<ReceiptText size={16} />} label="Dokumente" value={`${documents.length} gespeichert`} />
             </div>
           </div>
 
           <div className="object-summary">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-black uppercase text-muted">Saved thing</p>
+                <p className="text-xs font-black uppercase text-muted">Produktpass</p>
                 <h1 className="mt-3 max-w-xl break-words text-4xl font-black leading-[0.98] text-ink sm:text-5xl">{item.name}</h1>
               </div>
               <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-ink text-white">
@@ -360,23 +380,23 @@ export function ItemDetail() {
 
             <div className="mt-7 rounded-lg border border-line bg-white p-4">
               <div className="mb-2 flex items-center justify-between text-xs font-black uppercase text-muted">
-                <span>Saved details</span>
+                <span>Gespeicherte Details</span>
                 <span className="text-ink">{item.completenessScore}%</span>
               </div>
               <ProgressBar value={item.completenessScore} />
               <p className={`mt-3 text-sm font-bold ${missing.length ? "text-amber" : "text-moss"}`}>
-                {missing.length ? `Still missing: ${missing.join(", ")}` : "Everything important is attached."}
+                {missing.length ? `Fehlt noch: ${missing.join(", ")}` : "Alles Wichtige ist verbunden."}
               </p>
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <HeroFact label="Warranty until" value={isoDate(item.warrantyUntil)} icon={<ShieldCheck size={18} />} />
-              <HeroFact label="Purchase" value={isoDate(item.purchaseDate)} icon={<CalendarClock size={18} />} />
-              <HeroFact label="Price" value={`${item.price ?? 0} ${item.currency}`} icon={<CreditCard size={18} />} />
-              <HeroFact label="Location" value={item.space?.name ?? item.location ?? "Unknown"} icon={<MapPin size={18} />} />
+              <HeroFact label="Garantie bis" value={formatDate(item.warrantyUntil)} icon={<ShieldCheck size={18} />} />
+              <HeroFact label="Kauf" value={formatDate(item.purchaseDate)} icon={<CalendarClock size={18} />} />
+              <HeroFact label="Preis" value={`${item.price ?? 0} ${item.currency}`} icon={<CreditCard size={18} />} />
+              <HeroFact label="Ort" value={item.space?.name ?? item.location ?? "Unbekannt"} icon={<MapPin size={18} />} />
             </div>
 
-            {imageSource ? <p className="mt-4 text-xs font-bold text-muted">Photo matched from {imageSource.sourceName}</p> : null}
+            {imageSource ? <p className="mt-4 text-xs font-bold text-muted">Produktbild gefunden über {imageSource.sourceName}</p> : null}
           </div>
         </div>
       </section>
@@ -384,37 +404,37 @@ export function ItemDetail() {
       <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_23rem]">
         <div className="space-y-5">
           <section className="object-panel rounded-lg p-4 md:p-5">
-            <SectionTitle eyebrow="What you know" title="Ownership details" icon={<FileText size={19} />} />
+            <SectionTitle eyebrow="Grunddaten" title="Besitz und Kauf" icon={<FileText size={19} />} />
             <div className="mt-5 divide-y divide-line/70 rounded-lg border border-line bg-white">
-              <DetailRow icon={<Store size={18} />} label="Bought at" value={item.merchant ?? "Unknown"} />
-              <DetailRow icon={<CalendarClock size={18} />} label="Bought on" value={isoDate(item.purchaseDate)} />
-              <DetailRow icon={<CreditCard size={18} />} label="Paid" value={`${item.price ?? 0} ${item.currency}`} />
-              <DetailRow icon={<ShieldCheck size={18} />} label="Warranty until" value={isoDate(item.warrantyUntil)} />
-              <DetailRow icon={<Package size={18} />} label="Brand / model" value={identity} />
-              <DetailRow icon={<ClipboardCheck size={18} />} label="Serial number" value={item.serialNumber ?? "Missing"} />
-              <DetailRow icon={<ScanBarcode size={18} />} label="Barcode / GTIN" value={item.barcode ?? "Missing"} />
-              <DetailRow icon={<MapPin size={18} />} label="Where it is" value={item.location ?? "Unknown"} />
-              <DetailRow icon={<LifeBuoy size={18} />} label="Support" value={item.supportContact ?? item.supportUrl ?? "Missing"} />
+              <DetailRow icon={<Store size={18} />} label="Gekauft bei" value={item.merchant ?? "Unbekannt"} />
+              <DetailRow icon={<CalendarClock size={18} />} label="Gekauft am" value={formatDate(item.purchaseDate)} />
+              <DetailRow icon={<CreditCard size={18} />} label="Gezahlt" value={`${item.price ?? 0} ${item.currency}`} />
+              <DetailRow icon={<ShieldCheck size={18} />} label="Garantie bis" value={formatDate(item.warrantyUntil)} />
+              <DetailRow icon={<Package size={18} />} label="Marke / Modell" value={identity} />
+              <DetailRow icon={<ClipboardCheck size={18} />} label="Seriennummer" value={item.serialNumber ?? "Fehlt"} />
+              <DetailRow icon={<ScanBarcode size={18} />} label="Barcode / GTIN" value={item.barcode ?? "Fehlt"} />
+              <DetailRow icon={<MapPin size={18} />} label="Standort" value={item.location ?? "Unbekannt"} />
+              <DetailRow icon={<LifeBuoy size={18} />} label="Support" value={item.supportContact ?? item.supportUrl ?? "Fehlt"} />
             </div>
           </section>
 
           <section className="object-panel rounded-lg p-4 md:p-5">
-            <SectionTitle eyebrow="Product Passport" title="Manuals, drivers, support" icon={<BookOpen size={19} />} />
+            <SectionTitle eyebrow="Produktpass" title="Handbuch, Software, Support" icon={<BookOpen size={19} />} />
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <PassportLink icon={<BookOpen size={17} />} label="Manual" saved={hasManualDocument} url={item.manualUrl} />
-              <PassportLink icon={<Cpu size={17} />} label="Drivers" saved={hasDriverDocument} url={item.driverUrl} />
+              <PassportLink icon={<BookOpen size={17} />} label="Handbuch" saved={hasManualDocument} url={item.manualUrl} />
+              <PassportLink icon={<Cpu size={17} />} label="Treiber" saved={hasDriverDocument} url={item.driverUrl} />
               <PassportLink icon={<Package size={17} />} label="Software" saved={hasSoftwareDocument} url={item.softwareUrl} />
               <PassportLink icon={<LifeBuoy size={17} />} label="Support" url={item.supportUrl} />
             </div>
             <div className="mt-5 grid gap-3 md:grid-cols-2">
               <PassportField
-                label="Manual URL"
+                label="Handbuch-URL"
                 value={passportLinks.manualUrl}
                 onChange={(value) => setPassportLinks((current) => ({ ...current, manualUrl: value }))}
                 placeholder="https://brand.com/manual"
               />
               <PassportField
-                label="Driver URL"
+                label="Treiber-URL"
                 value={passportLinks.driverUrl}
                 onChange={(value) => setPassportLinks((current) => ({ ...current, driverUrl: value }))}
                 placeholder="https://brand.com/drivers"
@@ -433,7 +453,7 @@ export function ItemDetail() {
               />
               <div className="md:col-span-2">
                 <PassportField
-                  label="Support contact"
+                  label="Support-Kontakt"
                   value={passportLinks.supportContact}
                   onChange={(value) => setPassportLinks((current) => ({ ...current, supportContact: value }))}
                   placeholder="LG Support, support@example.com, case portal"
@@ -441,22 +461,24 @@ export function ItemDetail() {
               </div>
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm font-bold text-muted">{passportLinkCount}/5 passport helpers saved</p>
+              <p className="text-sm font-bold text-muted">{passportLinkCount}/5 passport helpers gespeichert</p>
               <Button onClick={savePassportLinks} icon={<Save size={18} />}>
-                Save passport
+                Produktpass speichern
               </Button>
             </div>
           </section>
 
+          <ProductRecommendationPanel item={item} tab={recommendationTab} setTab={setRecommendationTab} />
+
           <section className="object-panel rounded-lg p-4 md:p-5">
-            <SectionTitle eyebrow="Proof" title="Receipts and documents" icon={<ReceiptText size={19} />} />
+            <SectionTitle eyebrow="Nachweise" title="Belege und Dokumente" icon={<ReceiptText size={19} />} />
             <div className="mt-5 rounded-lg border border-line bg-white p-3">
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem_auto] md:items-end">
                 <label className="block text-sm font-bold text-ink">
-                  Add document
+                  Dokument hinzufügen
                   <span className="mt-2 flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line bg-[#f8faf9] px-3 text-sm font-black text-muted transition hover:border-leaf hover:bg-leaf/5">
                     <UploadCloud className="shrink-0 text-leaf" size={18} />
-                    <span className="min-w-0 truncate">{documentFile ? documentFile.name : "Choose file"}</span>
+                    <span className="min-w-0 truncate">{documentFile ? documentFile.name : "Datumi wählen"}</span>
                     <input
                       className="hidden"
                       type="file"
@@ -466,7 +488,7 @@ export function ItemDetail() {
                   </span>
                 </label>
                 <label className="block text-sm font-bold text-ink">
-                  Type
+                  Typ
                   <select
                     className="mt-2 h-12 w-full rounded-lg border border-line bg-[#f8faf9] px-3 text-sm font-black text-ink outline-none focus:border-leaf"
                     value={documentType}
@@ -480,7 +502,7 @@ export function ItemDetail() {
                   </select>
                 </label>
                 <Button onClick={uploadPassportDocument} disabled={!documentFile || busy === "document-upload"} icon={<UploadCloud size={18} />} type="button">
-                  {busy === "document-upload" ? "Uploading..." : "Attach"}
+                  {busy === "document-upload" ? "Lädt hoch..." : "Anhängen"}
                 </Button>
               </div>
             </div>
@@ -499,20 +521,20 @@ export function ItemDetail() {
                       <span className="block truncate">{document.fileName}</span>
                       <span className="mt-1 block text-xs font-black uppercase text-muted">{document.type}</span>
                     </span>
-                    <span className="text-xs font-black text-leaf opacity-0 transition group-hover:opacity-100">Open</span>
+                    <span className="text-xs font-black text-leaf opacity-0 transition group-hover:opacity-100">Öffnen</span>
                   </a>
                 ))
               ) : (
-                <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">No receipt or manual attached yet.</div>
+                <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">Noch kein Beleg oder Handbuch verbunden.</div>
               )}
             </div>
           </section>
 
           <section className="object-panel rounded-lg p-4 md:p-5">
-            <SectionTitle eyebrow="Repair Log" title="What happened to it" icon={<Hammer size={19} />} />
+            <SectionTitle eyebrow="Reparaturen" title="Was passiert ist" icon={<Hammer size={19} />} />
             <div className="mt-5 grid gap-3 rounded-lg border border-line bg-white p-3 md:grid-cols-[9rem_minmax(0,1fr)]">
               <label className="text-sm font-bold text-ink">
-                Date
+                Datum
                 <input
                   type="date"
                   value={repairDraft.date}
@@ -536,13 +558,13 @@ export function ItemDetail() {
                   onChange={(event) => setRepairDraft((current) => ({ ...current, status: event.target.value }))}
                   className="mt-2 w-full rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
                 >
-                  <option value="OPEN">OPEN</option>
-                  <option value="WAITING">WAITING</option>
-                  <option value="RESOLVED">RESOLVED</option>
+                  <option value="OPEN">Offen</option>
+                  <option value="WAITING">Wartet</option>
+                  <option value="RESOLVED">Erledigt</option>
                 </select>
               </label>
               <label className="text-sm font-bold text-ink">
-                Notes
+                Notizen
                 <input
                   value={repairDraft.resolution}
                   onChange={(event) => setRepairDraft((current) => ({ ...current, resolution: event.target.value }))}
@@ -551,7 +573,7 @@ export function ItemDetail() {
                 />
               </label>
               <label className="text-sm font-bold text-ink">
-                Cost
+                Kosten
                 <input
                   inputMode="decimal"
                   value={repairDraft.cost}
@@ -562,7 +584,7 @@ export function ItemDetail() {
               </label>
               <div className="flex items-end">
                 <Button className="w-full" onClick={addRepairLog} icon={<Plus size={18} />} disabled={!repairDraft.problem.trim()}>
-                  Add repair
+                  Reparatur hinzufügen
                 </Button>
               </div>
             </div>
@@ -570,24 +592,24 @@ export function ItemDetail() {
               {repairLogs.length ? (
                 repairLogs.map((repair) => <RepairLogCard key={repair.id} repair={repair} currency={item.currency} />)
               ) : (
-                <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">No repair history yet.</div>
+                <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">Noch keine Reparaturhistorie.</div>
               )}
             </div>
           </section>
 
           <section className="object-panel rounded-lg p-4 md:p-5">
-            <SectionTitle eyebrow="Memory" title="Timeline" icon={<CheckCircle2 size={19} />} />
+            <SectionTitle eyebrow="Verlauf" title="Aktivität" icon={<CheckCircle2 size={19} />} />
             <div className="mt-5 grid gap-3">
               {item.activities?.length ? (
                 item.activities.map((activity) => (
                   <div className="rounded-lg border border-line bg-white p-4" key={activity.id}>
                     <p className="text-xs font-black uppercase text-muted">{activity.type}</p>
                     <p className="mt-1 text-sm font-black text-ink">{activity.message}</p>
-                    <p className="mt-2 text-xs font-semibold text-muted">{isoDate(activity.createdAt)}</p>
+                    <p className="mt-2 text-xs font-semibold text-muted">{formatDate(activity.createdAt)}</p>
                   </div>
                 ))
               ) : (
-                <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">No item history yet.</div>
+                <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">Noch kein Verlauf vorhanden.</div>
               )}
             </div>
           </section>
@@ -595,7 +617,7 @@ export function ItemDetail() {
 
         <aside className="space-y-5 lg:sticky lg:top-28 lg:self-start">
           <section className="object-panel rounded-lg p-4">
-            <SectionTitle eyebrow="Smart thing" title="Object control" icon={<RadioTower size={19} />} />
+            <SectionTitle eyebrow="Smart-Gerät" title="Gerätesteuerung" icon={<RadioTower size={19} />} />
             <div className="mt-5 grid gap-3">
               {item.smartHomeDevices?.length ? (
                 item.smartHomeDevices.map((device) => (
@@ -629,8 +651,8 @@ export function ItemDetail() {
                     </div>
                     ) : (
                       <div className="object-device-note">
-                        <p>Local identity saved</p>
-                        <strong>{device.rawJson?.host ? String(device.rawJson.host) : "No control channel yet"}</strong>
+                        <p>Local identity gespeichert</p>
+                        <strong>{device.rawJson?.host ? String(device.rawJson.host) : "Noch kein Steuerkanal"}</strong>
                         <div>
                           {device.capabilities.slice(0, 3).map((capability) => (
                             <span key={capability}>{capability}</span>
@@ -642,17 +664,17 @@ export function ItemDetail() {
                 ))
               ) : (
                 <div className="rounded-lg border border-dashed border-line bg-white/70 p-4 text-sm font-bold text-muted">
-                  No smart provider linked yet.
+                  Noch kein Smart-Home-Gerät verbunden.
                 </div>
               )}
               <Link className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-ink px-4 text-sm font-black text-white" to="/smart-home">
-                <Link2 size={16} /> Match smart device
+                <Link2 size={16} /> Smart-Gerät verbinden
               </Link>
             </div>
           </section>
 
           <section className="object-panel rounded-lg p-4">
-            <SectionTitle eyebrow="Reorder" title="Shop & family" icon={<Repeat2 size={19} />} />
+            <SectionTitle eyebrow="Nachkauf" title="Links und Haushalt" icon={<Repeat2 size={19} />} />
             <div className="mt-5 grid gap-3">
               {shopUrl ? (
                 <a
@@ -662,13 +684,13 @@ export function ItemDetail() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Open shop <ExternalLink size={16} />
+                  Shop öffnen <ExternalLink size={16} />
                 </a>
               ) : (
-                <div className="rounded-lg border border-dashed border-line bg-white/70 p-4 text-sm font-bold text-muted">No reorder link attached.</div>
+                <div className="rounded-lg border border-dashed border-line bg-white/70 p-4 text-sm font-bold text-muted">Kein Nachkauf-Link verbunden.</div>
               )}
               <label className="block text-sm font-bold text-ink">
-                Reorder link
+                Nachkauf-Link
                 <input
                   value={reorderUrl}
                   onChange={(event) => setReorderUrl(event.target.value)}
@@ -677,7 +699,7 @@ export function ItemDetail() {
                 />
               </label>
               <label className="block text-sm font-bold text-ink">
-                Affiliate link
+                Partner-Link
                 <input
                   value={affiliateUrl}
                   onChange={(event) => setAffiliateUrl(event.target.value)}
@@ -686,53 +708,53 @@ export function ItemDetail() {
                 />
               </label>
               <Button onClick={saveCommerceLinks} icon={<Save size={18} />}>
-                Save shop links
+                Links speichern
               </Button>
               {detailMessage ? <p className="rounded-full bg-leaf/10 px-3 py-2 text-xs font-black text-leaf">{detailMessage}</p> : null}
               <div className="grid gap-2 rounded-lg bg-white p-3 ring-1 ring-line">
-                <SmallFact icon={<Users size={16} />} label="Visible" value={item.visibility ?? "HOUSEHOLD"} />
-                <SmallFact icon={<Home size={16} />} label="Space" value={item.space?.name ?? item.location ?? "Unknown"} />
-                <SmallFact icon={<Package size={16} />} label="Type" value={item.itemType ?? "THING"} />
+                <SmallFact icon={<Users size={16} />} label="Sichtbar" value={visibilityLabel(item.visibility)} />
+                <SmallFact icon={<Home size={16} />} label="Raum" value={item.space?.name ?? item.location ?? "Unbekannt"} />
+                <SmallFact icon={<Package size={16} />} label="Typ" value={itemTypeLabel(item.itemType)} />
               </div>
             </div>
           </section>
 
           <section className="object-panel rounded-lg p-4">
-            <SectionTitle eyebrow="Next missing piece" title="Serial" icon={<Wrench size={19} />} />
+            <SectionTitle eyebrow="Nächster fehlender Punkt" title="Seriennummer" icon={<Wrench size={19} />} />
             <label className="mt-5 block text-sm font-bold text-ink">
-              Serial number
+              Seriennummer
               <input
                 value={serialNumber}
                 onChange={(event) => setSerialNumber(event.target.value)}
                 className="mt-2 w-full rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
-                placeholder="Scan or type serial number"
+                placeholder="Seriennummer scannen oder eingeben"
               />
             </label>
             <div className="mt-4 grid gap-2">
               <Button onClick={saveSerial} icon={<Save size={18} />}>
-                Save serial
+                Seriennummer speichern
               </Button>
               <Button variant="secondary" onClick={completeProfile}>
-                Fill example
+                Beispiel einsetzen
               </Button>
             </div>
           </section>
 
           <section className="object-panel rounded-lg p-4">
-            <SectionTitle eyebrow="Support-Autopilot" title="Draft request" icon={<LifeBuoy size={19} />} />
+            <SectionTitle eyebrow="Support" title="Anfrage vorbereiten" icon={<LifeBuoy size={19} />} />
             <div className="mt-5 grid gap-3">
               <Button onClick={prepareSupportDraft} icon={<Send size={18} />} disabled={busy === "support-draft"}>
-                {busy === "support-draft" ? "Preparing..." : "Prepare support"}
+                {busy === "support-draft" ? "Wird vorbereitet..." : "Support vorbereiten"}
               </Button>
               {supportDraft ? (
                 <div className="rounded-lg border border-line bg-white p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs font-black uppercase text-muted">Support packet</p>
-                      <p className="mt-1 text-2xl font-black text-ink">{supportReadyScore}% ready</p>
+                      <p className="text-xs font-black uppercase text-muted">Supportpaket</p>
+                      <p className="mt-1 text-2xl font-black text-ink">{supportReadyScore}% bereit</p>
                     </div>
                     <span className={`rounded-full px-3 py-1.5 text-xs font-black ${supportDraft.missingInfo.length ? "bg-amber/10 text-amber" : "bg-leaf/10 text-leaf"}`}>
-                      {supportDraft.missingInfo.length ? `${supportDraft.missingInfo.length} missing` : "Ready"}
+                      {supportDraft.missingInfo.length ? `${supportDraft.missingInfo.length} fehlen` : "Bereit"}
                     </span>
                   </div>
                   <div className="mt-3">
@@ -741,15 +763,15 @@ export function ItemDetail() {
 
                   <div className="mt-4 grid gap-3 rounded-lg bg-[#f8faf9] p-3">
                     <div>
-                      <p className="text-xs font-black uppercase text-muted">To</p>
+                      <p className="text-xs font-black uppercase text-muted">An</p>
                       <p className="mt-1 break-words text-sm font-black text-ink">{supportDraft.to}</p>
                     </div>
                     <div>
-                      <p className="text-xs font-black uppercase text-muted">Issue</p>
+                      <p className="text-xs font-black uppercase text-muted">Problem</p>
                       <p className="mt-1 break-words text-sm font-black text-ink">{supportDraft.issueSummary}</p>
                     </div>
                     <div>
-                      <p className="text-xs font-black uppercase text-muted">Subject</p>
+                      <p className="text-xs font-black uppercase text-muted">Betreff</p>
                       <p className="mt-1 break-words text-sm font-black text-ink">{supportDraft.subject}</p>
                     </div>
                   </div>
@@ -768,7 +790,7 @@ export function ItemDetail() {
                     {supportDraft.attachments.length ? (
                       supportDraft.attachments.map((attachment) => <SupportAttachmentLine attachment={attachment} key={attachment.id} />)
                     ) : (
-                      <div className="rounded-lg border border-dashed border-line bg-white/70 p-3 text-xs font-black text-muted">No attachments prepared yet.</div>
+                      <div className="rounded-lg border border-dashed border-line bg-white/70 p-3 text-xs font-black text-muted">Noch keine Anhänge vorbereitet.</div>
                     )}
                   </div>
 
@@ -783,27 +805,27 @@ export function ItemDetail() {
                 </div>
               ) : (
                 <div className="rounded-lg border border-dashed border-line bg-white/70 p-4 text-sm font-bold text-muted">
-                  Uses passport data, warranty, serial number, and repair history.
+                  Nutzt Produktpass, Garantie, Seriennummer und Reparaturhistorie.
                 </div>
               )}
             </div>
           </section>
 
           <section className="object-panel rounded-lg p-4">
-            <SectionTitle eyebrow="Care" title="Reminders" icon={<ShieldCheck size={19} />} />
+            <SectionTitle eyebrow="Erinnerungen" title="Offene Punkte" icon={<ShieldCheck size={19} />} />
             <div className="mt-4 flex gap-2">
               <input
                 value={reminderTitle}
                 onChange={(event) => setReminderTitle(event.target.value)}
                 className="min-w-0 flex-1 rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
-                placeholder="Add reminder"
+                placeholder="Erinnerung hinzufügen"
               />
               <Button onClick={addReminder} icon={<Plus size={18} />}>
-                Add
+                Anlegen
               </Button>
             </div>
             <div className="mt-4 grid gap-3">
-              {loops.length ? loops.map((loop) => <LoopCard key={loop.id} loop={loop} />) : <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">No reminders for this item yet.</div>}
+              {loops.length ? loops.map((loop) => <LoopCard key={loop.id} loop={loop} />) : <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">Noch keine Erinnerungen für dieses Produkt.</div>}
             </div>
           </section>
         </aside>
@@ -816,6 +838,31 @@ function hasDocumentType(documents: { type: string }[], type: string) {
   return documents.some((document) => document.type.toUpperCase() === type);
 }
 
+function formatDate(value?: string | null) {
+  const formatted = isoDate(value);
+  return formatted === "No date" ? "Kein Datum" : formatted;
+}
+
+function visibilityLabel(value?: string | null) {
+  const labels: Record<string, string> = {
+    PRIVATE: "Privat",
+    HOUSEHOLD: "Haushalt"
+  };
+  return value ? labels[value] ?? value : "Haushalt";
+}
+
+function itemTypeLabel(value?: string | null) {
+  const labels: Record<string, string> = {
+    THING: "Ding",
+    ELECTRONIC: "Elektronik",
+    FURNITURE: "Möbel",
+    INFRASTRUCTURE: "Infrastruktur",
+    VEHICLE: "Fahrzeug",
+    COLLECTIBLE: "Sammlung"
+  };
+  return value ? labels[value] ?? value : "Ding";
+}
+
 function PassportLink({ icon, label, saved = false, url }: { icon: ReactNode; label: string; saved?: boolean; url?: string | null }) {
   const isSaved = Boolean(url || saved);
   const content = (
@@ -823,7 +870,7 @@ function PassportLink({ icon, label, saved = false, url }: { icon: ReactNode; la
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-[#eef2f0] text-leaf">{icon}</span>
       <span className="min-w-0 flex-1">
         <span className="block text-xs font-black uppercase text-muted">{label}</span>
-        <span className="mt-1 block truncate text-sm font-black text-ink">{isSaved ? "Saved" : "Missing"}</span>
+        <span className="mt-1 block truncate text-sm font-black text-ink">{isSaved ? "Gespeichert" : "Fehlt"}</span>
       </span>
       {url ? <ExternalLink className="shrink-0 text-leaf" size={16} /> : null}
     </>
@@ -868,6 +915,177 @@ function PassportField({
   );
 }
 
+function ProductRecommendationPanel({
+  item,
+  setTab,
+  tab
+}: {
+  item: Item;
+  setTab: (tab: RecommendationTab) => void;
+  tab: RecommendationTab;
+}) {
+  const recommendations = productRecommendationsFor(item);
+  const activeRecommendations = recommendations.filter((recommendation) => recommendation.tab === tab);
+  const tabItems: { id: RecommendationTab; label: string; helper: string }[] = [
+    { id: "spare", label: "Ersatzteile", helper: "Teile und Reparatur" },
+    { id: "buy", label: "Zubehör", helper: "Kaufen oder nachbestellen" },
+    { id: "print", label: "Druckdateien", helper: "Nur einfache, nicht kritische Teile" },
+    { id: "check", label: "Prüfen", helper: "Unsichere Treffer" }
+  ];
+
+  return (
+    <section className="object-panel rounded-lg p-4 md:p-5">
+      <SectionTitle eyebrow="Empfehlungen" title="Passendes für dieses Ding" icon={<Package size={19} />} />
+      <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-muted">
+        Avareno zeigt hier nur einfache Vorschläge zum aktuellen Produkt. Was nicht eindeutig zum Modell passt, bleibt in „Prüfen“.
+      </p>
+
+      <div className="item-rec-tabs" role="tablist" aria-label="Empfehlungen">
+        {tabItems.map((entry) => {
+          const count = recommendations.filter((recommendation) => recommendation.tab === entry.id).length;
+          return (
+            <button className={tab === entry.id ? "is-active" : ""} key={entry.id} onClick={() => setTab(entry.id)} type="button">
+              <strong>{entry.label}</strong>
+              <span>{entry.helper}</span>
+              <em>{count}</em>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="item-rec-list">
+        {activeRecommendations.length ? (
+          activeRecommendations.map((recommendation) => <ProductRecommendationCard key={recommendation.id} recommendation={recommendation} />)
+        ) : (
+          <div className="item-rec-empty">
+            <ShieldAlert size={19} />
+            <strong>Noch nichts Sicheres gefunden</strong>
+            <p>Für dieses Produkt braucht Avareno zuerst ein eindeutiges Modell, eine Seriennummer oder eine verlässliche Quelle.</p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ProductRecommendationCard({ recommendation }: { recommendation: ProductRecommendation }) {
+  return (
+    <article className="item-rec-card">
+      <a className="item-rec-image" href={recommendation.sourceUrl} target="_blank" rel="noreferrer" aria-label={`${recommendation.title} öffnen`}>
+        <img src={recommendation.imageUrl} alt="" loading="lazy" />
+      </a>
+      <div className="item-rec-body">
+        <div className="item-rec-titleline">
+          <div>
+            <span>{recommendation.subtitle}</span>
+            <h3>{recommendation.title}</h3>
+          </div>
+          <small className={recommendation.verification === "exact" ? "is-exact" : "is-check"}>
+            {recommendation.verification === "exact" ? "passt zum Modell" : "bitte prüfen"}
+          </small>
+        </div>
+        <p>{recommendation.note}</p>
+        <div className="item-rec-facts">
+          {recommendation.priceLabel ? <span>{recommendation.priceLabel}</span> : null}
+          <span>{recommendation.availabilityLabel}</span>
+          <span>{recommendation.confidenceLabel}</span>
+        </div>
+        <div className="item-rec-footer">
+          <span>{recommendation.sourceName}</span>
+          <a href={recommendation.sourceUrl} target="_blank" rel="noreferrer">
+            {recommendation.actionLabel}
+            <ExternalLink size={15} />
+          </a>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function productRecommendationsFor(item: Item): ProductRecommendation[] {
+  const haystack = [item.name, item.manufacturer, item.model, item.category].filter(Boolean).join(" ").toLowerCase();
+  const imageUrl =
+    item.imageUrl ||
+    "https://media.us.lg.com/transform/ecomm-PDPGalleryThumbnail-350x350/b7a77420-3fb6-4ca9-9b00-552b20956548/Tvs_OLED65C3PUA_gallery-01_5000x5000?io=transform%3Afill%2Cwidth%3A700";
+
+  if (!/lg/.test(haystack) || !/(oled65c3|oled c3|c3)/.test(haystack)) {
+    return [];
+  }
+
+  return [
+    {
+      id: "lg-c3-parts-search",
+      tab: "spare",
+      title: "LG Ersatzteile für OLED65C3 suchen",
+      subtitle: "Ersatzteile",
+      imageUrl,
+      sourceName: "LG Parts",
+      sourceUrl: "https://lgparts.com/search?q=OLED65C3",
+      actionLabel: "Teile suchen",
+      availabilityLabel: "Modellsuche geöffnet",
+      confidenceLabel: "Quelle: Teilekatalog",
+      note: "Direkte Suche nach deinem Modell. Avareno empfiehlt noch kein einzelnes Teil als final passend, bevor Seriennummer und Teilenummer bestätigt sind.",
+      verification: "check"
+    },
+    {
+      id: "lg-c3-power-board-check",
+      tab: "check",
+      title: "Power Supply Board EAY65689424 prüfen",
+      subtitle: "Unsicheres Ersatzteil",
+      imageUrl: "https://www.lg.com/content/dam/channel/wcms/mx/images/accesorios/eay65689424_awmxlat_ecom_s_ecom_s_1100x730.jpg",
+      sourceName: "LG Zubehörseite",
+      sourceUrl: "https://www.lg.com/mx/accesorios-para-tv/eay65689424/",
+      actionLabel: "Quelle prüfen",
+      availabilityLabel: "Nicht final empfohlen",
+      confidenceLabel: "Modellprüfung nötig",
+      note: "Reales LG-Ersatzteil mit Produktbild, aber nicht als sicherer Match für OLED65C3 markiert. Vor Kauf muss die exakte Modell-/Seriennummer passen.",
+      verification: "check"
+    },
+    {
+      id: "lg-c3-magic-remote",
+      tab: "buy",
+      title: "LG Magic Remote",
+      subtitle: "Zubehör",
+      imageUrl: "https://www.lg.com/us/images/tv-audio-video-accessories/md08003585/gallery/medium01.jpg",
+      sourceName: "LG",
+      sourceUrl: "https://www.lg.com/us/magic-remote",
+      actionLabel: "Ansehen",
+      availabilityLabel: "Offizielle Zubehörseite",
+      confidenceLabel: "Kompatibilität im Shop prüfen",
+      note: "Sinnvolles Zubehör für LG TVs. Avareno zeigt es hier als Kaufvorschlag, aber finaler Kauf erst nach Modellprüfung im LG-Shop.",
+      verification: "check"
+    },
+    {
+      id: "lg-c3-remote-holder-print",
+      tab: "print",
+      title: "LG C3 Wandhalter für Magic Remote",
+      subtitle: "Druckdatei",
+      imageUrl: "https://www.lg.com/us/images/tv-audio-video-accessories/md08003585/gallery/medium01.jpg",
+      sourceName: "MakerWorld",
+      sourceUrl: "https://makerworld.com/en/models/448222-lg-c3-wall-mounted-magic-remote-holder",
+      actionLabel: "Druckdatei öffnen",
+      availabilityLabel: "3D-Datei",
+      confidenceLabel: "Nicht sicherheitskritisch",
+      note: "Ein einfacher Halter für die Fernbedienung ist ein gutes Beispiel für Druckdateien: praktisch, niedriges Risiko, kein sicherheitskritisches Ersatzteil.",
+      verification: "exact"
+    },
+    {
+      id: "lg-c3-support-page",
+      tab: "buy",
+      title: "LG OLED65C3 Support & Handbuch",
+      subtitle: "Support",
+      imageUrl,
+      sourceName: "LG Support",
+      sourceUrl: item.supportUrl || "https://www.lg.com/support/product/lg-OLED65C3",
+      actionLabel: "Support öffnen",
+      availabilityLabel: "Offizielle Quelle",
+      confidenceLabel: "Modellquelle gespeichert",
+      note: "Handbuch, Firmware und Support bleiben direkt am Ding. Das ist oft hilfreicher als sofort ein Kaufteil vorzuschlagen.",
+      verification: "exact"
+    }
+  ];
+}
+
 function SupportAttachmentLine({ attachment }: { attachment: { fileName: string; filePath?: string | null; type: string } }) {
   const content = (
     <>
@@ -903,7 +1121,7 @@ function SupportChecklistLine({ entry }: { entry: { detail: string; label: strin
           <span className="truncate">{entry.label}</span>
         </span>
         <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black uppercase ${ready ? "bg-leaf/10 text-leaf" : "bg-amber/10 text-amber"}`}>
-          {ready ? "Ready" : "Missing"}
+          {ready ? "Bereit" : "Fehlt"}
         </span>
       </div>
       <p className="break-words text-xs font-semibold leading-5 text-muted">{entry.detail}</p>
@@ -916,7 +1134,7 @@ function RepairLogCard({ currency, repair }: { currency: string; repair: RepairL
     <div className="rounded-lg border border-line bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-black uppercase text-muted">{isoDate(repair.date)}</p>
+          <p className="text-xs font-black uppercase text-muted">{formatDate(repair.date)}</p>
           <h3 className="mt-1 break-words text-lg font-black text-ink">{repair.problem}</h3>
         </div>
         <span className="rounded-full bg-leaf/10 px-3 py-1.5 text-xs font-black text-leaf">{repair.status}</span>
@@ -935,7 +1153,7 @@ function PrinterObjectControls({
 }: {
   busy: string;
   device: SmartHomeDevice;
-  onBambuEvent: (deviceId: string, eventType: string) => void;
+  onBambuEvent: (deviceId: string, eventTyp: string) => void;
   onCommand: (deviceId: string, command: string) => void;
 }) {
   const metrics = printerMetrics(device);
@@ -1043,9 +1261,9 @@ function DetailRow({ icon, label, value }: { icon: ReactNode; label: string; val
 }
 
 function warrantyState(value?: string | null): { label: string; tone: "green" | "amber" | "red" | "gray" } {
-  if (!value) return { label: "No warranty", tone: "gray" };
+  if (!value) return { label: "Keine Garantie", tone: "gray" };
   const days = Math.ceil((new Date(value).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-  if (days < 0) return { label: "Warranty expired", tone: "red" };
-  if (days < 60) return { label: `${days} days left`, tone: "amber" };
-  return { label: "Protected", tone: "green" };
+  if (days < 0) return { label: "Garantie abgelaufen", tone: "red" };
+  if (days < 60) return { label: `${days} Tage`, tone: "amber" };
+  return { label: "Geschützt", tone: "green" };
 }

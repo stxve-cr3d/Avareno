@@ -15,6 +15,7 @@ import { CaptureItem } from "./pages/CaptureItem";
 import { HomeBinder } from "./pages/HomeBinder";
 import { AskAvareno } from "./pages/AskAvareno";
 import { SmartHome } from "./pages/SmartHome";
+import { Resolve } from "./pages/Resolve";
 import { CookiesPage, DatenschutzPage, ImpressumPage, PricingPage } from "./pages/MarketingPages";
 import "./styles.css";
 
@@ -37,6 +38,10 @@ const router = createBrowserRouter([
       { path: "items/:id", element: <ItemDetail /> },
       { path: "ask", element: <AskAvareno /> },
       { path: "smart-home", element: <SmartHome /> },
+      { path: "resolve", element: <Resolve /> },
+      { path: "resolve/tickets", element: <Resolve /> },
+      { path: "resolve/tickets/:ticketId", element: <Resolve /> },
+      { path: "resolve/create", element: <Resolve /> },
       { path: "reports/home-binder", element: <HomeBinder /> },
       { path: "loops/:id", element: <LoopDetail /> },
       { path: "rewards", element: <Rewards /> },
@@ -50,6 +55,10 @@ const router = createBrowserRouter([
       { path: "app/items/:id", element: <ItemDetail /> },
       { path: "app/ask", element: <AskAvareno /> },
       { path: "app/smart-home", element: <SmartHome /> },
+      { path: "app/resolve", element: <Resolve /> },
+      { path: "app/resolve/tickets", element: <Resolve /> },
+      { path: "app/resolve/tickets/:ticketId", element: <Resolve /> },
+      { path: "app/resolve/create", element: <Resolve /> },
       { path: "app/reports/home-binder", element: <HomeBinder /> },
       { path: "app/loops/:id", element: <LoopDetail /> },
       { path: "app/rewards", element: <Rewards /> }

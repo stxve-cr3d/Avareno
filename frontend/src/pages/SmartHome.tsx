@@ -30,7 +30,8 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api, isoDate } from "../lib/api";
-import type { Item, LocalDiscoveryCandidate, LocalDiscoveryPayload, SmartHomeDevice, SmartHomeInsight, SmartHomePayload } from "../lib/types";
+import { MotivationWidget } from "../components/Motivation";
+import type { Item, LocalDiscoveryCandidate, LocalDiscoveryPayload, MotivationSummary, SmartHomeDevice, SmartHomeInsight, SmartHomePayload } from "../lib/types";
 import homeMemoryCube from "../assets/generated/avareno-home-memory-cube-dark.png";
 
 const providerLabels: Record<string, string> = {
@@ -99,6 +100,10 @@ type BambuDiagnostic = {
     name: string;
     location?: string | null;
   } | null;
+};
+
+type HomeRewardsPayload = {
+  motivation: MotivationSummary;
 };
 
 const smartFallbackPayload: SmartHomePayload = {
@@ -264,10 +269,37 @@ const smartFallbackDiscovery: LocalDiscoveryPayload = {
   ]
 };
 
+const fallbackHomeMotivation: MotivationSummary = {
+  motivationEnabled: true,
+  streakTrackingEnabled: true,
+  gentleNudgesEnabled: true,
+  currentStreakDays: 6,
+  longestStreakDays: 14,
+  freezeDaysAvailable: 2,
+  weeklyXP: 180,
+  totalXP: 1240,
+  levelName: "Organisiert",
+  levelProgress: 40,
+  statusText: "6 Tage gut gepflegt",
+  nudgeText: "Heute reicht schon eine kleine Aktion.",
+  pauseText: "Kein Stress — Avareno belohnt Fortschritt, nicht Perfektion.",
+  freezeState: {
+    active: true,
+    title: "Pausentag verfügbar",
+    body: "Pausentage schützen deine Serie, ohne daraus Druck zu machen."
+  },
+  recentXPEvents: [
+    { id: "mock-receipt", label: "Rechnung für MacBook hinzugefügt", points: 25, createdAt: new Date().toISOString() },
+    { id: "mock-warranty", label: "Garantie für Sony Kopfhörer erkannt", points: 15, createdAt: new Date().toISOString() }
+  ],
+  xpRules: []
+};
+
 export function SmartHome() {
   const [payload, setPayload] = useState<SmartHomePayload | null>(null);
   const [discovery, setDiscovery] = useState<LocalDiscoveryPayload | null>(null);
   const [items, setItems] = useState<Item[]>([]);
+  const [motivation, setMotivation] = useState<MotivationSummary | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
   const [probeHost, setProbeHost] = useState("");
@@ -284,13 +316,19 @@ export function SmartHome() {
 
   async function load() {
     try {
-      const [smartHome, allItems] = await Promise.all([api<SmartHomePayload>("/api/smart-home"), api<Item[]>("/api/items")]);
+      const [smartHome, allItems, rewards] = await Promise.all([
+        api<SmartHomePayload>("/api/smart-home"),
+        api<Item[]>("/api/items"),
+        api<HomeRewardsPayload>("/api/rewards").catch(() => ({ motivation: fallbackHomeMotivation }))
+      ]);
       setPayload(smartHome);
       setItems(allItems);
+      setMotivation(rewards.motivation);
     } catch (error) {
       console.warn("Smart home API unavailable; using demo fallback.", error);
       setPayload(smartFallbackPayload);
       setItems([]);
+      setMotivation(fallbackHomeMotivation);
     }
   }
 
@@ -529,407 +567,145 @@ export function SmartHome() {
   const isOnline = mainDevice ? !["offline", "error"].includes(String(mainDevice.status ?? "").toLowerCase()) : true;
   const roomName = (mainDevice?.roomName ?? bambuSetup.roomName) || "Wohnzimmer";
   const primaryInsight = insights.find((insight) => insight.status !== "ACTIVE") ?? insights[0];
-  const primaryPlanLabel = mainDevice ? cleanUiText(primaryInsight?.title ?? "3 recommendations") : "3 recommendations";
   const openInsightCount = insights.filter((insight) => insight.status !== "ACTIVE").length;
   const dashboardDocumentCount = items.reduce((count, item) => count + (item.documents?.length ?? 0), 0) || 18;
   const warrantyCount = items.filter((item) => item.warrantyUntil).length || 4;
   const roomCount = new Set(items.map((item) => item.location || item.space?.name).filter(Boolean)).size || 6;
   const matchItem = items.find((item) => /oled|tv|fernseher/i.test([item.name, item.category, item.manufacturer, item.model].join(" "))) ?? null;
   const matchName = matchItem?.name ?? "LG OLED C3";
+  const itemCount = items.length || payload.devices.length || 7;
+  const nextItems = buildHomeNextItems(items, matchName, dashboardDocumentCount, openInsightCount);
   const appPath = (path: string) => (path === "/" ? "/app" : `/app${path}`);
   const scrollToPanel = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
-    <div className="smart-page smart-app-page">
-      <section className="smart-mobile-shell" aria-label="Avareno Smart mobile control">
-        <div className="smart-status-row" aria-hidden="true">
-          <span>9:41</span>
-          <span className="smart-status-icons">
-            <Wifi size={17} />
-            <span>100</span>
-          </span>
+    <main className="smart-calm-page">
+      <section className="smart-calm-hero">
+        <div>
+          <h1>Zuhause</h1>
+          <p>Deine wichtigsten Dinge, Belege und offenen Punkte an einem ruhigen Ort.</p>
         </div>
-
-        <header className="smart-mobile-header">
-          <div>
-            <button className="smart-home-selector" type="button">
-              Zuhause
-              <ChevronDown size={20} />
-            </button>
-            <p className={isOnline ? "smart-online-label" : "smart-online-label smart-offline-label"}>
-              <span />
-              {isOnline ? "Online" : "Offline"}
-            </p>
+        {motivation ? (
+          <MotivationWidget motivation={motivation} />
+        ) : (
+          <div className="smart-calm-hero-card">
+            <span>Status</span>
+            <strong>{isOnline ? "Alles erreichbar" : "Prüfen"}</strong>
+            <small>{roomName} · {itemCount} Dinge</small>
           </div>
-          <div className="smart-header-actions" aria-label="Smart controls">
-            <button type="button" aria-label="Notifications">
-              <BellRing size={22} />
-            </button>
-            <button onClick={() => scrollToPanel("bambu-setup-panel")} type="button" aria-label="Add device">
-              <Plus size={23} />
-            </button>
-          </div>
-        </header>
+        )}
+      </section>
 
-        <div className="smart-context-tabs" aria-label="Device context">
-          <Link className="smart-context-tab smart-context-tab-active" to={appPath("/")}>
-            <Home size={18} />
-            Avareno
-          </Link>
-          <Link className="smart-context-tab" to={appPath("/items")}>
-            <Monitor size={18} />
-            {roomName === "Werkstatt" ? "Wohnzimmer" : roomName}
-          </Link>
+      <section className="smart-calm-focus">
+        <div className="smart-calm-focus-copy">
+          <span>Heute</span>
+          <h2>Garantie läuft bald ab</h2>
+          <p>{matchName} endet in 45 Tagen. Prüfe nur diesen einen Punkt oder öffne später die vollständige Liste.</p>
         </div>
-
-        <section className="smart-device-stage" aria-label="Avareno home memory overview">
-          <SmartTelemetryPill to={appPath("/reports/home-binder")} className="smart-pill-nozzle" icon={<FileText size={22} />} label="Dokumente" value={`${dashboardDocumentCount}`} />
-          <SmartTelemetryPill to={appPath("/items")} className="smart-pill-bed" icon={<ShieldCheck size={22} />} label="Garantien" value={`${warrantyCount}`} />
-          <SmartTelemetryPill onClick={() => scrollToPanel("smart-plans-panel")} className="smart-pill-chamber" icon={<CircleDot size={22} />} label="Offene Loops" value={`${openInsightCount || 3}`} />
-          <SmartTelemetryPill to={appPath("/items")} className="smart-pill-filament" icon={<Home size={22} />} label="Räume" value={`${roomCount}`} />
-          <Link className="smart-device-render" to={appPath("/items")} aria-label="Open Home Memory">
-            <img src={homeMemoryCube} alt="" />
-          </Link>
-        </section>
-
-        <div className="smart-device-title-row">
-          <span className="smart-device-cube">
-            <Archive size={25} />
-            <i />
-          </span>
-          <div>
-            <h1>Home Memory</h1>
-            <p>Dinge, Belege, Garantien</p>
-          </div>
-          <Link className="smart-stage-next" to={appPath("/items")} aria-label="Open things">
-            <ChevronRight size={24} />
-          </Link>
+        <div className="smart-calm-focus-meta">
+          <small>{matchName}</small>
+          <strong>45 Tage</strong>
         </div>
-
-        <div className="smart-stage-dots" aria-hidden="true">
-          <span />
-          <span />
-        </div>
-
-        <section className="smart-queue-card">
-          <div className="smart-queue-art">
-            <ShieldCheck size={34} />
-          </div>
-          <div className="smart-queue-copy">
-            <div className="smart-queue-head">
-              <div>
-                <h2>Heute wichtig</h2>
-                <p>Garantie läuft bald ab</p>
-              </div>
-              <span>Aktiv</span>
-            </div>
-            <div className="smart-queue-progress" aria-label="72% complete">
-              <span style={{ width: "72%" }} />
-            </div>
-            <strong>{matchName}</strong>
-            <p className="smart-queue-meta">Endet in 45 Tagen | 26. Juli 2026</p>
-          </div>
-          <button
-            className="smart-queue-pause"
-            onClick={() => scrollToPanel("smart-plans-panel")}
-            type="button"
-            aria-label="Open reminder"
-          >
-            <ChevronRight size={23} />
-          </button>
-        </section>
-
-        <section className="smart-object-match-card">
-          <span className="smart-object-match-thumb">
-            <Monitor size={26} />
-          </span>
-          <div>
-            <h2>Object Match</h2>
-            <p>{matchName}</p>
-            <span>Wohnzimmer - {dashboardDocumentCount} Dokumente - 94% Match</span>
-            <strong>
-              <CheckCircle2 size={17} />
-              Matched with product memory
-            </strong>
-          </div>
-          <Link to={matchItem ? appPath(`/items/${matchItem.id}`) : appPath("/items")} aria-label="Open matched product">
-            <ChevronRight size={21} />
-          </Link>
-        </section>
-
-        <section className="smart-command-grid" aria-label="Device Control">
-          <Link className="smart-command-card" to={appPath("/reports/home-binder")}>
-            <FolderOpen size={29} />
-            <span>
-              <strong>Dokumente</strong>
-              <small>{dashboardDocumentCount} Dateien</small>
-            </span>
-            <ChevronRight size={20} />
-          </Link>
-          <button onClick={discoverLocal} disabled={busy === "local-discover"} type="button">
-            <PlugZap size={31} />
-            <span>
-              <strong>Geräte</strong>
-              <small>{busy === "local-discover" ? "Suche..." : `${linkedCount || 7} online`}</small>
-            </span>
-            <ChevronRight size={20} />
-          </button>
-          <Link className="smart-command-card" to={appPath("/capture/loop")}>
-            <Wrench size={29} />
-            <span>
-              <strong>Reparaturen</strong>
-              <small>2 Historien</small>
-            </span>
-            <ChevronRight size={20} />
-          </Link>
-        </section>
-
-        <button className="smart-plans-row" onClick={() => scrollToPanel("smart-plans-panel")} type="button">
-          <span>
-            <Sparkles size={24} />
-          </span>
-          <span>
-            <strong>Smart Plans</strong>
-                  <small>{primaryPlanLabel}</small>
-          </span>
-          <em>{openInsightCount || insights.length} new</em>
-          <ChevronRight size={21} />
-        </button>
-
-        <Link className="smart-assistant-fab" to={appPath("/ask")} aria-label="Ask Avareno">
-          <Bot size={31} />
+        <Link className="smart-calm-primary-button" to={appPath("/capture/loop")}>
+          Erinnerung öffnen
+          <ArrowRight size={16} />
         </Link>
-
-        <SmartBottomNav appPath={appPath} />
       </section>
 
-      <section className="smart-workbench" aria-label="Avareno Smart workbench">
-        <div className="smart-workbench-head">
-          <div>
-            <p>Avareno App Workspace</p>
-            <h2>Dein Zuhause als Arbeitsfläche</h2>
-            <span>
-              Links ist die mobile Home-Ansicht. Rechts liegen die Module, Listen und Setup-Flows, die später mit Usern, Rollen und Haushalten wachsen.
-            </span>
+      <section className="smart-calm-overview" aria-label="Zuhause Überblick">
+        <CalmMetric icon={<Package size={18} />} label="Dinge" value={String(itemCount)} />
+        <CalmMetric icon={<FileText size={18} />} label="Dokumente" value={String(dashboardDocumentCount)} />
+        <CalmMetric icon={<ShieldCheck size={18} />} label="Garantien" value={String(warrantyCount)} />
+      </section>
+
+      <section className="smart-calm-actions" aria-label="Schnell erfassen">
+        <CalmActionLink icon={<Archive size={18} />} label="Produkt" body="Gerät oder Sache speichern" to={appPath("/capture/item")} />
+        <CalmActionLink icon={<FileText size={18} />} label="Beleg" body="Rechnung oder Garantie sichern" to={appPath("/capture/receipt")} />
+        <CalmActionLink icon={<Sparkles size={18} />} label="Ticket" body="Problem passend einordnen" to={appPath("/resolve/create")} />
+      </section>
+
+      <section className="smart-calm-workspace" aria-label="Weiterarbeiten">
+        <article className="smart-calm-next">
+          <div className="smart-calm-panel-head">
+            <div>
+              <span>Weiterarbeiten</span>
+              <h2>Nächste Schritte</h2>
+            </div>
+            <Link to={appPath("/items")}>Alle Dinge</Link>
           </div>
-          <div className="smart-workbench-signals">
-            <Signal icon={<Wifi />} label="Modus" value={payload.mode} />
-            <Signal icon={<Link2 />} label="Verknüpft" value={`${linkedCount}/${payload.devices.length}`} />
-            <Signal icon={<RadioTower />} label="Status" value={liveReady ? "configured" : "demo-safe"} />
+          <div className="smart-calm-next-list">
+            {nextItems.map((item) => (
+              <Link className="smart-calm-next-row" key={item.to + item.title} to={item.to}>
+                <span>{item.icon}</span>
+                <div>
+                  <strong>{item.title}</strong>
+                  <small>{item.body}</small>
+                </div>
+                <ChevronRight size={16} />
+              </Link>
+            ))}
+          </div>
+        </article>
+
+        <aside className="smart-calm-sections" aria-label="Avareno Bereiche">
+          <CalmSectionLink label="Dinge" body={`${dashboardDocumentCount} Dokumente und Produktakten`} to={appPath("/items")} />
+          <CalmSectionLink label="Resolve" body={`${openInsightCount || 2} offene Fragen und Hilfe-Tickets`} to={appPath("/resolve")} />
+          <CalmSectionLink label="Care" body="Garantien, Reparaturen und Erinnerungen" to={appPath("/capture/loop")} />
+        </aside>
+      </section>
+
+      <section className="smart-calm-activity" aria-label="Letzte Aktivität">
+        <div className="smart-calm-panel-head">
+          <div>
+            <span>Zuletzt</span>
+            <h2>Aktivität</h2>
           </div>
         </div>
-
-        {message ? <p className="smart-message-pill">{message}</p> : null}
-
-        <section className="smart-insight-panel rounded-lg" id="smart-plans-panel">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-black uppercase text-muted">Smart Plans</p>
-              <h2 className="mt-2 text-3xl font-black leading-tight text-ink">Empfehlungen aus echten Objekten</h2>
-              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-muted">
-                Avareno macht aus Dingen, Belegen, Geräten und Fristen konkrete nächste Schritte.
-              </p>
-            </div>
-            <span className="smart-insight-count">
-              <BellRing size={16} />
-              {openInsightCount} open
-            </span>
+        <div className="smart-calm-activity-list">
+          <div>
+            <span>Beleg gesichert</span>
+            <strong>{matchName}</strong>
           </div>
-          <div className="mt-5 grid gap-3 lg:grid-cols-3">
-            {insights.length ? (
-              insights.slice(0, 3).map((insight) => (
-                <InsightCard busy={busy} insight={insight} key={insight.id} onActivate={activateInsight} />
-              ))
-            ) : (
-              <div className="smart-local-empty lg:col-span-3">Connect or discover a smart thing to get product-aware suggestions.</div>
-            )}
+          <div>
+            <span>Produkt ergänzt</span>
+            <strong>{dashboardDocumentCount} Dokumente verfügbar</strong>
           </div>
-        </section>
-
-        <section className="smart-bambu-panel rounded-lg" id="bambu-setup-panel">
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:items-start">
-            <div>
-              <p className="text-xs font-black uppercase text-muted">Geräte-Setup</p>
-              <h2 className="mt-2 text-3xl font-black leading-tight text-ink">Geräte als echte Objekte</h2>
-              <p className="mt-3 text-sm font-semibold leading-6 text-muted">
-                Geräte-ID, Produktprofil, Raum, Dokumente und Care-Erinnerungen werden in einem Flow verbunden.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <span className="smart-capability">LAN-ready</span>
-                <span className="smart-capability">product match</span>
-                <span className="smart-capability">care alerts</span>
-              </div>
-            </div>
-
-            <form className="smart-bambu-form" onSubmit={setupBambu}>
-              <div className="smart-bambu-fields">
-                <label>
-                  <span>Modell</span>
-                  <input value={bambuSetup.model} onChange={(event) => updateBambu("model", event.target.value)} />
-                </label>
-                <label>
-                  <span>IP-Adresse</span>
-                  <input value={bambuSetup.host} onChange={(event) => updateBambu("host", event.target.value)} required />
-                </label>
-                <label>
-                  <span>Serial</span>
-                  <input value={bambuSetup.serial} onChange={(event) => updateBambu("serial", event.target.value)} placeholder="optional" />
-                </label>
-                <label>
-                  <span>Zugriffscode</span>
-                  <input value={bambuSetup.accessCode} onChange={(event) => updateBambu("accessCode", event.target.value)} placeholder="optional for MVP" type="password" />
-                </label>
-                <label>
-                  <span>Raum</span>
-                  <input value={bambuSetup.roomName} onChange={(event) => updateBambu("roomName", event.target.value)} />
-                </label>
-                <label className="smart-bambu-check">
-                  <input checked={bambuSetup.createItem} onChange={(event) => updateBambu("createItem", event.target.checked)} type="checkbox" />
-                  <span>Avareno-Objekt anlegen</span>
-                </label>
-              </div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                <button className="smart-local-button" disabled={busy === "bambu-setup"} type="submit">
-                  <PlugZap size={16} />
-                  {busy === "bambu-setup" ? "Wird vorbereitet..." : "Gerät vorbereiten"}
-                </button>
-                <button className="smart-local-button smart-local-button-light" disabled={busy === "bambu-diagnose"} onClick={diagnoseBambu} type="button">
-                  <RadioTower size={16} />
-                  {busy === "bambu-diagnose" ? "Teste..." : "IP testen"}
-                </button>
-              </div>
-              {bambuDiagnostic ? <BambuDiagnosticPanel diagnostic={bambuDiagnostic} /> : null}
-            </form>
+          <div>
+            <span>Offene Aufgabe</span>
+            <strong>{openInsightCount || 2} Punkte warten</strong>
           </div>
-        </section>
-
-        <section className="smart-local-panel rounded-lg">
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start">
-            <div>
-              <p className="text-xs font-black uppercase text-muted">Local Discovery</p>
-              <h2 className="mt-2 text-3xl font-black leading-tight text-ink">Lokale Geräte finden</h2>
-              <p className="mt-3 text-sm font-semibold leading-6 text-muted">
-                Avareno sucht nur, wenn du es startest. Standard bleibt demo-safe; echte LAN-Suche läuft erst, wenn der Server dafür aktiviert ist.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <span className="smart-capability">{localDiscovery.mode}</span>
-                <span className="smart-capability">{localDiscovery.enabled ? "LAN probes enabled" : "demo candidates"}</span>
-                <span className="smart-capability">{discoveryCandidates.length} found</span>
-              </div>
-              <button className="smart-local-button mt-5" onClick={discoverLocal} disabled={busy === "local-discover"} type="button">
-                <Search size={16} />
-                {busy === "local-discover" ? "Searching..." : "Local Discovery"}
-              </button>
-              <form className="smart-probe-form" onSubmit={probeLocal}>
-                <label>
-                  <span>Exact IP or host</span>
-                  <input value={probeHost} onChange={(event) => setProbeHost(event.target.value)} placeholder="192.168.178.44 or 192.168.178.44:8883" />
-                </label>
-                <button disabled={busy === "local-probe"} type="submit">
-                  <RadioTower size={16} />
-                  {busy === "local-probe" ? "Checking..." : "Check IP"}
-                </button>
-              </form>
-            </div>
-
-            <div className="grid gap-3">
-              {discovery ? (
-                discovery.candidates.length ? (
-                  <>
-                    <DiscoveryFilterBar activeFilter={discoveryFilter} counts={discoveryFilterCounts} onChange={setDiscoveryFilter} />
-                    {filteredDiscoveryCandidates.length ? (
-                      filteredDiscoveryCandidates.map((candidate) => (
-                        <LocalCandidateCard busy={busy} candidate={candidate} key={candidate.id} onImport={importCandidate} onUseForBambu={useCandidateForBambu} />
-                      ))
-                    ) : (
-                      <div className="smart-local-empty">No candidates in this filter. Try All or probe the exact device IP.</div>
-                    )}
-                  </>
-                ) : (
-                  <div className="smart-local-empty">
-                    No local candidates found{discovery.target ? ` at ${discovery.target}` : ""}. Check the device IP, LAN mode, firewall, or router client list.
-                  </div>
-                )
-              ) : (
-                <div className="smart-local-empty">Run discovery to see local candidates and Avareno product matches.</div>
-              )}
-            </div>
-          </div>
-        </section>
-
-        <section className="smart-provider-grid">
-          {payload.providers.map((provider) => (
-            <div className="smart-provider" key={provider.id}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-black uppercase text-muted">{provider.mode}</p>
-                  <h2 className="mt-1 text-xl font-black text-ink">{providerLabels[provider.id] ?? cleanUiText(provider.name)}</h2>
-                </div>
-                <span className="grid h-10 w-10 place-items-center rounded-full bg-ink text-white">
-                  <PlugZap size={17} />
-                </span>
-              </div>
-              <p className="mt-4 text-sm font-semibold leading-6 text-muted">{provider.authNote}</p>
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <button className="smart-mini-action" onClick={() => connect(provider.id)} disabled={busy === `connect-${provider.id}`} type="button">
-                  Connect
-                </button>
-                <button className="smart-mini-action smart-mini-action-light" onClick={() => sync(provider.id)} disabled={busy === `sync-${provider.id}` || provider.mode === "PLANNED" || provider.id === "LOCAL_DISCOVERY"} type="button">
-                  <RefreshCw size={15} /> Sync
-                </button>
-              </div>
-            </div>
-          ))}
-        </section>
-
-        <section className="smart-device-ledger">
-          <div className="space-y-3">
-            {payload.devices.length ? (
-              payload.devices.map((device) => (
-                <SmartDeviceCard
-                  busy={busy}
-                  device={device}
-                  items={suggestions.get(device.id) ?? []}
-                  key={device.id}
-                  onCommand={command}
-                  onLink={linkItem}
-                />
-              ))
-            ) : (
-              <div className="smart-panel rounded-lg p-5 text-sm font-bold text-muted">No smart devices yet. Sync Samsung SmartThings to create the first Object Control card.</div>
-            )}
-          </div>
-
-          <aside className="smart-panel rounded-lg p-4 lg:sticky lg:top-28 lg:self-start">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-black uppercase text-muted">Recent commands</p>
-                <h2 className="mt-1 text-2xl font-black text-ink">Control history</h2>
-              </div>
-              <span className="grid h-10 w-10 place-items-center rounded-full bg-leaf/10 text-leaf">
-                <ShieldCheck size={18} />
-              </span>
-            </div>
-            <div className="mt-5 grid gap-2">
-              {payload.commands.length ? (
-                payload.commands.map((command) => (
-                  <div className="smart-command-row" key={command.id}>
-                    <p>{command.deviceName ?? "Device"}</p>
-                    <strong>{command.command.replace("_", " ")}</strong>
-                    <span>
-                      {command.status} - {isoDate(command.createdAt)}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-lg border border-dashed border-line bg-white/70 p-4 text-sm font-bold text-muted">No commands yet.</div>
-              )}
-            </div>
-          </aside>
-        </section>
+        </div>
       </section>
-    </div>
+
+      {message ? <p className="smart-calm-message">{message}</p> : null}
+    </main>
   );
+}
+
+function buildHomeNextItems(items: Item[], matchName: string, documentCount: number, openInsightCount: number) {
+  const itemWithMissingContext = items.find((item) => (item.documents?.length ?? 0) === 0 || !item.warrantyUntil);
+  const itemWithWarranty = items.find((item) => item.warrantyUntil);
+
+  return [
+    {
+      body: itemWithWarranty?.warrantyUntil ? `Garantie bis ${displayHomeDate(itemWithWarranty.warrantyUntil)}` : "Frist und Beleg gemeinsam sichern",
+      icon: <ShieldCheck size={18} />,
+      title: itemWithWarranty ? displayHomeItemName(itemWithWarranty.name) : `${displayHomeItemName(matchName)} prüfen`,
+      to: itemWithWarranty ? `/app/items/${itemWithWarranty.id}` : "/app/capture/loop"
+    },
+    {
+      body: itemWithMissingContext ? "Beleg oder Garantie fehlt noch" : `${documentCount} Dokumente sind abgelegt`,
+      icon: <FileText size={18} />,
+      title: itemWithMissingContext ? displayHomeItemName(itemWithMissingContext.name) : "Dokumente ansehen",
+      to: itemWithMissingContext ? `/app/items/${itemWithMissingContext.id}` : "/app/reports/home-binder"
+    },
+    {
+      body: `${openInsightCount || 2} offene Punkte sinnvoll einordnen`,
+      icon: <Sparkles size={18} />,
+      title: "Resolve fortsetzen",
+      to: "/app/resolve"
+    }
+  ];
 }
 
 function SmartTelemetryPill({
@@ -978,6 +754,49 @@ function SmartTelemetryPill({
       {content}
     </div>
   );
+}
+
+function CalmSectionLink({ body, label, to }: { body: string; label: string; to: string }) {
+  return (
+    <Link className="smart-calm-section-link" to={to}>
+      <span>
+        <strong>{label}</strong>
+        <small>{body}</small>
+      </span>
+      <ChevronRight size={18} />
+    </Link>
+  );
+}
+
+function CalmMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <div className="smart-calm-metric">
+      <span>{icon}</span>
+      <small>{label}</small>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function CalmActionLink({ body, icon, label, to }: { body: string; icon: ReactNode; label: string; to: string }) {
+  return (
+    <Link className="smart-calm-action-link" to={to}>
+      <span>{icon}</span>
+      <strong>{label}</strong>
+      <small>{body}</small>
+    </Link>
+  );
+}
+
+function displayHomeDate(value?: string | null) {
+  const formatted = isoDate(value);
+  return formatted === "No date" ? "kein Datum" : formatted;
+}
+
+function displayHomeItemName(name: string) {
+  if (name.toLowerCase().includes("3d printer")) return "Smartes Gerät";
+  if (name.toLowerCase().includes("test passport")) return "Produktpass";
+  return name;
 }
 
 function SmartBottomNav({ appPath }: { appPath: (path: string) => string }) {
