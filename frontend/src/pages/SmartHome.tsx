@@ -12,6 +12,7 @@ import {
   FileText,
   FolderOpen,
   Home,
+  LifeBuoy,
   Link2,
   MessageCircle,
   Monitor,
@@ -20,6 +21,7 @@ import {
   PlugZap,
   RadioTower,
   RefreshCw,
+  ReceiptText,
   Search,
   ShieldCheck,
   Sparkles,
@@ -566,115 +568,112 @@ export function SmartHome() {
 
   const isOnline = mainDevice ? !["offline", "error"].includes(String(mainDevice.status ?? "").toLowerCase()) : true;
   const roomName = (mainDevice?.roomName ?? bambuSetup.roomName) || "Wohnzimmer";
-  const primaryInsight = insights.find((insight) => insight.status !== "ACTIVE") ?? insights[0];
   const openInsightCount = insights.filter((insight) => insight.status !== "ACTIVE").length;
   const dashboardDocumentCount = items.reduce((count, item) => count + (item.documents?.length ?? 0), 0) || 18;
-  const warrantyCount = items.filter((item) => item.warrantyUntil).length || 4;
-  const roomCount = new Set(items.map((item) => item.location || item.space?.name).filter(Boolean)).size || 6;
   const matchItem = items.find((item) => /oled|tv|fernseher/i.test([item.name, item.category, item.manufacturer, item.model].join(" "))) ?? null;
   const matchName = matchItem?.name ?? "LG OLED C3";
   const itemCount = items.length || payload.devices.length || 7;
   const nextItems = buildHomeNextItems(items, matchName, dashboardDocumentCount, openInsightCount);
+  const importantItems = buildTodayImportantItems(items, matchName);
+  const recentThings = buildRecentThings(items, matchName);
   const appPath = (path: string) => (path === "/" ? "/app" : `/app${path}`);
-  const scrollToPanel = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
     <main className="smart-calm-page">
       <section className="smart-calm-hero">
         <div>
-          <h1>Zuhause</h1>
-          <p>Deine wichtigsten Dinge, Belege und offenen Punkte an einem ruhigen Ort.</p>
+          <h1>Guten Morgen, Stefan</h1>
+          <p>3 Dinge brauchen heute deine Aufmerksamkeit.</p>
         </div>
-        {motivation ? (
-          <MotivationWidget motivation={motivation} />
-        ) : (
-          <div className="smart-calm-hero-card">
-            <span>Status</span>
-            <strong>{isOnline ? "Alles erreichbar" : "Prüfen"}</strong>
-            <small>{roomName} · {itemCount} Dinge</small>
-          </div>
-        )}
-      </section>
-
-      <section className="smart-calm-focus">
-        <div className="smart-calm-focus-copy">
-          <span>Heute</span>
-          <h2>Garantie läuft bald ab</h2>
-          <p>{matchName} endet in 45 Tagen. Prüfe nur diesen einen Punkt oder öffne später die vollständige Liste.</p>
+        <div className="smart-calm-hero-card">
+          <span>Privater Speicher</span>
+          <strong>{isOnline ? "Bereit" : "Prüfen"}</strong>
+          <small>{roomName} · {itemCount} Dinge</small>
         </div>
-        <div className="smart-calm-focus-meta">
-          <small>{matchName}</small>
-          <strong>45 Tage</strong>
-        </div>
-        <Link className="smart-calm-primary-button" to={appPath("/capture/loop")}>
-          Erinnerung öffnen
-          <ArrowRight size={16} />
-        </Link>
       </section>
 
-      <section className="smart-calm-overview" aria-label="Zuhause Überblick">
-        <CalmMetric icon={<Package size={18} />} label="Dinge" value={String(itemCount)} />
-        <CalmMetric icon={<FileText size={18} />} label="Dokumente" value={String(dashboardDocumentCount)} />
-        <CalmMetric icon={<ShieldCheck size={18} />} label="Garantien" value={String(warrantyCount)} />
-      </section>
-
-      <section className="smart-calm-actions" aria-label="Schnell erfassen">
-        <CalmActionLink icon={<Archive size={18} />} label="Produkt" body="Gerät oder Sache speichern" to={appPath("/capture/item")} />
-        <CalmActionLink icon={<FileText size={18} />} label="Beleg" body="Rechnung oder Garantie sichern" to={appPath("/capture/receipt")} />
-        <CalmActionLink icon={<Sparkles size={18} />} label="Ticket" body="Problem passend einordnen" to={appPath("/resolve/create")} />
-      </section>
-
-      <section className="smart-calm-workspace" aria-label="Weiterarbeiten">
-        <article className="smart-calm-next">
-          <div className="smart-calm-panel-head">
-            <div>
-              <span>Weiterarbeiten</span>
-              <h2>Nächste Schritte</h2>
+      <section className="smart-calm-home-grid" aria-label="Home Inbox">
+        <div className="smart-calm-main-column">
+          <article className="smart-calm-focus">
+            <div className="smart-calm-panel-head">
+              <div>
+                <span>Home Inbox</span>
+                <h2>Heute wichtig</h2>
+              </div>
+              <Link to={appPath("/care")}>Care öffnen</Link>
             </div>
-            <Link to={appPath("/items")}>Alle Dinge</Link>
-          </div>
-          <div className="smart-calm-next-list">
-            {nextItems.map((item) => (
-              <Link className="smart-calm-next-row" key={item.to + item.title} to={item.to}>
-                <span>{item.icon}</span>
-                <div>
-                  <strong>{item.title}</strong>
-                  <small>{item.body}</small>
-                </div>
-                <ChevronRight size={16} />
-              </Link>
-            ))}
-          </div>
-        </article>
+            <div className="smart-calm-important-list">
+              {importantItems.map((item, index) => (
+                <ImportantItemCard key={item.product + item.title} item={item} primary={index === 0} />
+              ))}
+            </div>
+          </article>
 
-        <aside className="smart-calm-sections" aria-label="Avareno Bereiche">
-          <CalmSectionLink label="Dinge" body={`${dashboardDocumentCount} Dokumente und Produktakten`} to={appPath("/items")} />
-          <CalmSectionLink label="Resolve" body={`${openInsightCount || 2} offene Fragen und Hilfe-Tickets`} to={appPath("/resolve")} />
-          <CalmSectionLink label="Care" body="Garantien, Reparaturen und Erinnerungen" to={appPath("/capture/loop")} />
+          <article className="smart-calm-activity" aria-label="Zuletzt gespeicherte Dinge">
+            <div className="smart-calm-panel-head">
+              <div>
+                <span>Dinge</span>
+                <h2>Zuletzt gespeicherte Dinge</h2>
+              </div>
+              <Link to={appPath("/items")}>Alle Dinge</Link>
+            </div>
+            <div className="smart-calm-thing-grid">
+              {recentThings.map((thing) => (
+                <RecentThingCard key={thing.name} thing={thing} />
+              ))}
+            </div>
+          </article>
+
+          <article className="smart-calm-next">
+            <div className="smart-calm-panel-head">
+              <div>
+                <span>Weiterarbeiten</span>
+                <h2>Nächste Schritte</h2>
+              </div>
+            </div>
+            <div className="smart-calm-next-list">
+              {nextItems.map((item) => (
+                <Link className="smart-calm-next-row" key={item.to + item.title} to={item.to}>
+                  <span>{item.icon}</span>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <small>{item.body}</small>
+                  </div>
+                  <ChevronRight size={16} />
+                </Link>
+              ))}
+            </div>
+          </article>
+        </div>
+
+        <aside className="smart-calm-side-column">
+          <section className="smart-calm-actions" aria-label="Schnell erfassen">
+            <div className="smart-calm-panel-head">
+              <div>
+                <span>Quick Capture</span>
+                <h2>Etwas speichern</h2>
+              </div>
+            </div>
+            <div className="smart-calm-action-list">
+              <CalmActionLink className="is-primary" icon={<Archive size={18} />} label="Produkt hinzufügen" body="Ein Ding mit Kontext starten" to={appPath("/capture/item")} />
+              <CalmActionLink icon={<ReceiptText size={18} />} label="Rechnung scannen" body="Beleg und Garantie sichern" to={appPath("/capture/receipt")} />
+              <CalmActionLink icon={<LifeBuoy size={18} />} label="Ticket erstellen" body="Problem zu einem Produkt öffnen" to={appPath("/resolve/create")} />
+              <CalmActionLink icon={<BellRing size={18} />} label="Erinnerung anlegen" body="Offenen Punkt nicht verlieren" to={appPath("/capture/loop")} />
+            </div>
+          </section>
+
+          {motivation ? (
+            <section className="smart-calm-motivation" aria-label="Motivation">
+              <MotivationWidget motivation={motivation} />
+            </section>
+          ) : null}
+
+          <section className="smart-calm-sections" aria-label="Avareno Bereiche">
+            <CalmSectionLink label="Dinge" body={`${dashboardDocumentCount} Dokumente und Produktakten`} to={appPath("/items")} />
+            <CalmSectionLink label="Resolve" body={`${openInsightCount || 2} offene Fragen und Hilfe-Tickets`} to={appPath("/resolve")} />
+            <CalmSectionLink label="Care" body="Garantien, Reparaturen und Erinnerungen" to={appPath("/care")} />
+          </section>
         </aside>
-      </section>
-
-      <section className="smart-calm-activity" aria-label="Letzte Aktivität">
-        <div className="smart-calm-panel-head">
-          <div>
-            <span>Zuletzt</span>
-            <h2>Aktivität</h2>
-          </div>
-        </div>
-        <div className="smart-calm-activity-list">
-          <div>
-            <span>Beleg gesichert</span>
-            <strong>{matchName}</strong>
-          </div>
-          <div>
-            <span>Produkt ergänzt</span>
-            <strong>{dashboardDocumentCount} Dokumente verfügbar</strong>
-          </div>
-          <div>
-            <span>Offene Aufgabe</span>
-            <strong>{openInsightCount || 2} Punkte warten</strong>
-          </div>
-        </div>
       </section>
 
       {message ? <p className="smart-calm-message">{message}</p> : null}
@@ -688,24 +687,156 @@ function buildHomeNextItems(items: Item[], matchName: string, documentCount: num
 
   return [
     {
-      body: itemWithWarranty?.warrantyUntil ? `Garantie bis ${displayHomeDate(itemWithWarranty.warrantyUntil)}` : "Frist und Beleg gemeinsam sichern",
-      icon: <ShieldCheck size={18} />,
-      title: itemWithWarranty ? displayHomeItemName(itemWithWarranty.name) : `${displayHomeItemName(matchName)} prüfen`,
-      to: itemWithWarranty ? `/app/items/${itemWithWarranty.id}` : "/app/capture/loop"
+      body: `${openInsightCount || 2} offene Punkte sinnvoll einordnen`,
+      icon: <LifeBuoy size={18} />,
+      title: "Resolve fortsetzen",
+      to: "/app/resolve"
     },
     {
-      body: itemWithMissingContext ? "Beleg oder Garantie fehlt noch" : `${documentCount} Dokumente sind abgelegt`,
+      body: itemWithMissingContext ? `${displayHomeItemName(itemWithMissingContext.name)} braucht noch einen Beleg` : `${documentCount} Dokumente sind abgelegt`,
       icon: <FileText size={18} />,
-      title: itemWithMissingContext ? displayHomeItemName(itemWithMissingContext.name) : "Dokumente ansehen",
+      title: "Dokument ansehen",
       to: itemWithMissingContext ? `/app/items/${itemWithMissingContext.id}` : "/app/reports/home-binder"
     },
     {
-      body: `${openInsightCount || 2} offene Punkte sinnvoll einordnen`,
-      icon: <Sparkles size={18} />,
-      title: "Resolve fortsetzen",
-      to: "/app/resolve"
+      body: itemWithWarranty?.warrantyUntil ? `Garantie bis ${displayHomeDate(itemWithWarranty.warrantyUntil)}` : `${displayHomeItemName(matchName)} in 45 Tagen prüfen`,
+      icon: <ShieldCheck size={18} />,
+      title: "Erinnerung prüfen",
+      to: itemWithWarranty ? `/app/items/${itemWithWarranty.id}` : "/app/care"
     }
   ];
+}
+
+type ImportantHomeItem = {
+  action: string;
+  detail: string;
+  icon: ReactNode;
+  product: string;
+  title: string;
+  to: string;
+};
+
+type RecentHomeThing = {
+  category: string;
+  invoiceStatus: string;
+  name: string;
+  openPoints: number;
+  to: string;
+  warrantyStatus: string;
+};
+
+function buildTodayImportantItems(items: Item[], matchName: string): ImportantHomeItem[] {
+  const itemWithMissingInvoice = items.find((item) => (item.documents?.length ?? 0) === 0);
+  const itemWithOpenLoop = items.find((item) => (item.loops ?? []).some((loop) => loop.status === "OPEN")) ?? items.find((item) => item.repairLogs?.some((repair) => repair.status !== "RESOLVED"));
+
+  return [
+    {
+      action: "Erinnerung öffnen",
+      detail: "Garantie läuft in 45 Tagen ab",
+      icon: <ShieldCheck size={18} />,
+      product: displayHomeItemName(matchName),
+      title: "Garantie endet bald",
+      to: "/app/care"
+    },
+    {
+      action: "Beleg hinzufügen",
+      detail: "Rechnung fehlt noch",
+      icon: <ReceiptText size={18} />,
+      product: displayHomeItemName(itemWithMissingInvoice?.name ?? "Sony WH-1000XM5"),
+      title: "Nachweis unvollständig",
+      to: itemWithMissingInvoice ? `/app/items/${itemWithMissingInvoice.id}` : "/app/capture/receipt"
+    },
+    {
+      action: "Ansehen",
+      detail: "Wartung offen",
+      icon: <Wrench size={18} />,
+      product: displayHomeItemName(itemWithOpenLoop?.name ?? "Bambu Lab X1C"),
+      title: "Care-Punkt offen",
+      to: itemWithOpenLoop ? `/app/items/${itemWithOpenLoop.id}` : "/app/care"
+    }
+  ];
+}
+
+function buildRecentThings(items: Item[], matchName: string): RecentHomeThing[] {
+  if (items.length) {
+    return items.slice(0, 3).map((item) => {
+      const openPoints = (item.missingFields?.length ?? 0) + (item.loops?.filter((loop) => loop.status === "OPEN").length ?? 0) + (item.repairLogs?.filter((repair) => repair.status !== "RESOLVED").length ?? 0);
+      return {
+        category: cleanUiText(item.category || item.itemType || "Ding"),
+        invoiceStatus: (item.documents?.length ?? 0) > 0 ? "Rechnung gespeichert" : "Rechnung fehlt",
+        name: displayHomeItemName(item.name),
+        openPoints,
+        to: `/app/items/${item.id}`,
+        warrantyStatus: item.warrantyUntil ? `Garantie bis ${displayHomeDate(item.warrantyUntil)}` : "Garantie unbekannt"
+      };
+    });
+  }
+
+  return [
+    {
+      category: "TV / Media",
+      invoiceStatus: "Rechnung gespeichert",
+      name: displayHomeItemName(matchName),
+      openPoints: 1,
+      to: "/app/items",
+      warrantyStatus: "Garantie endet in 45 Tagen"
+    },
+    {
+      category: "Audio",
+      invoiceStatus: "Rechnung fehlt",
+      name: "Sony WH-1000XM5",
+      openPoints: 1,
+      to: "/app/capture/receipt",
+      warrantyStatus: "Garantie offen"
+    },
+    {
+      category: "Werkstatt",
+      invoiceStatus: "Beleg gespeichert",
+      name: "Bambu Lab X1C",
+      openPoints: 2,
+      to: "/app/care",
+      warrantyStatus: "Wartung fällig"
+    }
+  ];
+}
+
+function ImportantItemCard({ item, primary = false }: { item: ImportantHomeItem; primary?: boolean }) {
+  return (
+    <Link className={primary ? "smart-calm-important-row is-primary" : "smart-calm-important-row"} to={item.to}>
+      <span>{item.icon}</span>
+      <div>
+        <small>{item.title}</small>
+        <strong>{item.product}</strong>
+        <p>{item.detail}</p>
+      </div>
+      <em>{item.action}</em>
+    </Link>
+  );
+}
+
+function RecentThingCard({ thing }: { thing: RecentHomeThing }) {
+  return (
+    <Link className="smart-calm-thing-card" to={thing.to}>
+      <div>
+        <small>{thing.category}</small>
+        <strong>{thing.name}</strong>
+      </div>
+      <dl>
+        <div>
+          <dt>Beleg</dt>
+          <dd>{thing.invoiceStatus}</dd>
+        </div>
+        <div>
+          <dt>Garantie</dt>
+          <dd>{thing.warrantyStatus}</dd>
+        </div>
+        <div>
+          <dt>Offen</dt>
+          <dd>{thing.openPoints ? `${thing.openPoints} Punkt${thing.openPoints === 1 ? "" : "e"}` : "Nichts offen"}</dd>
+        </div>
+      </dl>
+    </Link>
+  );
 }
 
 function SmartTelemetryPill({
@@ -768,19 +899,9 @@ function CalmSectionLink({ body, label, to }: { body: string; label: string; to:
   );
 }
 
-function CalmMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+function CalmActionLink({ body, className = "", icon, label, to }: { body: string; className?: string; icon: ReactNode; label: string; to: string }) {
   return (
-    <div className="smart-calm-metric">
-      <span>{icon}</span>
-      <small>{label}</small>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-function CalmActionLink({ body, icon, label, to }: { body: string; icon: ReactNode; label: string; to: string }) {
-  return (
-    <Link className="smart-calm-action-link" to={to}>
+    <Link className={`smart-calm-action-link ${className}`} to={to}>
       <span>{icon}</span>
       <strong>{label}</strong>
       <small>{body}</small>

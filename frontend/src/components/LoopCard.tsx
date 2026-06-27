@@ -19,7 +19,7 @@ export function LoopCard({ loop, onComplete }: { loop: Loop; onComplete?: (id: s
       <div className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-ink text-white">
         <SourceIcon size={19} />
       </div>
-      <Link to={`/loops/${loop.id}`} className="min-w-0 flex-1">
+      <Link to={`/app/care/${loop.id}`} className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="min-w-0 flex-1 truncate text-base font-black text-ink">{loop.title}</p>
           <Badge tone={priorityTone[loop.priority]}>{loop.priority === "MEDIUM" ? "easy" : loop.priority.toLowerCase()}</Badge>

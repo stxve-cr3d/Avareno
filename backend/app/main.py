@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app.auth import auth_middleware
 from app.db import PROJECT_ROOT
 from app.routers import assistant, capture, dashboard, documents, extract, items, loops, me, mobile, notifications, planner, reports, rewards, search, smart_home, structure
 
@@ -32,6 +33,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.middleware("http")(auth_middleware)
 
 uploads = PROJECT_ROOT / "uploads"
 uploads.mkdir(parents=True, exist_ok=True)

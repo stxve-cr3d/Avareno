@@ -8,7 +8,7 @@ Avareno is a mobile-first web app for real-life open loops: receipts, devices, d
 - Backend: Python, FastAPI
 - Database: SQLite
 - Uploads: local `/uploads`
-- Auth: mocked default user for MVP
+- Auth: Supabase Auth with local SQLite user mirroring
 - AI/OCR: mocked extraction services with clear replacement points
 
 ## Run locally
@@ -23,6 +23,8 @@ npm run dev
 Frontend: http://localhost:5173  
 Backend: http://localhost:4000
 API docs: http://localhost:4000/docs
+
+Local auth expects `frontend/.env.local` and `backend/.env.local`. The frontend uses the Supabase publishable key; the backend verifies Supabase access tokens through Supabase Auth before serving `/api/*` routes.
 
 ## Cloudflare Pages
 

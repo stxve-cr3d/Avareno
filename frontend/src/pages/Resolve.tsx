@@ -110,6 +110,22 @@ export function Resolve() {
     );
   }
 
+  function markSolutionHelpful(ticket: ResolveTicket, proposal: SolutionProposal) {
+    setTickets((current) =>
+      current.map((entry) =>
+        entry.id === ticket.id
+          ? {
+              ...entry,
+              status: entry.status === "OPEN" ? "ANSWERED" : entry.status,
+              solutions: entry.solutions.map((solution) =>
+                solution.id === proposal.id ? { ...solution, helpedCount: solution.helpedCount + 1 } : solution
+              )
+            }
+          : entry
+      )
+    );
+  }
+
   if (isCreate) {
     return (
       <ResolveShell
@@ -144,7 +160,7 @@ export function Resolve() {
             Zurück zur Liste
           </Link>
         </div>
-        <TicketDetailPanel onAcceptSolution={acceptSolution} ticket={selectedTicket} />
+        <TicketDetailPanel onAcceptSolution={acceptSolution} onMarkHelpful={markSolutionHelpful} ticket={selectedTicket} />
       </ResolveShell>
     );
   }
@@ -325,7 +341,15 @@ function TicketCard({ onClick, ticket }: { onClick: () => void; ticket: ResolveT
   );
 }
 
-function TicketDetailPanel({ onAcceptSolution, ticket }: { onAcceptSolution: (ticket: ResolveTicket, proposal: SolutionProposal) => void; ticket: ResolveTicket }) {
+function TicketDetailPanel({
+  onAcceptSolution,
+  onMarkHelpful,
+  ticket
+}: {
+  onAcceptSolution: (ticket: ResolveTicket, proposal: SolutionProposal) => void;
+  onMarkHelpful: (ticket: ResolveTicket, proposal: SolutionProposal) => void;
+  ticket: ResolveTicket;
+}) {
   const product = getProduct(ticket.productId);
   const helpers = ticket.helperIds.map(getHelper);
   return (
@@ -377,6 +401,7 @@ function TicketDetailPanel({ onAcceptSolution, ticket }: { onAcceptSolution: (ti
               helper={getHelper(proposal.helperId)}
               key={proposal.id}
               onAccept={() => onAcceptSolution(ticket, proposal)}
+              onHelpful={() => onMarkHelpful(ticket, proposal)}
               proposal={proposal}
               ticketSolved={ticket.status === "SOLVED"}
             />
@@ -458,14 +483,34 @@ function HelperCard({ helper }: { helper: HelperProfile }) {
 function SolutionProposalCard({
   helper,
   onAccept,
+  onHelpful,
   proposal,
   ticketSolved
 }: {
   helper: HelperProfile;
   onAccept: () => void;
+  onHelpful: () => void;
   proposal: SolutionProposal;
   ticketSolved: boolean;
 }) {
+  const [helped, setHelped] = useState(false);
+  const [questionOpen, setQuestionOpen] = useState(false);
+  const [questionDraft, setQuestionDraft] = useState("");
+  const [questionSent, setQuestionSent] = useState("");
+
+  function handleHelpful() {
+    if (helped) return;
+    setHelped(true);
+    onHelpful();
+  }
+
+  function sendQuestion() {
+    if (!questionDraft.trim()) return;
+    setQuestionSent(questionDraft.trim());
+    setQuestionDraft("");
+    setQuestionOpen(false);
+  }
+
   return (
     <article className={proposal.accepted ? "resolve-solution-card is-accepted" : "resolve-solution-card"}>
       <div className="resolve-solution-head">
@@ -487,12 +532,28 @@ function SolutionProposalCard({
         ))}
       </div>
       <div className="resolve-solution-actions">
-        <button type="button">Hat geholfen</button>
-        <button type="button">Nachfrage</button>
+        <button className={helped ? "is-confirmed" : ""} disabled={helped} onClick={handleHelpful} type="button">
+          {helped ? "Markiert" : "Hat geholfen"}
+        </button>
+        <button onClick={() => setQuestionOpen((open) => !open)} type="button">
+          {questionOpen ? "Schliessen" : "Nachfrage"}
+        </button>
         <button disabled={proposal.accepted || ticketSolved} onClick={onAccept} type="button">
           Lösung annehmen
         </button>
       </div>
+      {questionOpen ? (
+        <div className="resolve-question-box">
+          <label>
+            Nachfrage an {helper.name}
+            <textarea onChange={(event) => setQuestionDraft(event.target.value)} placeholder="Was ist noch unklar?" value={questionDraft} />
+          </label>
+          <button disabled={!questionDraft.trim()} onClick={sendQuestion} type="button">
+            Frage speichern
+          </button>
+        </div>
+      ) : null}
+      {questionSent ? <p className="resolve-feedback-note">Nachfrage gespeichert: {questionSent}</p> : null}
     </article>
   );
 }

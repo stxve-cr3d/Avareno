@@ -18,7 +18,7 @@ export function CaptureMessage() {
       body: JSON.stringify({ text, contactName })
     });
     setPreview(`Created: ${result.parsed.title}`);
-    setTimeout(() => navigate(`/loops/${result.loop.id}`), 600);
+    setTimeout(() => navigate(`/app/care/${result.loop.id}`), 600);
   }
 
   return (

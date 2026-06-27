@@ -32,7 +32,7 @@ export function CaptureLoop() {
         xpReward: priority === "BOSS" ? 100 : priority === "HIGH" ? 50 : priority === "LOW" ? 10 : 25
       })
     });
-    navigate(`/app/loops/${loop.id}`);
+    navigate(`/app/care/${loop.id}`);
   }
 
   return (

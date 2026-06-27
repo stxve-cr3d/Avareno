@@ -6,6 +6,57 @@ export type User = {
   level: number;
 };
 
+export type UserProfile = {
+  id: string;
+  authUserId: string;
+  displayName: string;
+  email: string;
+  avatarUrl?: string | null;
+  authProvider: "email" | "google" | "apple";
+  createdAt: string;
+  updatedAt: string;
+  emailVerified: boolean;
+  onboardingCompleted: boolean;
+  motivationEnabled: boolean;
+  leaderboardEnabled: boolean;
+  privateProfile: boolean;
+  onboardingInterests: string[];
+  weeklyXp: number;
+  totalXp: number;
+  currentStreakDays: number;
+  longestStreakDays: number;
+  freezeDaysAvailable: number;
+};
+
+export type FriendStatus = "pending" | "accepted" | "blocked";
+
+export type Friend = {
+  id: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  status: FriendStatus;
+  addedAt: string;
+};
+
+export type FriendInviteStatus = "active" | "used" | "expired";
+
+export type FriendInvite = {
+  id: string;
+  inviteCode: string;
+  createdByUserId: string;
+  status: FriendInviteStatus;
+  createdAt: string;
+  expiresAt: string;
+};
+
+export type FriendCircle = {
+  id: string;
+  name: string;
+  memberIds: string[];
+  createdByUserId: string;
+  visibility: "private" | "invite_only";
+};
+
 export type XPEvent = {
   id: string;
   label: string;

@@ -1,12 +1,14 @@
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Archive, FileText, Home, LifeBuoy, MessageSquareText, Package, PenLine, Plus, ReceiptText, UserRound, X } from "lucide-react";
+import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Archive, FileText, Home, LifeBuoy, LogOut, MessageSquareText, Package, PenLine, Plus, ReceiptText, UserRound, X } from "lucide-react";
 import { useState } from "react";
 import avarenoMark from "../assets/avareno-mark.svg";
+import { useAuth } from "../lib/authProvider";
 
 const nav = [
   { to: "/app", label: "Zuhause", icon: Home },
   { to: "/app/items", label: "Dinge", icon: Archive },
   { to: "/app/resolve", label: "Resolve", icon: LifeBuoy },
+  { to: "/app/care", label: "Care", icon: PenLine },
   { to: "/app/rewards", label: "Ich", icon: UserRound }
 ];
 
@@ -16,21 +18,32 @@ const captureOptions = [
   { label: "Ding", helper: "Produktpass für ein echtes Objekt starten", to: "/app/capture/item", icon: Package },
   { label: "Nachricht", helper: "Kontext in Erinnerung verwandeln", to: "/app/capture/message", icon: MessageSquareText },
   { label: "Dokument", helper: "Speichern und später verbinden", to: "/app/capture/receipt", icon: FileText },
-  { label: "Care", helper: "Garantie, Reparatur, Service, Rückgabe", to: "/app/capture/loop", icon: PenLine }
+  { label: "Care", helper: "Garantie, Reparatur, Service, Rückgabe", to: "/app/care", icon: PenLine }
 ];
 
 export function AppShell() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const auth = useAuth();
   const isMarketingSurface = ["/", "/pricing", "/impressum", "/datenschutz", "/cookies"].includes(location.pathname);
+  const isAuthSurface = ["/login", "/signup", "/forgot-password", "/reset-password", "/auth/callback", "/auth/verify-email", "/onboarding"].includes(location.pathname);
+  const isProtectedSurface = !isMarketingSurface && !isAuthSurface;
 
-  if (isMarketingSurface) {
+  if (isMarketingSurface || isAuthSurface) {
     return (
-      <main className="avareno-landing-main">
+      <main className={isAuthSurface ? "auth-shell" : "avareno-landing-main"}>
         <Outlet />
       </main>
     );
+  }
+
+  if (isProtectedSurface && auth.status === "loading") {
+    return <AuthRouteLoading />;
+  }
+
+  if (isProtectedSurface && auth.status === "anonymous") {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
   const isSmartSurface = location.pathname === "/smart-home" || location.pathname === "/app" || location.pathname === "/app/smart-home";
@@ -67,6 +80,18 @@ export function AppShell() {
             <Link className="avareno-app-website-link" to="/">
               Website
             </Link>
+            <button
+              className="avareno-app-logout"
+              onClick={() => {
+                void auth.logout();
+                navigate("/login", { replace: true });
+              }}
+              title="Abmelden"
+              type="button"
+            >
+              <LogOut size={17} />
+              <span>Abmelden</span>
+            </button>
             <button className="avareno-app-capture" onClick={() => setOpen(true)}>
               <Plus size={17} />
               <span>Erfassen</span>
@@ -120,5 +145,16 @@ export function AppShell() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function AuthRouteLoading() {
+  return (
+    <main className="auth-route-loading">
+      <div>
+        <span />
+        <p>Privater Bereich wird vorbereitet...</p>
+      </div>
+    </main>
   );
 }

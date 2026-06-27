@@ -2,6 +2,19 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_ORIGIN?: string;
+  readonly VITE_AUTH_PROVIDER?: "supabase" | "mock";
+  readonly VITE_SUPABASE_URL?: string;
+  readonly VITE_SUPABASE_PUBLISHABLE_KEY?: string;
+  readonly VITE_SUPABASE_ANON_KEY?: string;
+  readonly VITE_AUTH_REDIRECT_URL?: string;
+  readonly VITE_AUTH_EMAIL_REDIRECT_URL?: string;
+  readonly VITE_AUTH_PASSWORD_RESET_URL?: string;
+  readonly VITE_AUTH_GOOGLE_ENABLED?: string;
+  readonly VITE_AUTH_APPLE_ENABLED?: string;
+  readonly VITE_AUTH_EMAIL_FROM?: string;
+  readonly VITE_AUTH_EMAIL_FROM_NAME?: string;
+  readonly VITE_AUTH_EMAIL_REPLY_TO?: string;
+  readonly VITE_AUTH_SUPPORT_EMAIL?: string;
 }
 
 interface ImportMeta {

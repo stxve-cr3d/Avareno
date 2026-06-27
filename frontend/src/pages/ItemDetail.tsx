@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   BookOpen,
   CalendarClock,
@@ -71,6 +71,7 @@ const documentTypes = ["RECEIPT", "WARRANTY", "MANUAL", "DRIVER", "SOFTWARE", "O
 
 export function ItemDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [item, setItem] = useState<Item | null>(null);
   const [serialNumber, setSerialNumber] = useState("");
   const [passportLinks, setPassportLinks] = useState({
@@ -216,23 +217,28 @@ export function ItemDetail() {
 
   async function addReminder() {
     if (!item || !reminderTitle) return;
+    setBusy("care-create");
     const due = new Date();
     due.setDate(due.getDate() + 7);
-    await api<Loop>("/api/loops", {
-      method: "POST",
-      body: JSON.stringify({
-        itemId: item.id,
-        title: reminderTitle,
-        description: `Offener Punkt für ${item.name}`,
-        sourceType: "DEVICE",
-        priority: "MEDIUM",
-        dueDate: due.toISOString(),
-        reminderAt: due.toISOString(),
-        xpReward: 25
-      })
-    });
-    setReminderTitle("");
-    await load();
+    try {
+      const loop = await api<Loop>("/api/loops", {
+        method: "POST",
+        body: JSON.stringify({
+          itemId: item.id,
+          title: reminderTitle,
+          description: `Offener Punkt für ${item.name}`,
+          sourceType: "DEVICE",
+          priority: "MEDIUM",
+          dueDate: due.toISOString(),
+          reminderAt: due.toISOString(),
+          xpReward: 25
+        })
+      });
+      setReminderTitle("");
+      navigate(`/app/care/${loop.id}`);
+    } finally {
+      setBusy("");
+    }
   }
 
   async function completeProfile() {
@@ -812,20 +818,23 @@ export function ItemDetail() {
           </section>
 
           <section className="object-panel rounded-lg p-4">
-            <SectionTitle eyebrow="Erinnerungen" title="Offene Punkte" icon={<ShieldCheck size={19} />} />
+            <SectionTitle eyebrow="Care" title="Offene Punkte zu diesem Ding" icon={<ShieldCheck size={19} />} />
+            <p className="mt-3 text-sm font-semibold leading-6 text-muted">
+              Starte hier eine produktgebundene Erinnerung. Beleg, Garantie und Produktkontext bleiben mit dem Care-Punkt verbunden.
+            </p>
             <div className="mt-4 flex gap-2">
               <input
                 value={reminderTitle}
                 onChange={(event) => setReminderTitle(event.target.value)}
                 className="min-w-0 flex-1 rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
-                placeholder="Erinnerung hinzufügen"
+                placeholder="z.B. Garantie pruefen"
               />
-              <Button onClick={addReminder} icon={<Plus size={18} />}>
-                Anlegen
+              <Button disabled={!reminderTitle.trim() || busy === "care-create"} onClick={addReminder} icon={<Plus size={18} />}>
+                Care anlegen
               </Button>
             </div>
             <div className="mt-4 grid gap-3">
-              {loops.length ? loops.map((loop) => <LoopCard key={loop.id} loop={loop} />) : <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">Noch keine Erinnerungen für dieses Produkt.</div>}
+              {loops.length ? loops.map((loop) => <LoopCard key={loop.id} loop={loop} />) : <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">Noch keine Care-Punkte fuer dieses Produkt.</div>}
             </div>
           </section>
         </aside>
