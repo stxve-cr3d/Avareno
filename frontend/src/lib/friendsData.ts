@@ -130,7 +130,7 @@ export function buildCurrentUserProgress(profile: UserProfile, preferences: Moti
     currentStreakDays: profile.currentStreakDays,
     consistencyScore: 78,
     label: "Gemeinsam aktiv",
-    note: "Du entscheidest, welche Werte Freunde sehen duerfen.",
+    note: "Du entscheidest, welche Werte Freunde sehen dürfen.",
     sourceBreakdown: [
       { label: "Produkte", count: 2 },
       { label: "Dokumente", count: 1 },

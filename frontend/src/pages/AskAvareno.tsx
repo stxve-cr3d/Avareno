@@ -42,7 +42,7 @@ export function AskAvareno() {
             frag deine dinge
           </h1>
           <p className="mt-5 max-w-2xl text-base font-semibold leading-7 text-white/62">
-            Kein normaler Chat. Avareno antwortet aus deinen Objekten, Belegen, Raeumen, Garantien und fehlenden Daten.
+            Kein normaler Chat. Avareno antwortet aus deinen Objekten, Belegen, Räumen, Garantien und fehlenden Daten.
           </p>
         </div>
         <div className="ask-signal">

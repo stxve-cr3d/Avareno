@@ -53,6 +53,7 @@ import {
   WarrantyTimeline
 } from "../components/app/AppKit";
 import type { GraphEdge } from "../components/app/AppKit";
+import { InlineNotice, SuggestionPanel } from "../components/app/Notifications";
 
 type ImageSuggestion = {
   imageUrl: string;
@@ -109,6 +110,7 @@ export function ItemDetail() {
   const [detailMessage, setDetailMessage] = useState("");
   const [busy, setBusy] = useState("");
   const [recommendationTab, setRecommendationTab] = useState<RecommendationTab>("spare");
+  const [dismissedWarrantyItemId, setDismissedWarrantyItemId] = useState<string | null>(null);
 
   async function load() {
     if (!id) return;
@@ -353,6 +355,7 @@ export function ItemDetail() {
 
   const receiptPresent = hasDocumentType(documents, "RECEIPT") || documents.length > 0;
   const wDays = warrantyDaysLeft(item.warrantyUntil);
+  const warrantyNeedsAttention = typeof wDays === "number" && wDays >= 0 && wDays < 60 && dismissedWarrantyItemId !== item.id;
   const openCount =
     loops.filter((loop) => loop.status === "OPEN").length +
     repairLogs.filter((repair) => repair.status !== "RESOLVED").length +
@@ -388,6 +391,35 @@ export function ItemDetail() {
           )
         }
       />
+
+      {!receiptPresent || warrantyNeedsAttention ? (
+        <div className="av-detail-notices">
+          {!receiptPresent ? (
+            <InlineNotice
+              variant="warning"
+              title="Beleg fehlt"
+              description={`Für ${item.name} ist noch kein Kaufnachweis gespeichert.`}
+              actionLabel="Beleg hinzufügen"
+              actionTo="/app/capture/receipt"
+            />
+          ) : null}
+          {warrantyNeedsAttention ? (
+            <SuggestionPanel
+              variant="warning"
+              title="Garantie endet bald"
+              description={`${item.name} ${warrantyCountdownLabel(wDays ?? 0)}. Du kannst eine Erinnerung anlegen.`}
+              actionLabel="Erinnerung anlegen"
+              secondaryActionLabel="Später"
+              onAction={() => {
+                setReminderTitle((current) => current || "Garantie prüfen");
+                document.getElementById("item-care-reminder")?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+              onDismiss={() => setDismissedWarrantyItemId(item.id)}
+              onSecondaryAction={() => setDismissedWarrantyItemId(item.id)}
+            />
+          ) : null}
+        </div>
+      ) : null}
 
       {/* Object Memory Profile hero */}
       <section className="av-profile-hero">
@@ -655,7 +687,7 @@ export function ItemDetail() {
         </div>
 
         <aside className="space-y-5 lg:sticky lg:top-28 lg:self-start">
-          <section className="object-panel rounded-lg p-4">
+          <section className="object-panel rounded-lg p-4" id="item-care-reminder">
             <SectionTitle eyebrow="Smart-Gerät" title="Gerätesteuerung" icon={<RadioTower size={19} />} />
             <div className="mt-5 grid gap-3">
               {item.smartHomeDevices?.length ? (
@@ -860,14 +892,14 @@ export function ItemDetail() {
                 value={reminderTitle}
                 onChange={(event) => setReminderTitle(event.target.value)}
                 className="min-w-0 flex-1 rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
-                placeholder="z.B. Garantie pruefen"
+                placeholder="z.B. Garantie prüfen"
               />
               <Button disabled={!reminderTitle.trim() || busy === "care-create"} onClick={addReminder} icon={<Plus size={18} />}>
                 Care anlegen
               </Button>
             </div>
             <div className="mt-4 grid gap-3">
-              {loops.length ? loops.map((loop) => <LoopCard key={loop.id} loop={loop} />) : <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">Noch keine Care-Punkte fuer dieses Produkt.</div>}
+              {loops.length ? loops.map((loop) => <LoopCard key={loop.id} loop={loop} />) : <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">Noch keine Care-Punkte für dieses Produkt.</div>}
             </div>
           </section>
         </aside>
@@ -879,6 +911,12 @@ export function ItemDetail() {
 function warrantyDaysLeft(value?: string | null): number | null {
   if (!value) return null;
   return Math.ceil((new Date(value).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+function warrantyCountdownLabel(daysLeft: number) {
+  if (daysLeft <= 0) return "läuft heute aus";
+  if (daysLeft === 1) return "läuft morgen aus";
+  return `läuft in ${daysLeft} Tagen aus`;
 }
 
 function warrantyElapsedPct(purchase?: string | null, end?: string | null): number {

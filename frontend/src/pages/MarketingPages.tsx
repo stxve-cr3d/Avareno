@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Check, Cookie, FileText, LockKeyhole, Mail, MapPin, Scale, Server, Settings, ShieldCheck } from "lucide-react";
 import { MarketingFooter, MarketingHeader } from "../components/MarketingShell";
+import { Reveal, RevealGroup } from "../components/MarketingReveal";
 
 const lastUpdated = "24. Juni 2026";
 
@@ -21,6 +22,7 @@ const pricingPlans = [
     note: "Fuer Haushalte, Belege, Garantien und gemeinsame Verantwortung.",
     features: ["Unbegrenzte Dinge", "Garantie- und Care-Loops", "Haushaltsmitglieder", "Export fuer Support-Faelle"],
     cta: "Home waehlen",
+    badge: "Empfohlen",
     highlighted: true
   },
   {
@@ -44,7 +46,7 @@ const pricingFaq = [
   },
   {
     title: "Kann ich meine Daten exportieren?",
-    text: "Der Produktgedanke sieht Exporte fuer Support, Garantie und eigene Sicherungen vor. Die technische Umsetzung sollte vor Launch final definiert werden."
+    text: "Der Produktgedanke sieht Exporte für Support, Garantie und eigene Sicherungen vor. Die technische Umsetzung sollte vor Launch final definiert werden."
   }
 ];
 
@@ -74,8 +76,18 @@ const privacySections = [
 const cookieRows = [
   {
     name: "Technisch notwendige Speicherung",
-    purpose: "Betrieb, Navigation, Sicherheit und spaetere Login-Sessions.",
-    status: "Vorbereitet"
+    purpose: "Betrieb, Navigation, Sicherheit und Login-Sessions.",
+    status: "Aktiv, notwendig"
+  },
+  {
+    name: "Supabase Auth Session",
+    purpose: "Supabase speichert die Session im Browser, damit Nutzer eingeloggt bleiben.",
+    status: "Aktiv, notwendig"
+  },
+  {
+    name: "Cloudflare Turnstile",
+    purpose: "Bot-Schutz für Login und Registrierung. Das Challenge-Token wird an Supabase Auth weitergegeben.",
+    status: "Aktiv, Sicherheit"
   },
   {
     name: "Analyse",
@@ -130,26 +142,47 @@ function DraftNotice() {
   );
 }
 
+function PricingFaqItem({ item, open = false }: { item: { title: string; text: string }; open?: boolean }) {
+  const [isOpen, setIsOpen] = useState(open);
+
+  return (
+    <article className={isOpen ? "avareno-faq-item is-open" : "avareno-faq-item"}>
+      <button type="button" aria-expanded={isOpen} onClick={() => setIsOpen((value) => !value)}>
+        <h3>{item.title}</h3>
+        <span aria-hidden="true" />
+      </button>
+      <div>
+        <p>{item.text}</p>
+      </div>
+    </article>
+  );
+}
+
 export function PricingPage() {
   usePageTitle("Preise");
 
   return (
     <MarketingPageFrame>
-      <StandardHero
-        eyebrow="Pricing"
-        title="Ein klares Modell fuer dein Zuhause."
-        text="Avareno startet einfach und kann spaeter mit Haushalten, Rollen, Familien und mehr Orten wachsen."
-      >
-        <div className="avareno-price-signal">
-          <span>Beta</span>
-          <strong>Preise als MVP-Entwurf</strong>
-        </div>
-      </StandardHero>
+      <Reveal>
+        <StandardHero
+          eyebrow="Pricing"
+          title="Ein klares Modell fuer dein Zuhause."
+          text="Avareno startet einfach und kann spaeter mit Haushalten, Rollen, Familien und mehr Orten wachsen."
+        >
+          <div className="avareno-price-signal">
+            <span>Beta</span>
+            <strong>Preise als MVP-Entwurf</strong>
+          </div>
+        </StandardHero>
+      </Reveal>
 
-      <section className="avareno-pricing-grid" aria-label="Avareno Preisplaene">
+      <RevealGroup as="section" className="avareno-pricing-grid" aria-label="Avareno Preisplaene" stagger={90}>
         {pricingPlans.map((plan) => (
           <article className={plan.highlighted ? "avareno-pricing-card is-highlighted" : "avareno-pricing-card"} key={plan.name}>
-            <p>{plan.name}</p>
+            <div className="avareno-pricing-card-head">
+              <p>{plan.name}</p>
+              {"badge" in plan ? <span>{plan.badge}</span> : null}
+            </div>
             <h2>{plan.price}<span>/Monat</span></h2>
             <small>{plan.note}</small>
             <ul>
@@ -160,27 +193,24 @@ export function PricingPage() {
                 </li>
               ))}
             </ul>
-            <Link className={plan.highlighted ? "avareno-primary-cta" : "avareno-secondary-cta"} to="/app">
+            <Link className={plan.highlighted ? "avareno-primary-cta" : "avareno-secondary-cta"} to="/signup">
               {plan.cta} <ArrowRight size={16} />
             </Link>
           </article>
         ))}
-      </section>
+      </RevealGroup>
 
-      <section className="avareno-standard-panel">
+      <Reveal as="section" className="avareno-standard-panel">
         <div className="avareno-standard-copy">
           <p>FAQ</p>
           <h2>Was vor dem Launch noch festgelegt wird.</h2>
         </div>
         <div className="avareno-faq-list">
-          {pricingFaq.map((item) => (
-            <article key={item.title}>
-              <h3>{item.title}</h3>
-              <p>{item.text}</p>
-            </article>
+          {pricingFaq.map((item, index) => (
+            <PricingFaqItem key={item.title} item={item} open={index === 0} />
           ))}
         </div>
-      </section>
+      </Reveal>
     </MarketingPageFrame>
   );
 }
@@ -293,7 +323,7 @@ export function DatenschutzPage() {
         <article className="avareno-legal-card">
           <h2>Empfaenger und Dienste</h2>
           <p>
-            Aktuell sind im Frontend keine Analyse-, Marketing- oder Cookie-Dienste verdrahtet. Hosting, Datenbank, E-Mail, KI- oder Speicheranbieter muessen vor Launch konkret benannt werden.
+            Aktuell sind Supabase Auth fuer Login-Sessions und Cloudflare Turnstile fuer Bot-Schutz eingebunden. Analyse-, Marketing-, KI- oder weitere Speicheranbieter muessen vor Launch konkret benannt werden.
           </p>
         </article>
         <article className="avareno-legal-card">
@@ -325,7 +355,7 @@ export function CookiesPage() {
       >
         <div className="avareno-cookie-badge">
           <Cookie size={22} />
-          <span>Keine Analyse- oder Marketing-Cookies im aktuellen Frontend gefunden</span>
+          <span>Keine Analyse- oder Marketing-Cookies im aktuellen Frontend aktiv</span>
         </div>
       </StandardHero>
 
@@ -349,7 +379,7 @@ export function CookiesPage() {
         <div className="avareno-cookie-settings">
           <Settings size={24} />
           <p>
-            Technisch notwendige Speicherung darf separat behandelt werden. Sobald Analyse, Marketing, externe Medien oder aehnliche Dienste hinzukommen, sollte ein Consent-Flow mit echten Kategorien und Widerruf eingebaut werden.
+            Technisch notwendige Speicherung fuer Login und Sicherheit braucht keinen Marketing-Consent, muss aber transparent erklaert werden. Sobald Analyse, Marketing, externe Medien oder aehnliche Dienste hinzukommen, sollte ein Consent-Flow mit echten Kategorien und Widerruf eingebaut werden.
           </p>
         </div>
       </section>

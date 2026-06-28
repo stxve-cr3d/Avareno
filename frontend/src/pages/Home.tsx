@@ -3,132 +3,188 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
+  Bell,
+  BookOpenText,
   Check,
-  Clock3,
+  ClipboardCheck,
+  FileLock2,
   FileText,
   FolderLock,
   Hammer,
-  Home as HomeIcon,
   LifeBuoy,
-  Link2,
-  ListChecks,
   Package,
-  Plus,
   ReceiptText,
-  Search,
   ShieldCheck,
   Sparkles,
-  UserRound,
-  UsersRound,
+  TimerReset,
   Wrench
 } from "lucide-react";
-import { api } from "../lib/api";
-import type { Dashboard, Item, Loop, Planner } from "../lib/types";
 import { MarketingFooter, MarketingHeader } from "../components/MarketingShell";
-import { ProgressBar } from "../components/ProgressBar";
-import homeMemoryCube from "../assets/generated/avareno-home-memory-cube-dark.png";
+import { Reveal, RevealGroup } from "../components/MarketingReveal";
 
-const proofPoints = ["Dinge", "Belege", "Garantien", "Offene Aufgaben"];
-
-const memoryNodes = [
-  { icon: <Package size={19} />, label: "Product", text: "LG TV" },
-  { icon: <ReceiptText size={19} />, label: "Invoice", text: "Proof saved" },
-  { icon: <ShieldCheck size={19} />, label: "Warranty", text: "Still protected" },
-  { icon: <Wrench size={19} />, label: "Repair history", text: "What changed" },
-  { icon: <LifeBuoy size={19} />, label: "Support case", text: "Ready packet" },
-  { icon: <Clock3 size={19} />, label: "Reminder", text: "Before it matters" },
-  { icon: <UsersRound size={19} />, label: "Family member", text: "Shared context" }
-];
-
-const modules = [
+const features = [
   {
-    icon: <Package size={20} />,
-    title: "Product Memory",
-    text: "Model, serial number, purchase context, location and ownership details stay attached to the thing itself."
+    icon: <Package size={18} />,
+    title: "Object Memory",
+    line: "Every thing gets a profile.",
+    text: "Store the product, receipt, warranty, manual and open points in one place.",
+    visual: "object"
   },
   {
-    icon: <ShieldCheck size={20} />,
-    title: "Warranty Timeline",
-    text: "Know what is protected, what proof is missing and what expires before the deadline gets quiet."
+    icon: <ReceiptText size={18} />,
+    title: "Receipt & Warranty",
+    line: "Never lose the proof.",
+    text: "Avareno links receipts to products and helps you see what expires next.",
+    visual: "receipt"
   },
   {
-    icon: <FolderLock size={20} />,
-    title: "Document Vault",
-    text: "Invoices, manuals, drivers, software links and insurance documents sit where you actually need them."
+    icon: <ClipboardCheck size={18} />,
+    title: "Resolve",
+    line: "Open loops become clear.",
+    text: "Missing documents, warranty risks and unfinished care points become actionable.",
+    visual: "resolve"
   },
   {
-    icon: <Hammer size={20} />,
-    title: "Repair Log",
-    text: "Track what broke, who fixed it, what it cost and which part was replaced last time."
+    icon: <Wrench size={18} />,
+    title: "Care",
+    line: "Repairs and reminders stay connected.",
+    text: "Keep support, maintenance and reminders tied to the object they belong to.",
+    visual: "care"
   },
   {
-    icon: <UsersRound size={20} />,
-    title: "Family Vault",
-    text: "Household knowledge becomes shared memory for family, roommates or anyone responsible for the same things."
+    icon: <FolderLock size={18} />,
+    title: "Private Vault",
+    line: "Your real-life memory stays private.",
+    text: "Organize sensitive documents and product information in a calm private workspace.",
+    visual: "vault"
   },
   {
-    icon: <LifeBuoy size={20} />,
-    title: "Support Autopilot",
-    text: "Avareno prepares the support story with product details, proof, history and attachments already in order."
-  },
-  {
-    icon: <ListChecks size={20} />,
-    title: "Open Loop Reminders",
-    text: "Returns, promises, missing documents and warranty checks stay visible until they are actually done."
-  },
-  {
-    icon: <UserRound size={20} />,
-    title: "Personal Profile Vault",
-    text: "Important identity, household and ownership details become a calm profile for real-life administration."
+    icon: <Sparkles size={18} />,
+    title: "Memory Build",
+    line: "From messy capture to complete profile.",
+    text: "Capture something once. Avareno builds the structure around it.",
+    visual: "build"
   }
 ];
 
-const workflow = [
+const steps = [
+  ["Capture", "Scan a product, receipt, screenshot or document."],
+  ["Understand", "Avareno identifies what it is and what belongs together."],
+  ["Remember", "It creates an object memory with receipt, warranty, documents and reminders."],
+  ["Act", "You see what needs attention before it becomes a problem."]
+];
+
+const memoryRailItems = [
   {
-    title: "Capture anything",
-    text: "Start with a receipt, product photo, message, PDF or loose commitment."
+    icon: <Package size={18} />,
+    title: "Product",
+    text: "LG OLED C3",
+    meta: "Model, room, serial"
   },
   {
-    title: "Avareno understands it",
-    text: "The important facts are extracted into product, document, warranty and loop context."
+    icon: <ReceiptText size={18} />,
+    title: "Receipt",
+    text: "Proof saved",
+    meta: "MediaMarkt · 2024"
   },
   {
-    title: "It connects to your life",
-    text: "Related proof, people, rooms, repairs and support cases live around the same object."
+    icon: <ShieldCheck size={18} />,
+    title: "Warranty",
+    text: "45 days left",
+    meta: "Action window"
   },
   {
-    title: "It reminds you before it matters",
-    text: "Deadlines, missing details and unresolved promises surface while they can still be handled."
+    icon: <BookOpenText size={18} />,
+    title: "Manual",
+    text: "Connected",
+    meta: "PDF and support link"
+  },
+  {
+    icon: <Hammer size={18} />,
+    title: "Repair",
+    text: "Panel issue",
+    meta: "History attached"
+  },
+  {
+    icon: <Bell size={18} />,
+    title: "Reminder",
+    text: "Ready",
+    meta: "Before warranty ends"
+  },
+  {
+    icon: <FileLock2 size={18} />,
+    title: "Private Vault",
+    text: "Documents safe",
+    meta: "Personal context"
   }
 ];
 
-const useCases = [
-  "Where is the invoice for the TV?",
-  "Is this still under warranty?",
-  "What model is our router?",
-  "Who promised to send me that document?",
-  "What did the repair shop replace last time?"
+const pricingPlans = [
+  {
+    name: "Free",
+    price: "0 EUR",
+    note: "For trying Avareno with your first real-life things.",
+    features: ["20 things", "Basic documents", "Manual reminders", "Local demo use"],
+    cta: "Start free",
+    highlighted: false
+  },
+  {
+    name: "Home",
+    price: "6 EUR",
+    note: "For products, receipts, warranties and care loops at home.",
+    features: ["Unlimited things", "Warranty and care loops", "Household members", "Support-ready exports"],
+    cta: "Choose Home",
+    badge: "Recommended",
+    highlighted: true
+  },
+  {
+    name: "Family",
+    price: "12 EUR",
+    note: "For families, shared places and more responsibility.",
+    features: ["Multiple households", "Roles and sharing", "Prioritized reminders", "Extended object history"],
+    cta: "Reserve Family",
+    highlighted: false
+  }
+];
+
+const faqs = [
+  {
+    title: "Is Avareno a notes app?",
+    text: "No. Avareno is structured around real-life things: products, receipts, warranties, documents, reminders and care actions."
+  },
+  {
+    title: "What happens after I capture something?",
+    text: "Avareno turns the capture into an object memory and connects the useful context around it, such as proof, warranty dates, documents and next steps."
+  },
+  {
+    title: "Is the pricing final?",
+    text: "Not yet. The current pricing communicates the intended product shape and can be adjusted before launch."
+  },
+  {
+    title: "Can I export important information?",
+    text: "The product direction includes export for support, insurance, warranties and your own archive, so the memory stays useful outside the app."
+  }
+];
+
+const securityTrust = [
+  {
+    icon: <FileLock2 size={18} />,
+    title: "Private by default",
+    text: "Avareno is built around personal products, receipts and documents, so private context is treated as product-critical."
+  },
+  {
+    icon: <ShieldCheck size={18} />,
+    title: "Readable controls",
+    text: "Important reminders, warranty windows and stored proof stay visible without turning the site into a noisy dashboard."
+  },
+  {
+    icon: <FolderLock size={18} />,
+    title: "Document memory",
+    text: "Receipts, manuals and support material stay tied to the real thing they belong to, not scattered across folders."
+  }
 ];
 
 export function Home() {
-  const [dashboard, setDashboard] = useState<Dashboard | null>(null);
-  const [planner, setPlanner] = useState<Planner | null>(null);
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const [dashboardResult, plannerResult] = await Promise.all([api<Dashboard>("/api/dashboard"), api<Planner>("/api/planner")]);
-        setDashboard(dashboardResult);
-        setPlanner(plannerResult);
-      } catch {
-        setDashboard(null);
-        setPlanner(null);
-      }
-    }
-
-    void load();
-  }, []);
-
   useEffect(() => {
     if (!window.location.hash) return;
     const target = document.getElementById(window.location.hash.slice(1));
@@ -136,271 +192,395 @@ export function Home() {
     window.requestAnimationFrame(() => target.scrollIntoView({ behavior: "smooth", block: "start" }));
   }, []);
 
-  const previewItem = dashboard?.incompleteItems[0] ?? null;
-  const nextLoop = planner?.nextBest ?? dashboard?.openLoops[0] ?? null;
-  const openLoops = dashboard?.stats.openLoopCount ?? 7;
-  const remindersSoon = dashboard?.stats.remindersSoonCount ?? 3;
-
   return (
-    <div className="avareno-page">
+    <div className="avareno-page site-page">
       <MarketingHeader />
 
-      <main>
-        <section className="avareno-hero" id="product" aria-labelledby="avareno-title">
-          <div className="avareno-hero-content">
-            <h1 id="avareno-title">Dein zweites Gedächtnis für Zuhause.</h1>
-            <p>
-              Dinge, Belege, Garantien und offene Aufgaben bleiben verbunden. Avareno macht aus deinem Zuhause eine ruhige, durchsuchbare Erinnerung.
-            </p>
-            <div className="avareno-hero-actions" aria-label="Primary actions">
-              <Link className="avareno-primary-cta" to="/app">
-                Jetzt starten <ArrowRight size={17} />
-              </Link>
-              <a className="avareno-secondary-cta" href="#memory-graph">
-                Mehr erfahren
-              </a>
+      <main className="site-main">
+        <section className="site-hero" id="product" aria-labelledby="site-title">
+          <div className="site-hero-inner">
+            <div className="site-hero-copy">
+              <Reveal as="p" className="site-eyebrow" delay={80}>Avareno Memory Layer</Reveal>
+              <Reveal as="h1" id="site-title" delay={150}>
+                Your private memory
+                <span>for real life</span>
+              </Reveal>
+              <Reveal as="p" delay={230}>
+                Capture a product, receipt, screenshot or document. Avareno assembles the context into one organized memory profile.
+              </Reveal>
+              <Reveal className="site-hero-actions" delay={320} aria-label="Primary actions">
+                <Link className="site-primary-button" to="/app">
+                  Start your memory <ArrowRight size={16} />
+                </Link>
+                <a className="site-secondary-button" href="#memory-gallery">
+                  See memory examples
+                </a>
+              </Reveal>
             </div>
-            <div className="avareno-proof-line" aria-label="Key benefits">
-              {proofPoints.map((point) => (
-                <span key={point}>
-                  <Check size={15} />
-                  {point}
-                </span>
-              ))}
-            </div>
-          </div>
 
-          <ProductPassportPreview item={previewItem} loop={nextLoop} openLoops={openLoops} remindersSoon={remindersSoon} />
+            <HeroMemoryBuild />
+          </div>
         </section>
 
-        <section className="avareno-memory-section" id="memory-graph" aria-labelledby="memory-graph-title">
-          <div className="avareno-section-intro">
-            <h2 id="memory-graph-title">Everything important, connected around the thing.</h2>
-            <p>
-              Avareno is not another to-do list. It turns the objects, documents, promises and people in your real life into one calm memory network.
-            </p>
+        <Reveal as="section" className="site-gallery-section" id="memory-gallery" aria-labelledby="gallery-title">
+          <div className="site-gallery-head">
+            <p className="site-eyebrow">Memory examples</p>
+            <h2 id="gallery-title">Built for the things you forget later.</h2>
           </div>
-          <div className="avareno-network-canvas" aria-label="Avareno memory graph">
-            {memoryNodes.map((node, index) => (
-              <div className="avareno-network-node" key={node.label}>
-                <span className="avareno-node-index">{String(index + 1).padStart(2, "0")}</span>
-                <span className="avareno-node-icon">{node.icon}</span>
-                <strong>{node.label}</strong>
-                <small>{node.text}</small>
-              </div>
+          <MemoryGalleryRail />
+        </Reveal>
+
+        <section className="site-section" id="dinge" aria-labelledby="features-title">
+          <Reveal>
+            <SectionHeader
+              eyebrow="Product"
+              title="A private structure for the things people actually need later."
+              text="Avareno is not a notes app or another task list. It builds memory around objects, proof, documents and the next action."
+            />
+          </Reveal>
+
+          <RevealGroup className="site-feature-grid" stagger={85}>
+            {features.map((feature) => (
+              <article className={`site-feature-card site-feature-${feature.visual}`} key={feature.title}>
+                <div className="site-card-topline">
+                  <span>{feature.icon}</span>
+                  <small>{feature.title}</small>
+                </div>
+                <FeatureVisual type={feature.visual} />
+                <div>
+                  <h3>{feature.line}</h3>
+                  <p>{feature.text}</p>
+                </div>
+              </article>
             ))}
-          </div>
+          </RevealGroup>
         </section>
 
-        <section className="avareno-modules-section" id="modules" aria-labelledby="modules-title">
-          <div className="avareno-modules-copy">
-            <h2 id="modules-title">Intelligent modules, not random folders.</h2>
-            <p>
-              Each module has one job: make the practical details of ownership easier to find, share and act on when life gets messy.
-            </p>
-            <Link className="avareno-text-link" to="/app/items">
-              Open product memory <ArrowRight size={16} />
-            </Link>
-          </div>
-          <div className="avareno-module-list">
-            {modules.map((module, index) => (
-              <ModuleRow key={module.title} index={index + 1} {...module} />
-            ))}
-          </div>
-        </section>
+        <section className="site-section site-steps-section" id="how-it-works" aria-labelledby="steps-title">
+          <Reveal>
+            <SectionHeader
+              eyebrow="How it works"
+              title="Capture once. Let the structure form around it."
+              text="The workflow stays simple: add what you have, let Avareno connect the context, then return when something needs attention."
+            />
+          </Reveal>
 
-        <section className="avareno-workflow-section" id="how-it-works" aria-labelledby="workflow-title">
-          <div className="avareno-section-intro">
-            <h2 id="workflow-title">How Avareno works.</h2>
-            <p>Capture once. Let Avareno structure the details. Come back when real life asks for an answer.</p>
-          </div>
-          <div className="avareno-workflow-rail">
-            {workflow.map((step, index) => (
-              <article className="avareno-workflow-step" key={step.title}>
+          <RevealGroup className="site-step-grid" stagger={95}>
+            {steps.map(([title, text], index) => (
+              <article className="site-step-card" key={title}>
                 <span>{String(index + 1).padStart(2, "0")}</span>
-                <h3>{step.title}</h3>
-                <p>{step.text}</p>
+                <h3>{title}</h3>
+                <p>{text}</p>
+              </article>
+            ))}
+          </RevealGroup>
+        </section>
+
+        <section className="site-section site-pricing-section" id="pricing" aria-labelledby="pricing-title">
+          <Reveal>
+            <SectionHeader
+              eyebrow="Pricing"
+              title="Simple plans for building a private real-life memory."
+              text="Start small, then grow into household and family memory when more people and places need the same source of truth."
+            />
+          </Reveal>
+
+          <RevealGroup className="site-pricing-grid" stagger={90}>
+            {pricingPlans.map((plan) => (
+              <article className={plan.highlighted ? "site-pricing-card is-highlighted" : "site-pricing-card"} key={plan.name}>
+                <div className="site-pricing-card-head">
+                  <p>{plan.name}</p>
+                  {"badge" in plan ? <span>{plan.badge}</span> : null}
+                </div>
+                <h3>{plan.price}<span>/month</span></h3>
+                <p>{plan.note}</p>
+                <ul>
+                  {plan.features.map((feature) => (
+                    <li key={feature}>
+                      <Check size={15} />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <Link className={plan.highlighted ? "site-primary-button" : "site-secondary-button"} to="/app">
+                  {plan.cta} <ArrowRight size={16} />
+                </Link>
+              </article>
+            ))}
+          </RevealGroup>
+        </section>
+
+        <Reveal as="section" className="site-security-section" id="security" aria-labelledby="security-title">
+          <SectionHeader
+            eyebrow="Trust"
+            title="Designed for the private details people only need when something goes wrong."
+            text="The public site should feel like the product: calm, structured and trustworthy with no decorative noise."
+          />
+          <div className="site-security-list">
+            {securityTrust.map((item) => (
+              <article key={item.title}>
+                <span>{item.icon}</span>
+                <div>
+                  <h3>{item.title}</h3>
+                  <p>{item.text}</p>
+                </div>
               </article>
             ))}
           </div>
-        </section>
+        </Reveal>
 
-        <section className="avareno-usecase-section" aria-labelledby="usecase-title">
-          <div>
-            <h2 id="usecase-title">The questions real life keeps asking.</h2>
-            <p>Avareno keeps the answer close, even when the drawer, chat thread or memory does not.</p>
-          </div>
-          <div className="avareno-question-list">
-            {useCases.map((question) => (
-              <div className="avareno-question" key={question}>
-                <Search size={18} />
-                <span>{question}</span>
-              </div>
+        <section className="site-section site-faq-section" aria-labelledby="faq-title">
+          <Reveal>
+            <SectionHeader
+              eyebrow="FAQ"
+              title="Clear answers for a calmer product."
+              text="Avareno is designed to reduce real-life uncertainty, so the website should be just as direct."
+            />
+          </Reveal>
+          <RevealGroup className="site-faq-list" stagger={80}>
+            {faqs.map((item, index) => (
+              <FaqItem key={item.title} item={item} open={index === 0} />
             ))}
-          </div>
+          </RevealGroup>
         </section>
 
-        <section className="avareno-final-panel" aria-labelledby="final-title">
-          <div>
-            <h2 id="final-title">Stop trying to remember everything.</h2>
-            <p>Let Avareno hold the details.</p>
+        <Reveal as="section" className="site-final-cta" aria-labelledby="final-title">
+          <p className="site-eyebrow">Start</p>
+          <h2 id="final-title">Start building your private memory</h2>
+          <p>Capture your first thing and let Avareno organize the context around it.</p>
+          <div className="site-hero-actions">
+            <Link className="site-primary-button" to="/app">
+              Get started <ArrowRight size={16} />
+            </Link>
+            <Link className="site-secondary-button" to="/app">
+              Open app
+            </Link>
           </div>
-          <Link className="avareno-primary-cta" to="/app/capture">
-            Start organizing <ArrowRight size={17} />
-          </Link>
-        </section>
+        </Reveal>
       </main>
+
       <MarketingFooter />
     </div>
   );
 }
 
-function ProductPassportPreview({ item, loop, openLoops, remindersSoon }: { item: Item | null; loop: Loop | null; openLoops: number; remindersSoon: number }) {
-  const itemName = item?.name ?? "LG OLED C3";
-  const completeness = item?.completenessScore ?? 72;
-  const documentCount = item?.documents?.length ?? 18;
-  const loopTitle = loop?.title ?? "Garantie läuft bald ab";
-
+function HeroMemoryBuild() {
   return (
-    <aside className="avareno-product-canvas" aria-label="Avareno mobile app preview">
-      <div className="avareno-phone-showcase">
-        <div className="avareno-phone avareno-phone-primary">
-          <div className="avareno-phone-status">
-            <span>9:41</span>
-            <span>100</span>
-          </div>
-          <div className="avareno-phone-head">
-            <div>
-              <h2>Zuhause</h2>
-              <p><span /> Online</p>
-            </div>
-            <div>
-              <BellIcon />
-              <Plus size={20} />
-            </div>
-          </div>
-          <div className="avareno-mobile-stage">
-            <MobileStat className="stat-docs" icon={<FileText size={18} />} label="Dokumente" value={documentCount} />
-            <MobileStat className="stat-loops" icon={<ListChecks size={18} />} label="Offene Loops" value={openLoops} />
-            <MobileStat className="stat-warranty" icon={<ShieldCheck size={18} />} label="Garantien" value={4} />
-            <MobileStat className="stat-rooms" icon={<HomeIcon size={18} />} label="Räume" value={6} />
-            <img src={homeMemoryCube} alt="" />
-          </div>
-          <div className="avareno-phone-section-row">
-            <h3>Heute wichtig</h3>
-            <span>Alle anzeigen</span>
-          </div>
-          <div className="avareno-reminder-card">
-            <span><ShieldCheck size={21} /></span>
-            <div>
-              <strong>{loopTitle}</strong>
-              <p>{itemName} · endet in 45 Tagen</p>
-              <ProgressBar value={completeness} />
-            </div>
-            <em>{completeness}%</em>
-          </div>
-          <div className="avareno-match-card">
-            <span><Package size={22} /></span>
-            <div>
-              <strong>{itemName}</strong>
-              <p>94% Match · {documentCount} Dokumente</p>
-            </div>
-          </div>
-          <div className="avareno-mobile-tile-row">
-            <PreviewTile icon={<FolderLock size={17} />} label="Dokumente" value={`${documentCount} Dateien`} />
-            <PreviewTile icon={<PlugIcon />} label="Geräte" value="7 online" />
-            <PreviewTile icon={<Wrench size={17} />} label="Reparaturen" value="2 Historien" />
-          </div>
-        </div>
-
-        <div className="avareno-phone avareno-phone-secondary">
-          <div className="avareno-phone-status">
-            <span>9:41</span>
-            <span>100</span>
-          </div>
-          <h3>Dokumente</h3>
-          {["MediaMarkt Rechnung", "Garantie LG OLED C3", "Versicherung Hausrat", "Bedienungsanleitung"].map((entry) => (
-            <div className="avareno-doc-row" key={entry}>
-              <FileText size={18} />
-              <span>{entry}</span>
-            </div>
-          ))}
+    <Reveal className="hero-memory-build" id="memory-build" delay={260} aria-label="Memory Build assembly">
+      <div className="hero-memory-build-grid" aria-hidden="true" />
+      <div className="hero-build-card hero-build-product">
+        <span><Package size={20} /></span>
+        <div>
+          <small>Product</small>
+          <strong>LG OLED C3</strong>
         </div>
       </div>
-    </aside>
+      <svg className="hero-build-lines" viewBox="0 0 720 300" aria-hidden="true">
+        <path className="line-one" d="M 230 150 C 300 92 374 82 455 104" />
+        <path className="line-two" d="M 230 150 C 320 144 384 150 475 150" />
+        <path className="line-three" d="M 230 150 C 306 210 388 224 462 201" />
+        <path className="line-four" d="M 230 150 C 366 262 508 266 612 221" />
+      </svg>
+      <HeroBuildChip className="chip-receipt" icon={<ReceiptText size={16} />} label="Receipt saved" meta="Proof connected" />
+      <HeroBuildChip className="chip-warranty" icon={<ShieldCheck size={16} />} label="Warranty 45 days" meta="Deadline found" />
+      <HeroBuildChip className="chip-reminder" icon={<Bell size={16} />} label="Reminder ready" meta="Before it matters" />
+      <HeroBuildChip className="chip-care" icon={<LifeBuoy size={16} />} label="Care point" meta="Next action clear" />
+      <div className="hero-build-status">
+        <Sparkles size={15} />
+        Memory profile complete
+      </div>
+    </Reveal>
   );
 }
 
-function MobileStat({ className, icon, label, value }: { className: string; icon: ReactNode; label: string; value: number }) {
+function HeroBuildChip({ className, icon, label, meta }: { className: string; icon: ReactNode; label: string; meta: string }) {
   return (
-    <div className={`avareno-mobile-stat ${className}`}>
-      {icon}
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-function BellIcon() {
-  return <span className="avareno-mini-bell" aria-hidden="true" />;
-}
-
-function PlugIcon() {
-  return <Sparkles size={17} />;
-}
-
-function PreviewNav({ active = false, icon, label }: { active?: boolean; icon: ReactNode; label: string }) {
-  return (
-    <div className={active ? "avareno-preview-nav is-active" : "avareno-preview-nav"}>
-      {icon}
-      <span>{label}</span>
-    </div>
-  );
-}
-
-function PreviewTile({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
-  return (
-    <div className="avareno-preview-tile">
+    <div className={`hero-build-chip ${className}`}>
       <span>{icon}</span>
       <div>
-        <p>{label}</p>
-        <strong>{value}</strong>
+        <strong>{label}</strong>
+        <small>{meta}</small>
       </div>
     </div>
   );
 }
 
-function TimelinePoint({ label, value }: { label: string; value: string }) {
+function MemoryGalleryRail() {
+  const items = [...memoryRailItems, ...memoryRailItems];
+
   return (
-    <div className="avareno-timeline-point">
-      <span />
-      <div>
-        <p>{label}</p>
-        <strong>{value}</strong>
+    <div className="memory-gallery-rail" aria-label="Real-life memory examples">
+      <div className="memory-gallery-track">
+        {items.map((item, index) => (
+          <article className="memory-gallery-card" key={`${item.title}-${index}`}>
+            <span>{item.icon}</span>
+            <small>{item.title}</small>
+            <strong>{item.text}</strong>
+            <p>{item.meta}</p>
+          </article>
+        ))}
       </div>
     </div>
   );
 }
 
-function MiniStat({ value, label }: { value: number; label: string }) {
+function SectionHeader({ eyebrow, title, text }: { eyebrow: string; title: string; text: string }) {
+  return (
+    <div className="site-section-header">
+      <p className="site-eyebrow">{eyebrow}</p>
+      <h2>{title}</h2>
+      <p>{text}</p>
+    </div>
+  );
+}
+
+function FeatureVisual({ type }: { type: string }) {
+  if (type === "object") {
+    return (
+      <div className="site-visual site-object-visual" aria-hidden="true">
+        <span><Package size={20} /></span>
+        <div>
+          <strong>LG OLED C3</strong>
+          <small>Object profile</small>
+        </div>
+        <i />
+        <i />
+      </div>
+    );
+  }
+
+  if (type === "receipt") {
+    return (
+      <div className="site-visual site-receipt-visual" aria-hidden="true">
+        <ReceiptText size={22} />
+        <div />
+        <div />
+        <span>Warranty 45 days</span>
+      </div>
+    );
+  }
+
+  if (type === "resolve") {
+    return (
+      <div className="site-visual site-list-visual" aria-hidden="true">
+        <span>Missing receipt</span>
+        <span>Warranty risk</span>
+        <span>Open care point</span>
+      </div>
+    );
+  }
+
+  if (type === "care") {
+    return (
+      <div className="site-visual site-timeline-visual" aria-hidden="true">
+        <TimelineDot label="Repair" value="Saved" />
+        <TimelineDot label="Service" value="Ready" />
+        <TimelineDot label="Reminder" value="Aug 12" />
+      </div>
+    );
+  }
+
+  if (type === "vault") {
+    return (
+      <div className="site-visual site-vault-visual" aria-hidden="true">
+        <FileLock2 size={23} />
+        <span />
+        <span />
+        <span />
+      </div>
+    );
+  }
+
+  return (
+    <div className="site-visual site-build-visual" aria-hidden="true">
+      {["Product", "Receipt", "Warranty", "Reminder", "Care"].map((label) => (
+        <span key={label}>{label}</span>
+      ))}
+    </div>
+  );
+}
+
+function TimelineDot({ label, value }: { label: string; value: string }) {
   return (
     <div>
+      <span />
+      <p>{label}</p>
       <strong>{value}</strong>
-      <span>{label}</span>
     </div>
   );
 }
 
-function ModuleRow({ icon, title, text, index }: { icon: ReactNode; title: string; text: string; index: number }) {
+function MemoryBuildConsole() {
   return (
-    <article className="avareno-module-row">
-      <span className="avareno-module-number">{String(index).padStart(2, "0")}</span>
-      <span className="avareno-module-icon">{icon}</span>
-      <div>
-        <h3>{title}</h3>
-        <p>{text}</p>
+    <article className="site-memory-console">
+      <div className="site-console-head">
+        <div>
+          <span>Memory Build Console</span>
+          <strong>LG OLED C3</strong>
+        </div>
+        <em>Active</em>
       </div>
-      <Link2 size={17} aria-hidden="true" />
+
+      <div className="site-console-body">
+        <div className="site-console-core">
+          <div className="site-product-token">
+            <Package size={22} />
+            <div>
+              <strong>LG OLED C3</strong>
+              <small>Living room · OLED65C37LA</small>
+            </div>
+          </div>
+
+          <div className="site-memory-flow" aria-hidden="true">
+            <MemoryChip icon={<Package size={15} />} label="Product" />
+            <MemoryChip icon={<ReceiptText size={15} />} label="Receipt saved" />
+            <MemoryChip icon={<ShieldCheck size={15} />} label="Warranty 45 days" />
+            <MemoryChip icon={<Bell size={15} />} label="Reminder ready" />
+            <MemoryChip icon={<LifeBuoy size={15} />} label="1 care point" />
+          </div>
+        </div>
+
+        <div className="site-console-side" aria-label="Open memory points">
+          <StatusRow icon={<FileText size={16} />} label="Receipt" value="Saved" />
+          <StatusRow icon={<TimerReset size={16} />} label="Warranty" value="45 days" warning />
+          <StatusRow icon={<Hammer size={16} />} label="Care point" value="Open" />
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function MemoryChip({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <span>
+      {icon}
+      {label}
+    </span>
+  );
+}
+
+function StatusRow({ icon, label, value, warning = false }: { icon: ReactNode; label: string; value: string; warning?: boolean }) {
+  return (
+    <div className={warning ? "site-status-row is-warning" : "site-status-row"}>
+      <span>{icon}</span>
+      <p>{label}</p>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function FaqItem({ item, open = false }: { item: { title: string; text: string }; open?: boolean }) {
+  const [isOpen, setIsOpen] = useState(open);
+
+  return (
+    <article className={isOpen ? "site-faq-item is-open" : "site-faq-item"}>
+      <button type="button" aria-expanded={isOpen} onClick={() => setIsOpen((value) => !value)}>
+        <h3>{item.title}</h3>
+        <span aria-hidden="true" />
+      </button>
+      <div>
+        <p>{item.text}</p>
+      </div>
     </article>
   );
 }

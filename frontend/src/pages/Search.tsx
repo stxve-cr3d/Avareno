@@ -50,7 +50,7 @@ export function Search() {
       <div className="mt-6">
         <h1 className="text-3xl font-black">Suche</h1>
         <p className="mt-2 text-sm font-bold text-ink/52">
-          {payload.results.length ? `${payload.results.length} Treffer fuer "${payload.query}"` : "Dinge, Loops, Dokumente und Erinnerungen an einem Ort."}
+          {payload.results.length ? `${payload.results.length} Treffer für "${payload.query}"` : "Dinge, Loops, Dokumente und Erinnerungen an einem Ort."}
         </p>
       </div>
 

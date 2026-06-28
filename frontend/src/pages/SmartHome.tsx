@@ -17,6 +17,16 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api, isoDate } from "../lib/api";
+import { formatUiText } from "../lib/uiText";
+import {
+  DottedGridPanel,
+  MetricCard,
+  ObjectMemoryMap,
+  ObjectMemoryCard,
+  QuickActionCard,
+  StatusSummaryCard,
+  defaultMemoryMapNodes
+} from "../components/app/AppKit";
 import type {
   Item,
   LocalDiscoveryCandidate,
@@ -29,7 +39,7 @@ import type {
 
 /* ── constants ──────────────────────────────────────────────── */
 
-const uiTextReplacements: [RegExp, string][] = [
+const smartHomeTextReplacements: [RegExp, string][] = [
   [/3d[-\s]?printer/gi, "device"],
   [/printer/gi, "device"],
   [/print-finished alerts/gi, "care reminders"],
@@ -46,9 +56,9 @@ const uiTextReplacements: [RegExp, string][] = [
 
 function cleanUiText(value: string | null | undefined) {
   if (!value) return "";
-  return uiTextReplacements.reduce(
+  return smartHomeTextReplacements.reduce(
     (text, [pattern, replacement]) => text.replace(pattern, replacement),
-    value
+    formatUiText(value)
   );
 }
 
@@ -207,7 +217,6 @@ export function SmartHome() {
   const [payload, setPayload] = useState<SmartHomePayload | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [motivation, setMotivation] = useState<MotivationSummary | null>(null);
-  const [message, setMessage] = useState("");
 
   async function load() {
     try {
@@ -251,57 +260,42 @@ export function SmartHome() {
   const appPath = (path: string) => (path === "/" ? "/app" : `/app${path}`);
 
   return (
-    <main className="av-home">
-
-      {/* ── Daily Memory Brief hero ── */}
-      <section className="av-hero">
-        <div className="av-hero-left">
-          <span className="av-kicker">Privater Speicher · Heute</span>
-          <h1 className="av-greeting">Guten Morgen,<br />Stefan.</h1>
-
-          {/* Structured morning brief card */}
-          <div className="av-hero-brief">
-            <div className="av-hero-brief-head">
-              <span className="av-hero-brief-label">Heute sortiert</span>
-              <span className="av-tag av-tag-warranty">{openInsightCount || 2} offen</span>
+    <main className="av-console">
+      <section className="av-console-top">
+        <div className="av-dashboard-header">
+          <span className="av-console-kicker">Private workspace</span>
+          <div className="av-dashboard-title-row">
+            <div>
+              <h1>Avareno Home</h1>
+              <p>Dein privater Speicher für Dinge, Belege, Garantien und offene Punkte.</p>
             </div>
-            <div className="av-hero-brief-rows">
-              <div className="av-hero-brief-row">
-                <span className="av-hbd av-hbd-warn" />
-                <span>Garantie läuft ab — <strong>{importantItems[0]?.product}</strong></span>
-              </div>
-              <div className="av-hero-brief-row">
-                <span className="av-hbd av-hbd-danger" />
-                <span>Rechnung fehlt — <strong>{importantItems[1]?.product}</strong></span>
-              </div>
-              <div className="av-hero-brief-row">
-                <span className="av-hbd av-hbd-teal" />
-                <span>Care offen — <strong>{importantItems[2]?.product}</strong></span>
-              </div>
-            </div>
-            <div className="av-hero-brief-foot">
-              <Link className="av-hero-brief-btn" to={appPath("/care")}>
-                Offene Punkte prüfen <ArrowRight size={14} />
-              </Link>
-              <span className="av-hero-facts">
-                {itemCount} Dinge · {dashboardDocumentCount} Dokumente
-              </span>
-            </div>
+            <Link className="av-console-primary" to={appPath("/care")}>
+              Offene Punkte prüfen <ArrowRight size={14} />
+            </Link>
+          </div>
+          <div className="av-status-grid" aria-label="Status summary">
+            <StatusSummaryCard label="Status" value="Bereit" tone="success" />
+            <StatusSummaryCard label="Dinge" value={itemCount} />
+            <StatusSummaryCard label="Dokumente" value={dashboardDocumentCount} />
+            <StatusSummaryCard label="Offen" value={openInsightCount || 3} tone="warning" />
+            <StatusSummaryCard label="Letzter Scan" value="Heute" />
           </div>
         </div>
 
-        {/* Larger Object Memory Map */}
-        <MemoryMap items={importantItems} />
+        <DottedGridPanel>
+          <ObjectMemoryMap nodes={defaultMemoryMapNodes(importantItems[0]?.product)} />
+        </DottedGridPanel>
       </section>
 
-      {/* ── Main content + sidebar ── */}
-      <div className="av-grid">
-        <div className="av-main">
-
-          <article className="av-section">
-            <div className="av-section-head">
-              <h2 className="av-section-title">Was braucht Aufmerksamkeit?</h2>
-              <Link className="av-section-link" to={appPath("/care")}>Care öffnen</Link>
+      <div className="av-console-grid">
+        <div className="av-console-main">
+          <article className="av-console-section">
+            <div className="av-console-section-head">
+              <div>
+                <span>Needs attention</span>
+                <h2>Aktuelle offene Punkte</h2>
+              </div>
+              <Link to={appPath("/care")}>Care öffnen</Link>
             </div>
             <div className="av-attention-list">
               {importantItems.map((item, i) => (
@@ -310,133 +304,85 @@ export function SmartHome() {
             </div>
           </article>
 
-          <article className="av-section">
-            <div className="av-section-head">
-              <h2 className="av-section-title">Zuletzt gespeichert</h2>
-              <Link className="av-section-link" to={appPath("/items")}>Alle Dinge</Link>
+          <article className="av-console-section">
+            <div className="av-console-section-head">
+              <div>
+                <span>Object memory</span>
+                <h2>Zuletzt gespeicherte Dinge</h2>
+              </div>
+              <Link to={appPath("/items")}>Alle Dinge</Link>
             </div>
             <div className="av-things-grid">
-              {recentThings.map((thing) => (
-                <ThingCard key={thing.name} thing={thing} />
-              ))}
+              {recentThings.map((thing) => {
+                const warranty = shortWarranty(thing.warrantyStatus);
+                return (
+                  <ObjectMemoryCard
+                    key={thing.name}
+                    to={thing.to}
+                    category={thing.category}
+                    name={thing.name}
+                    icon={categoryIcon(thing.category)}
+                    completeness={thing.completeness}
+                    invoicePresent={!thing.invoiceStatus.toLowerCase().includes("fehlt")}
+                    warranty={warranty}
+                    openPoints={thing.openPoints}
+                  />
+                );
+              })}
             </div>
           </article>
 
-          <article className="av-section av-section-slim">
-            <h2 className="av-section-title">Nächste Schritte</h2>
-            <div className="av-next-list">
-              {nextItems.map((item) => (
-                <Link className="av-next-row" key={item.to + item.title} to={item.to}>
-                  <span className="av-next-icon">{item.icon}</span>
-                  <div>
-                    <strong>{item.title}</strong>
-                    <small>{item.body}</small>
-                  </div>
-                  <ChevronRight size={14} />
-                </Link>
-              ))}
+          <article className="av-console-section">
+            <div className="av-console-section-head">
+              <div>
+                <span>Memory Capture</span>
+                <h2>Schnell erfassen</h2>
+              </div>
+            </div>
+            <div className="av-quick-action-grid">
+              <QuickActionCard
+                primary
+                to={appPath("/capture/item")}
+                icon={<Archive size={16} />}
+                title="Produkt hinzufügen"
+                body="Ein Ding mit Beleg, Garantie und Care-Kontext starten."
+              />
+              <QuickActionCard
+                to={appPath("/capture/receipt")}
+                icon={<ReceiptText size={16} />}
+                title="Rechnung scannen"
+                body="Nachweis speichern und mit einem Objekt verbinden."
+              />
+              <QuickActionCard
+                to={appPath("/resolve/create")}
+                icon={<LifeBuoy size={16} />}
+                title="Ticket erstellen"
+                body="Eine konkrete Care-Frage zu einem Ding öffnen."
+              />
+              <QuickActionCard
+                to={appPath("/capture/loop")}
+                icon={<BellRing size={16} />}
+                title="Erinnerung anlegen"
+                body="Frist, Rückgabe oder offenen Punkt festhalten."
+              />
             </div>
           </article>
-
         </div>
 
-        <aside className="av-sidebar">
-          <QuickCapture appPath={appPath} />
-          <MemoryStatus itemCount={itemCount} docCount={dashboardDocumentCount} openCount={openInsightCount} />
+        <aside className="av-console-side">
+          <MetricCard label="Belege im Speicher" value={dashboardDocumentCount} progress={74} tone="teal" />
+          <MetricCard label="Object Loops offen" value={openInsightCount || 3} progress={42} tone="warning" />
+          <MetricCard label="Garantie-Risiken" value="1" progress={28} tone="warning" />
+          <MetricCard label="Care-Streak" value={motivation?.currentStreakDays ?? 6} progress={motivation?.levelProgress ?? 40} tone="teal" />
           <ModuleNav appPath={appPath} itemCount={itemCount} openCount={openInsightCount} />
           {motivation ? <StreakBar motivation={motivation} /> : null}
         </aside>
       </div>
-
-      {message ? <div className="av-toast">{message}</div> : null}
     </main>
   );
 }
 
 /* ── presentation components ────────────────────────────────── */
-
-/*
- * Object Memory Map
- * Primary node: x=70 y=8 w=200 h≈104 → bottom-center (170, 112)
- * Secondary-0:  x=0  y=184 w=155 h≈60 → top-center (77.5, 184)
- * Secondary-1:  x=185 y=184 w=155 h≈60 → top-center (262.5, 184)
- * SVG stage: 340 × 248
- */
-function MemoryMap({ items }: { items: ImportantHomeItem[] }) {
-  const typeColor: Record<string, string> = {
-    warranty: "#E8C56E",
-    invoice: "#EF7D7D",
-    care: "#6FE7DF"
-  };
-  const cats = ["TV · Media", "Audio", "Werkstatt"];
-
-  return (
-    <div className="av-mm-wrap">
-      <p className="av-mm-label">Object Memory Map</p>
-      <div className="av-mm-stage">
-
-        <svg className="av-mm-lines" viewBox="0 0 384 270" preserveAspectRatio="none" aria-hidden="true">
-          {/* Lines from primary bottom-center (192,115) to secondary top-centers */}
-          <path
-            d="M 192 115 C 192 158 86 158 86 196"
-            fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="1.2" strokeDasharray="4 5"
-          />
-          <path
-            d="M 192 115 C 192 158 298 158 298 196"
-            fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="1.2" strokeDasharray="4 5"
-          />
-          {/* Junction dots */}
-          <circle cx="192" cy="115" r="2.5" fill="rgba(255,255,255,0.14)" />
-          <circle cx="86"  cy="196" r="2"   fill="rgba(255,255,255,0.10)" />
-          <circle cx="298" cy="196" r="2"   fill="rgba(255,255,255,0.10)" />
-        </svg>
-
-        {/* Primary node — shows product + 3 status chips + progress */}
-        {items[0] && (
-          <div className={`av-mm-card av-mm-primary av-mm-t-${items[0].type}`}>
-            <div className="av-mm-head">
-              <strong>{items[0].product}</strong>
-              <span className={`av-mm-dot av-mm-d-${items[0].type}`} />
-            </div>
-            <small>{cats[0]}</small>
-            <div className="av-mm-chip-row">
-              <span className="av-mm-ic av-mm-ic-ok">
-                <FileText size={9} /> Beleg ✓
-              </span>
-              <span className="av-mm-ic av-mm-ic-warn">
-                <ShieldCheck size={9} /> {items[0].signal}
-              </span>
-              <span className="av-mm-ic av-mm-ic-care">
-                <BellRing size={9} /> Erinnerung
-              </span>
-            </div>
-            <div className="av-mm-bar">
-              <div className="av-mm-fill" style={{ width: `${items[0].progress}%`, background: typeColor[items[0].type] }} />
-            </div>
-          </div>
-        )}
-
-        {/* Secondary nodes */}
-        {items.slice(1, 3).map((item, i) => (
-          <div key={item.product} className={`av-mm-card av-mm-secondary av-mm-sec${i} av-mm-t-${item.type}`}>
-            <div className="av-mm-head">
-              <strong>{item.product.length > 14 ? item.product.slice(0, 14) + "…" : item.product}</strong>
-              <span className={`av-mm-dot av-mm-d-${item.type}`} />
-            </div>
-            <small>{cats[i + 1]}</small>
-            <span className={`av-mm-ic av-mm-ic-${item.type === "invoice" ? "danger" : "care"}`}>
-              {item.type === "invoice" ? <FileText size={9} /> : <BellRing size={9} />}
-              {item.type === "invoice" ? "Beleg fehlt" : "Care offen"}
-            </span>
-            <div className="av-mm-bar">
-              <div className="av-mm-fill" style={{ width: `${item.progress}%`, background: typeColor[item.type] }} />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function AttentionCard({ item, primary = false }: { item: ImportantHomeItem; primary?: boolean }) {
   return (
@@ -460,53 +406,6 @@ function AttentionCard({ item, primary = false }: { item: ImportantHomeItem; pri
           <div className="av-att-bar" style={{ width: `${item.progress}%` }} />
         </div>
       )}
-    </Link>
-  );
-}
-
-function ThingCard({ thing }: { thing: RecentHomeThing }) {
-  const invoiceMissing = thing.invoiceStatus.toLowerCase().includes("fehlt");
-  const warranty = shortWarranty(thing.warrantyStatus);
-
-  return (
-    <Link className="av-thing-card" to={thing.to}>
-      <div className="av-thing-head">
-        {/* Layered icon — pseudo-elements behind suggest a document stack */}
-        <span className="av-thing-icon av-thing-stack">{categoryIcon(thing.category)}</span>
-        <div className="av-thing-info">
-          <span className="av-thing-cat">{thing.category}</span>
-          <span className="av-thing-name">{thing.name}</span>
-        </div>
-        <span className="av-thing-pct">{thing.completeness}%</span>
-      </div>
-
-      {/* Completeness bar */}
-      <div className="av-thing-bar">
-        <div className="av-thing-fill" style={{ width: `${thing.completeness}%` }} />
-      </div>
-
-      {/* Memory layers — Beleg / Garantie / Offen */}
-      <div className="av-thing-layers">
-        <div className="av-thing-layer">
-          <span className="av-layer-ic"><FileText size={12} /></span>
-          <span className="av-layer-label">Beleg</span>
-          <span className={`av-layer-val ${invoiceMissing ? "av-th-warn" : "av-th-ok"}`}>
-            {invoiceMissing ? "Fehlt" : "Gespeichert"}
-          </span>
-        </div>
-        <div className="av-thing-layer">
-          <span className="av-layer-ic"><ShieldCheck size={12} /></span>
-          <span className="av-layer-label">Garantie</span>
-          <span className={`av-layer-val ${warranty.urgent ? "av-th-amber" : ""}`}>{warranty.text}</span>
-        </div>
-        <div className="av-thing-layer">
-          <span className="av-layer-ic"><BellRing size={12} /></span>
-          <span className="av-layer-label">Offen</span>
-          <span className={`av-layer-val ${thing.openPoints > 0 ? "av-th-amber" : "av-th-ok"}`}>
-            {thing.openPoints > 0 ? `${thing.openPoints} Punkt${thing.openPoints === 1 ? "" : "e"}` : "Keine"}
-          </span>
-        </div>
-      </div>
     </Link>
   );
 }
@@ -663,7 +562,7 @@ function buildHomeNextItems(
         : `${documentCount} Dokumente sind abgelegt`,
       icon: <FileText size={16} />,
       title: "Beleg ergänzen",
-      to: itemWithMissingContext ? `/app/items/${itemWithMissingContext.id}` : "/app/reports/home-binder"
+      to: itemWithMissingContext ? `/app/dinge/${itemWithMissingContext.id}` : "/app/reports/home-binder"
     },
     {
       body: itemWithWarranty?.warrantyUntil
@@ -671,7 +570,7 @@ function buildHomeNextItems(
         : `${displayHomeItemName(matchName)} in 45 Tagen prüfen`,
       icon: <ShieldCheck size={16} />,
       title: "Garantie prüfen",
-      to: itemWithWarranty ? `/app/items/${itemWithWarranty.id}` : "/app/care"
+      to: itemWithWarranty ? `/app/dinge/${itemWithWarranty.id}` : "/app/care"
     }
   ];
 }
@@ -702,7 +601,7 @@ function buildTodayImportantItems(items: Item[], matchName: string): ImportantHo
       product: displayHomeItemName(itemWithMissingInvoice?.name ?? "Sony WH-1000XM5"),
       signal: "Beleg fehlt",
       title: "Nachweis unvollständig",
-      to: itemWithMissingInvoice ? `/app/items/${itemWithMissingInvoice.id}` : "/app/capture/receipt",
+      to: itemWithMissingInvoice ? `/app/dinge/${itemWithMissingInvoice.id}` : "/app/capture/receipt",
       type: "invoice"
     },
     {
@@ -713,7 +612,7 @@ function buildTodayImportantItems(items: Item[], matchName: string): ImportantHo
       product: displayHomeItemName(itemWithOpenLoop?.name ?? "Bambu Lab X1C"),
       signal: "Offen",
       title: "Care-Punkt offen",
-      to: itemWithOpenLoop ? `/app/items/${itemWithOpenLoop.id}` : "/app/care",
+      to: itemWithOpenLoop ? `/app/dinge/${itemWithOpenLoop.id}` : "/app/care",
       type: "care"
     }
   ];
@@ -732,7 +631,7 @@ function buildRecentThings(items: Item[], matchName: string): RecentHomeThing[] 
         invoiceStatus: (item.documents?.length ?? 0) > 0 ? "Rechnung gespeichert" : "Rechnung fehlt",
         name: displayHomeItemName(item.name),
         openPoints,
-        to: `/app/items/${item.id}`,
+        to: `/app/dinge/${item.id}`,
         warrantyStatus: item.warrantyUntil
           ? `Garantie bis ${displayHomeDate(item.warrantyUntil)}`
           : "Garantie unbekannt"
@@ -747,7 +646,7 @@ function buildRecentThings(items: Item[], matchName: string): RecentHomeThing[] 
       invoiceStatus: "Rechnung gespeichert",
       name: displayHomeItemName(matchName),
       openPoints: 1,
-      to: "/app/items",
+      to: "/app/dinge",
       warrantyStatus: "Garantie endet in 45 Tagen"
     },
     {

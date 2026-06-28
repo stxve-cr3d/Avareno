@@ -1,41 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
-  AlertCircle,
-  Archive,
-  ArrowRight,
-  FileText,
   House,
-  LayoutGrid,
   Monitor,
   Package,
   Plus,
-  Rows3,
   ScanLine,
   Search,
-  Share2,
-  ShieldCheck,
   Volume2,
   Wrench
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api, isoDate } from "../lib/api";
 import type { Item, ProductStructure } from "../lib/types";
-import { ItemCard } from "../components/ItemCard";
 import {
   ActionButton,
-  AppPage,
-  AppPageHeader,
-  AppSection,
-  IconTile,
+  DottedGridPanel,
+  MetricCard,
+  ObjectMemoryMap,
   ObjectMemoryCard,
   ObjectMemoryGraph,
+  QuickActionCard,
   SecondaryAction
 } from "../components/app/AppKit";
-import type { GraphEdge, StatusTone } from "../components/app/AppKit";
+import { StatusSummaryCard, defaultMemoryMapNodes } from "../components/app/AppKit";
 
 type StatusFilter = "ALL" | "MISSING_RECEIPT" | "WARRANTY_SOON" | "OPEN" | "COMPLETE";
-type ViewMode = "cards" | "list" | "memory";
 
 const statusFilters: { id: StatusFilter; label: string }[] = [
   { id: "ALL", label: "Alle" },
@@ -54,7 +44,6 @@ export function Items() {
   const [status, setStatus] = useState<StatusFilter>("ALL");
   const [category, setCategory] = useState<"ALL" | Category>("ALL");
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<ViewMode>("cards");
 
   async function load() {
     const [itemsResult, structureResult] = await Promise.all([api<Item[]>("/api/items"), api<ProductStructure>("/api/structure")]);
@@ -85,135 +74,131 @@ export function Items() {
   const documentCount = items.reduce((sum, item) => sum + (item.documents?.length ?? 0), 0);
   const openTotal = items.reduce((sum, item) => sum + openPointsOf(item), 0);
   const incompleteCount = items.filter((item) => (item.completenessScore ?? 0) < 100).length;
+  const warrantyRiskCount = items.filter(warrantySoon).length;
+  const completeCount = items.filter((item) => (item.completenessScore ?? 0) >= 100).length;
   const attentionItem = items.find((item) => !hasReceipt(item)) ?? items.find((item) => (item.completenessScore ?? 0) < 100) ?? items[0];
   const hasItems = items.length > 0;
 
   return (
-    <AppPage>
-      <AppPageHeader
-        kicker="Object Memory Library"
-        title="Dinge"
-        subtitle="Alle gespeicherten Dinge, Belege, Garantien und offenen Punkte."
-        actions={
-          <>
-            <SecondaryAction to="/app/capture/receipt" icon={<ScanLine size={15} />}>Rechnung scannen</SecondaryAction>
-            <ActionButton to="/app/capture/item" icon={<Plus size={15} />}>Ding erfassen</ActionButton>
-          </>
-        }
-      />
-
-      {/* Vault / library summary */}
-      <div className="av-stat-grid av-stat-grid-4">
-        <StatCard icon={<Archive size={16} />} tone="teal" label="Dinge" value={items.length} />
-        <StatCard icon={<FileText size={16} />} tone="neutral" label="Dokumente" value={documentCount} />
-        <StatCard icon={<AlertCircle size={16} />} tone="teal" label="Offene Punkte" value={openTotal} />
-        <StatCard icon={<ShieldCheck size={16} />} tone="amber" label="Unvollständig" value={incompleteCount} />
-      </div>
-
-      {/* Next action focus */}
-      {hasItems && attentionItem ? (
-        <AppSection title="Als Nächstes" slim>
-          <Link className="av-focus-row" to={`/app/items/${attentionItem.id}`}>
-            <IconTile tone={!hasReceipt(attentionItem) ? "red" : "amber"}>
-              <ScanLine size={16} />
-            </IconTile>
-            <div className="av-focus-copy">
-              <strong>{!hasReceipt(attentionItem) ? "Beleg fehlt" : "Produkt vervollständigen"}</strong>
-              <p>{attentionItem.name} braucht noch Kontext, damit Garantie, Support und spätere Suche wirklich nützlich werden.</p>
+    <main className="av-console av-library">
+      <section className="av-console-top">
+        <div className="av-dashboard-header">
+          <span className="av-console-kicker">Object Memory Library</span>
+          <div className="av-dashboard-title-row">
+            <div>
+              <h1>Dinge</h1>
+              <p>Alle gespeicherten Dinge, Belege, Garantien und offenen Punkte.</p>
             </div>
-            <span className="av-focus-go">
-              Produkt öffnen <ArrowRight size={15} />
-            </span>
-          </Link>
-        </AppSection>
-      ) : null}
-
-      {/* Library + search + filters */}
-      <article className="av-section">
-        <div className="av-section-head">
-          <h2 className="av-section-title">{filtered.length} Dinge</h2>
-          <div className="av-view-toggle">
-            <button className={`av-view-btn${view === "cards" ? " is-active" : ""}`} onClick={() => setView("cards")} type="button">
-              <LayoutGrid size={14} /> Karten
-            </button>
-            <button className={`av-view-btn${view === "list" ? " is-active" : ""}`} onClick={() => setView("list")} type="button">
-              <Rows3 size={14} /> Liste
-            </button>
-            <button className={`av-view-btn${view === "memory" ? " is-active" : ""}`} onClick={() => setView("memory")} type="button">
-              <Share2 size={14} /> Memory
-            </button>
+            <Link className="av-console-primary" to="/app/capture/item">
+              Ding erfassen <Plus size={14} />
+            </Link>
+          </div>
+          <div className="av-status-grid" aria-label="Dinge status summary">
+            <StatusSummaryCard label="Dinge" value={items.length} />
+            <StatusSummaryCard label="Dokumente" value={documentCount} />
+            <StatusSummaryCard label="Offen" value={openTotal} tone={openTotal > 0 ? "warning" : "neutral"} />
+            <StatusSummaryCard label="Garantie-Risiken" value={warrantyRiskCount} tone={warrantyRiskCount > 0 ? "warning" : "neutral"} />
+            <StatusSummaryCard label="Vollständig" value={completeCount} tone="success" />
           </div>
         </div>
 
-        <div className="av-search">
-          <Search size={15} />
-          <input
-            type="search"
-            placeholder="Ding, Modell, Beleg oder Kategorie suchen"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+        <DottedGridPanel label="Memory Build Vorschau" status="Object graph">
+          <ObjectMemoryMap nodes={defaultMemoryMapNodes(attentionItem?.name ?? "LG OLED C3")} />
+        </DottedGridPanel>
+      </section>
+
+      <div className="av-console-grid">
+        <div className="av-console-main">
+          <article className="av-console-section av-library-tools">
+            <div className="av-console-section-head">
+              <div>
+                <span>Object Memory Filter</span>
+                <h2>Objekte eingrenzen</h2>
+              </div>
+              <Link to="/app/capture/receipt">Rechnung scannen</Link>
+            </div>
+
+            <div className="av-search">
+              <Search size={15} />
+              <input
+                type="search"
+                placeholder="Ding, Modell, Beleg oder Kategorie suchen"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </div>
+
+            <div className="av-filters">
+              <FilterRow label="Status">
+                {statusFilters.map((filter) => (
+                  <FilterChip key={filter.id} active={status === filter.id} onClick={() => setStatus(filter.id)}>
+                    {filter.label}
+                  </FilterChip>
+                ))}
+              </FilterRow>
+              <FilterRow label="Kategorie">
+                <FilterChip active={category === "ALL"} onClick={() => setCategory("ALL")}>Alle</FilterChip>
+                {categories.map((cat) => (
+                  <FilterChip key={cat} active={category === cat} onClick={() => setCategory(cat)}>
+                    {cat}
+                  </FilterChip>
+                ))}
+              </FilterRow>
+            </div>
+          </article>
+
+          <article className="av-console-section">
+            <div className="av-console-section-head">
+              <div>
+                <span>Object memory</span>
+                <h2>{filtered.length} gespeicherte Dinge</h2>
+              </div>
+            </div>
+
+            {filtered.length ? (
+              <div className="av-things-grid">
+                {filtered.map((item) => (
+                  <ObjectMemoryCard
+                    key={item.id}
+                    to={`/app/dinge/${item.id}`}
+                    category={categoryBucket(item)}
+                    name={item.name}
+                    icon={categoryIcon(categoryBucket(item))}
+                    completeness={item.completenessScore ?? 0}
+                    invoicePresent={hasReceipt(item)}
+                    warranty={warrantyShort(item)}
+                    openPoints={openPointsOf(item)}
+                  />
+                ))}
+              </div>
+            ) : hasItems ? (
+              <FilteredEmpty onReset={() => { setStatus("ALL"); setCategory("ALL"); setQuery(""); }} />
+            ) : (
+              <LibraryEmpty />
+            )}
+          </article>
+        </div>
+
+        <aside className="av-console-side">
+          <MetricCard label="Belege verbunden" value={documentCount} progress={Math.min(100, documentCount * 6)} />
+          <MetricCard label="Offene Object Loops" value={openTotal} progress={Math.min(100, openTotal * 14)} tone="warning" />
+          <MetricCard label="Garantie bald fällig" value={warrantyRiskCount} progress={Math.min(100, warrantyRiskCount * 24)} tone="warning" />
+          <QuickActionCard
+            primary
+            to="/app/capture/item"
+            icon={<Package size={16} />}
+            title="Ding erfassen"
+            body="Produkt, Beleg, Garantie und offene Punkte strukturiert starten."
           />
-        </div>
-
-        <div className="av-filters">
-          <FilterRow label="Status">
-            {statusFilters.map((filter) => (
-              <FilterChip key={filter.id} active={status === filter.id} onClick={() => setStatus(filter.id)}>
-                {filter.label}
-              </FilterChip>
-            ))}
-          </FilterRow>
-          <FilterRow label="Kategorie">
-            <FilterChip active={category === "ALL"} onClick={() => setCategory("ALL")}>Alle</FilterChip>
-            {categories.map((cat) => (
-              <FilterChip key={cat} active={category === cat} onClick={() => setCategory(cat)}>
-                {cat}
-              </FilterChip>
-            ))}
-          </FilterRow>
-        </div>
-
-        {filtered.length ? (
-          view === "cards" ? (
-            <div className="av-things-grid">
-              {filtered.map((item) => (
-                <ObjectMemoryCard
-                  key={item.id}
-                  to={`/app/items/${item.id}`}
-                  category={categoryBucket(item)}
-                  name={item.name}
-                  icon={categoryIcon(categoryBucket(item))}
-                  completeness={item.completenessScore ?? 0}
-                  invoicePresent={hasReceipt(item)}
-                  warranty={warrantyShort(item)}
-                  openPoints={openPointsOf(item)}
-                />
-              ))}
-            </div>
-          ) : view === "list" ? (
-            <div className="av-item-grid">
-              {filtered.map((item) => <ItemCard key={item.id} item={item} />)}
-            </div>
-          ) : (
-            <div className="av-graph-grid">
-              {filtered.map((item) => (
-                <ObjectMemoryGraph
-                  key={item.id}
-                  title={item.name}
-                  category={categoryBucket(item)}
-                  icon={categoryIcon(categoryBucket(item))}
-                  edges={itemGraphEdges(item)}
-                />
-              ))}
-            </div>
-          )
-        ) : hasItems ? (
-          <FilteredEmpty onReset={() => { setStatus("ALL"); setCategory("ALL"); setQuery(""); }} />
-        ) : (
-          <LibraryEmpty />
-        )}
-      </article>
-    </AppPage>
+          <QuickActionCard
+            to="/app/capture/receipt"
+            icon={<ScanLine size={16} />}
+            title="Beleg nachtragen"
+            body="Rechnung oder Nachweis mit einem bestehenden Ding verbinden."
+          />
+        </aside>
+      </div>
+    </main>
   );
 }
 
@@ -311,37 +296,7 @@ function categoryIcon(category: Category): ReactNode {
   }
 }
 
-/* Sparse, product-specific relationship edges for the memory graph view. */
-function itemGraphEdges(item: Item): GraphEdge[] {
-  const edges: GraphEdge[] = [];
-  const receipt = hasReceipt(item);
-  edges.push({ tone: receipt ? "green" : "red", label: receipt ? "Beleg gespeichert" : "Beleg fehlt" });
-
-  const days = warrantyDays(item);
-  if (days === null) edges.push({ tone: "neutral", label: "Garantie unbekannt" });
-  else if (days < 0) edges.push({ tone: "red", label: "Garantie abgelaufen" });
-  else if (days < 60) edges.push({ tone: "amber", label: `Garantie endet in ${days} Tagen` });
-  else edges.push({ tone: "neutral", label: `Garantie bis ${isoDate(item.warrantyUntil)}` });
-
-  const open = openPointsOf(item);
-  if (open > 0) edges.push({ tone: "teal", label: `${open} offener Punkt${open === 1 ? "" : "e"}` });
-
-  return edges;
-}
-
 /* ── Small building blocks ──────────────────────────────────── */
-
-function StatCard({ icon, tone, label, value }: { icon: ReactNode; tone: StatusTone; label: string; value: number }) {
-  return (
-    <div className="av-stat-card">
-      <IconTile tone={tone}>{icon}</IconTile>
-      <div className="av-stat-copy">
-        <small>{label}</small>
-        <strong>{value}</strong>
-      </div>
-    </div>
-  );
-}
 
 function FilterRow({ label, children }: { label: string; children: ReactNode }) {
   return (

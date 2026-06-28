@@ -1,15 +1,15 @@
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Archive, FileText, Home, LifeBuoy, LogOut, MessageSquareText, Package, PenLine, Plus, ReceiptText, UserRound, X } from "lucide-react";
-import { useState } from "react";
+import { Archive, ChevronDown, FileText, Home, LifeBuoy, LogOut, MessageSquareText, Package, PenLine, Plus, ReceiptText, ShieldCheck, UserRound, UsersRound, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import avarenoMark from "../assets/avareno-mark.svg";
 import { useAuth } from "../lib/authProvider";
 
 const nav = [
   { to: "/app", label: "Zuhause", icon: Home },
-  { to: "/app/items", label: "Dinge", icon: Archive },
+  { to: "/app/dinge", label: "Dinge", icon: Archive, activePaths: ["/app/dinge", "/app/items"] },
   { to: "/app/resolve", label: "Resolve", icon: LifeBuoy },
   { to: "/app/care", label: "Care", icon: PenLine },
-  { to: "/app/rewards", label: "Ich", icon: UserRound }
+  { to: "/app/profile", label: "Ich", icon: UserRound, activePaths: ["/app/profile", "/app/ich", "/app/rewards", "/app/friends", "/app/settings"] }
 ];
 
 const captureOptions = [
@@ -23,12 +23,40 @@ const captureOptions = [
 
 export function AppShell() {
   const [open, setOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const auth = useAuth();
   const isMarketingSurface = ["/", "/pricing", "/impressum", "/datenschutz", "/cookies"].includes(location.pathname);
   const isAuthSurface = ["/login", "/signup", "/forgot-password", "/reset-password", "/auth/callback", "/auth/verify-email", "/onboarding"].includes(location.pathname);
   const isProtectedSurface = !isMarketingSurface && !isAuthSurface;
+
+  useEffect(() => {
+    setProfileMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (profileMenuRef.current?.contains(event.target as Node)) return;
+      setProfileMenuOpen(false);
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setProfileMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [profileMenuOpen]);
 
   if (isMarketingSurface || isAuthSurface) {
     return (
@@ -62,12 +90,16 @@ export function AppShell() {
           <nav className="avareno-app-nav no-scrollbar">
             {nav.map((item) => {
               const Icon = item.icon;
+              const activePaths = "activePaths" in item && item.activePaths ? item.activePaths : [item.to];
+              const isNavActive = activePaths.some((path) =>
+                path === "/app" ? location.pathname === path : location.pathname === path || location.pathname.startsWith(`${path}/`)
+              );
               return (
                 <NavLink
                   key={item.to}
                   to={item.to}
                   end={item.to === "/app"}
-                  className={({ isActive }) => (isActive ? "is-active" : "")}
+                  className={() => (isNavActive ? "is-active" : "")}
                 >
                   <Icon size={17} />
                   <span>{item.label}</span>
@@ -77,25 +109,61 @@ export function AppShell() {
           </nav>
 
           <div className="avareno-app-actions">
-            <Link className="avareno-app-website-link" to="/">
-              Website
-            </Link>
-            <button
-              className="avareno-app-logout"
-              onClick={() => {
-                void auth.logout();
-                navigate("/login", { replace: true });
-              }}
-              title="Abmelden"
-              type="button"
-            >
-              <LogOut size={17} />
-              <span>Abmelden</span>
-            </button>
             <button className="avareno-app-capture" onClick={() => setOpen(true)}>
               <Plus size={17} />
               <span>Erfassen</span>
             </button>
+            <div className="avareno-profile-menu" ref={profileMenuRef}>
+              <button
+                className="avareno-profile-trigger"
+                onClick={() => setProfileMenuOpen((current) => !current)}
+                type="button"
+                aria-expanded={profileMenuOpen}
+                aria-haspopup="menu"
+              >
+                <ProfileAvatar name={auth.profile?.displayName ?? "Avareno"} src={auth.profile?.avatarUrl} />
+                <ChevronDown size={13} />
+              </button>
+              {profileMenuOpen ? (
+                <div className="avareno-profile-dropdown" role="menu">
+                  <div className="avareno-profile-dropdown-head">
+                    <ProfileAvatar name={auth.profile?.displayName ?? "Avareno"} src={auth.profile?.avatarUrl} />
+                    <div>
+                      <strong>{auth.profile?.displayName ?? "Avareno"}</strong>
+                      <span>{auth.profile?.email ?? "Privater Workspace"}</span>
+                    </div>
+                  </div>
+                  <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" to="/app/ich/settings">
+                    <UserRound size={15} />
+                    Profil bearbeiten
+                  </Link>
+                  <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" to="/app/ich/friends">
+                    <UsersRound size={15} />
+                    Freunde
+                  </Link>
+                  <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" to="/app/ich/privacy">
+                    <ShieldCheck size={15} />
+                    Privatsphäre
+                  </Link>
+                  <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" to="/">
+                    <Home size={15} />
+                    Website
+                  </Link>
+                  <button
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      void auth.logout();
+                      navigate("/login", { replace: true });
+                    }}
+                    role="menuitem"
+                    type="button"
+                  >
+                    <LogOut size={15} />
+                    Abmelden
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </header>
@@ -148,12 +216,23 @@ export function AppShell() {
   );
 }
 
+function ProfileAvatar({ name, src }: { name: string; src?: string | null }) {
+  return (
+    <span className="avareno-profile-avatar" aria-hidden="true">
+      {src ? <img src={src} alt="" /> : name.slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
+
 function AuthRouteLoading() {
   return (
     <main className="auth-route-loading">
       <div>
-        <span />
-        <p>Privater Bereich wird vorbereitet...</p>
+        <div className="av-loading-bar is-route" role="status" aria-live="polite">
+          <span>Privater Bereich wird vorbereitet...</span>
+          <i aria-hidden="true" />
+        </div>
+        <p>Session und Speicher werden geprüft.</p>
       </div>
     </main>
   );

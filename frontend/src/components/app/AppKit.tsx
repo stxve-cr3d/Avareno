@@ -13,7 +13,8 @@
  */
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, ChevronRight } from "lucide-react";
+import { ArrowRight, BellRing, ChevronRight, FileText, ShieldCheck } from "lucide-react";
+import { formatUiText } from "../../lib/uiText";
 
 export { EmptyState } from "../EmptyState";
 
@@ -28,6 +29,10 @@ const toneClass: Record<StatusTone, string> = {
   red: "av-tone-red",
   green: "av-tone-green"
 };
+
+function normalizeText(value: ReactNode): ReactNode {
+  return typeof value === "string" ? formatUiText(value) : value;
+}
 
 /* ── Layout ─────────────────────────────────────────────────── */
 
@@ -49,9 +54,9 @@ export function AppPageHeader({
   return (
     <header className="av-page-header">
       <div className="av-page-header-copy">
-        {kicker ? <span className="av-page-kicker">{kicker}</span> : null}
-        <h1 className="av-page-title">{title}</h1>
-        {subtitle ? <p className="av-page-sub">{subtitle}</p> : null}
+        {kicker ? <span className="av-page-kicker">{formatUiText(kicker)}</span> : null}
+        <h1 className="av-page-title">{normalizeText(title)}</h1>
+        {subtitle ? <p className="av-page-sub">{normalizeText(subtitle)}</p> : null}
       </div>
       {actions ? <div className="av-page-actions">{actions}</div> : null}
     </header>
@@ -85,10 +90,10 @@ export function AppSection({
     <article className={`av-section${slim ? " av-section-slim" : ""}`}>
       {title || link ? (
         <div className="av-section-head">
-          {title ? <h2 className="av-section-title">{title}</h2> : <span />}
+          {title ? <h2 className="av-section-title">{normalizeText(title)}</h2> : <span />}
           {link ? (
             <Link className="av-section-link" to={link.to}>
-              {link.label}
+              {formatUiText(link.label)}
             </Link>
           ) : null}
         </div>
@@ -100,6 +105,30 @@ export function AppSection({
 
 export function AppPanel({ children, soft = false }: { children: ReactNode; soft?: boolean }) {
   return <div className={`av-panel-box${soft ? " is-soft" : ""}`}>{children}</div>;
+}
+
+export function MemoryGridBackground({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <div className={`av-memory-grid-bg ${className}`.trim()}>{children}</div>;
+}
+
+export function DottedGridPanel({
+  children,
+  label = "Object Memory Map",
+  status = "Live profile"
+}: {
+  children: ReactNode;
+  label?: string;
+  status?: ReactNode;
+}) {
+  return (
+    <aside className="av-dotted-panel">
+      <div className="av-dotted-panel-head">
+        <span>{formatUiText(label)}</span>
+        {status ? <em>{normalizeText(status)}</em> : null}
+      </div>
+      {normalizeText(children)}
+    </aside>
+  );
 }
 
 export function Divider() {
@@ -145,6 +174,94 @@ export function ProgressLine({ value, tone = "teal" }: { value: number; tone?: S
   );
 }
 
+export function AppLoadingBar({
+  active,
+  label = "Avareno arbeitet...",
+  className = ""
+}: {
+  active: boolean;
+  label?: string;
+  className?: string;
+}) {
+  if (!active) return null;
+
+  return (
+    <div className={`av-loading-bar ${className}`.trim()} role="status" aria-live="polite">
+      <span>{formatUiText(label)}</span>
+      <i aria-hidden="true" />
+    </div>
+  );
+}
+
+export function StatusSummaryCard({
+  label,
+  value,
+  tone = "neutral"
+}: {
+  label: string;
+  value: ReactNode;
+  tone?: "neutral" | "success" | "warning";
+}) {
+  return (
+    <div className={`av-status-card av-status-${tone}`}>
+      <span>{formatUiText(label)}</span>
+      <strong>{normalizeText(value)}</strong>
+    </div>
+  );
+}
+
+export function MetricCard({
+  label,
+  value,
+  progress,
+  tone = "teal"
+}: {
+  label: string;
+  value: ReactNode;
+  progress: number;
+  tone?: "teal" | "warning";
+}) {
+  return (
+    <div className={`av-metric-card av-metric-${tone}`}>
+      <div className="av-metric-head">
+        <span>{formatUiText(label)}</span>
+        <strong>{normalizeText(value)}</strong>
+      </div>
+      <div className="av-metric-bars" aria-hidden="true">
+        {[28, 48, 36, 68, progress, 44, 58].map((bar, index) => (
+          <i key={index} style={{ height: `${Math.max(16, Math.min(96, bar))}%` }} />
+        ))}
+      </div>
+      <div className="av-metric-line">
+        <span style={{ width: `${Math.max(0, Math.min(100, progress))}%` }} />
+      </div>
+    </div>
+  );
+}
+
+export function QuickActionCard({
+  to,
+  icon,
+  title,
+  body,
+  primary = false
+}: {
+  to: string;
+  icon: ReactNode;
+  title: string;
+  body: string;
+  primary?: boolean;
+}) {
+  return (
+    <Link className={`av-quick-action${primary ? " is-primary" : ""}`} to={to}>
+      <span className="av-quick-action-icon">{icon}</span>
+      <strong>{formatUiText(title)}</strong>
+      <small>{formatUiText(body)}</small>
+      <ChevronRight size={14} />
+    </Link>
+  );
+}
+
 export function ActionButton({
   to,
   onClick,
@@ -162,7 +279,7 @@ export function ActionButton({
 }) {
   const inner = (
     <>
-      {children}
+      {normalizeText(children)}
       {icon}
     </>
   );
@@ -196,7 +313,7 @@ export function SecondaryAction({
   const inner = (
     <>
       {icon ? <span className="av-action-ic">{icon}</span> : null}
-      <span>{children}</span>
+      <span>{normalizeText(children)}</span>
     </>
   );
   if (to && !disabled) {
@@ -216,8 +333,8 @@ export function SecondaryAction({
 export function MetadataRow({ label, value, tone = "neutral" }: { label: ReactNode; value: ReactNode; tone?: StatusTone }) {
   return (
     <div className="av-metarow">
-      <dt>{label}</dt>
-      <dd className={tone === "neutral" ? "" : toneClass[tone]}>{value}</dd>
+      <dt>{normalizeText(label)}</dt>
+      <dd className={tone === "neutral" ? "" : toneClass[tone]}>{normalizeText(value)}</dd>
     </div>
   );
 }
@@ -231,7 +348,7 @@ export function DocumentChip({ present }: { present: boolean }) {
 }
 
 export function WarrantyChip({ label, tone = "amber" }: { label: string; tone?: StatusTone }) {
-  return <StatusChip tone={tone}>{label}</StatusChip>;
+  return <StatusChip tone={tone}>{formatUiText(label)}</StatusChip>;
 }
 
 export function CareStatusChip({ open }: { open: number }) {
@@ -269,13 +386,13 @@ export function AttentionRow({
     <Link className={`av-attention-card av-att-${tone}${primary ? " av-att-primary" : ""}`} to={to}>
       <span className="av-att-icon">{icon}</span>
       <div className="av-att-copy">
-        <small>{label}</small>
-        <strong>{title}</strong>
-        <p>{detail}</p>
+        <small>{formatUiText(label)}</small>
+        <strong>{formatUiText(title)}</strong>
+        <p>{formatUiText(detail)}</p>
       </div>
       <div className="av-att-right">
-        <span className={`av-tag av-tag-${tone}`}>{signal}</span>
-        <em className="av-att-cta">{action}</em>
+        <span className={`av-tag av-tag-${tone}`}>{formatUiText(signal)}</span>
+        <em className="av-att-cta">{formatUiText(action)}</em>
       </div>
       {primary && typeof progress === "number" ? (
         <div className="av-att-track">
@@ -306,10 +423,10 @@ export function AppModuleCard({
     <Link className={`av-module-row ${cls}`.trim()} to={to}>
       <span className="av-module-icon">{icon}</span>
       <div className="av-module-copy">
-        <strong>{label}</strong>
-        <small>{sub}</small>
+        <strong>{formatUiText(label)}</strong>
+        <small>{formatUiText(sub)}</small>
       </div>
-      <em className="av-module-count">{count}</em>
+      <em className="av-module-count">{normalizeText(count)}</em>
       <ChevronRight size={13} />
     </Link>
   );
@@ -330,8 +447,8 @@ export function NextActionCard({
     <Link className="av-next-row" to={to}>
       <span className="av-next-icon">{icon}</span>
       <div>
-        <strong>{title}</strong>
-        <small>{body}</small>
+        <strong>{normalizeText(title)}</strong>
+        <small>{normalizeText(body)}</small>
       </div>
       <ChevronRight size={14} />
     </Link>
@@ -374,6 +491,109 @@ export function VaultSummary({
  * ----------------------------------------------------------- */
 
 export type GraphEdge = { tone?: StatusTone; label: string; sublabel?: string; icon?: ReactNode };
+
+export type ObjectMemoryMapNode = {
+  product: string;
+  category: string;
+  type: "warranty" | "invoice" | "care";
+  progress: number;
+  chips: { label: string; tone: "ok" | "warn" | "care" | "danger"; icon?: ReactNode }[];
+};
+
+export function ObjectMemoryMap({ nodes }: { nodes: ObjectMemoryMapNode[] }) {
+  const typeColor: Record<ObjectMemoryMapNode["type"], string> = {
+    warranty: "#E8C56E",
+    invoice: "#EF7D7D",
+    care: "#6FE7DF"
+  };
+  const primary = nodes[0];
+  const secondary = nodes.slice(1, 3);
+
+  return (
+    <div className="av-mm-wrap">
+      <p className="av-mm-label">Memory Build</p>
+      <div className="av-mm-stage">
+        <svg className="av-mm-lines" viewBox="0 0 384 270" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M 192 115 C 192 158 86 158 86 196" fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="1.2" strokeDasharray="4 5" />
+          <path d="M 192 115 C 192 158 298 158 298 196" fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="1.2" strokeDasharray="4 5" />
+          <circle cx="192" cy="115" r="2.5" fill="rgba(255,255,255,0.14)" />
+          <circle cx="86" cy="196" r="2" fill="rgba(255,255,255,0.10)" />
+          <circle cx="298" cy="196" r="2" fill="rgba(255,255,255,0.10)" />
+        </svg>
+
+        {primary ? (
+          <div className={`av-mm-card av-mm-primary av-mm-t-${primary.type}`}>
+            <div className="av-mm-head">
+              <strong>{primary.product}</strong>
+              <span className={`av-mm-dot av-mm-d-${primary.type}`} />
+            </div>
+            <small>{primary.category}</small>
+            <div className="av-mm-chip-row">
+              {primary.chips.map((chip) => (
+                <span className={`av-mm-ic av-mm-ic-${chip.tone}`} key={chip.label}>
+                  {chip.icon}
+                  {chip.label}
+                </span>
+              ))}
+            </div>
+            <div className="av-mm-bar">
+              <div className="av-mm-fill" style={{ width: `${primary.progress}%`, background: typeColor[primary.type] }} />
+            </div>
+          </div>
+        ) : null}
+
+        {secondary.map((item, index) => (
+          <div key={item.product} className={`av-mm-card av-mm-secondary av-mm-sec${index} av-mm-t-${item.type}`}>
+            <div className="av-mm-head">
+              <strong>{item.product}</strong>
+              <span className={`av-mm-dot av-mm-d-${item.type}`} />
+            </div>
+            <small>{item.category}</small>
+            {item.chips.slice(0, 1).map((chip) => (
+              <span className={`av-mm-ic av-mm-ic-${chip.tone}`} key={chip.label}>
+                {chip.icon}
+                {chip.label}
+              </span>
+            ))}
+            <div className="av-mm-bar">
+              <div className="av-mm-fill" style={{ width: `${item.progress}%`, background: typeColor[item.type] }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function defaultMemoryMapNodes(primaryName = "LG OLED C3"): ObjectMemoryMapNode[] {
+  return [
+    {
+      product: primaryName,
+      category: "TV · Media",
+      type: "warranty",
+      progress: 74,
+      chips: [
+        { tone: "ok", label: "Beleg gespeichert", icon: <FileText size={9} /> },
+        { tone: "warn", label: "Garantie 45 Tage", icon: <ShieldCheck size={9} /> },
+        { tone: "care", label: "1 offen", icon: <BellRing size={9} /> }
+      ]
+    },
+    {
+      product: "Sony WH-1000XM5",
+      category: "Audio",
+      type: "invoice",
+      progress: 38,
+      chips: [{ tone: "danger", label: "Beleg fehlt", icon: <FileText size={9} /> }]
+    },
+    {
+      product: "Bambu Lab X1C",
+      category: "Werkstatt",
+      type: "care",
+      progress: 62,
+      chips: [{ tone: "care", label: "Care offen", icon: <BellRing size={9} /> }]
+    }
+  ];
+}
 
 export function ObjectMemoryGraph({
   title,

@@ -536,7 +536,7 @@ function SolutionProposalCard({
           {helped ? "Markiert" : "Hat geholfen"}
         </button>
         <button onClick={() => setQuestionOpen((open) => !open)} type="button">
-          {questionOpen ? "Schliessen" : "Nachfrage"}
+          {questionOpen ? "Schließen" : "Nachfrage"}
         </button>
         <button disabled={proposal.accepted || ticketSolved} onClick={onAccept} type="button">
           Lösung annehmen

@@ -10,6 +10,7 @@ type AuthStatus = "loading" | "authenticated" | "anonymous";
 type AuthCredentials = {
   email: string;
   password: string;
+  captchaToken?: string;
 };
 
 type OnboardingInput = {
@@ -33,10 +34,13 @@ type AuthContextValue = {
   login: (input: AuthCredentials) => Promise<AuthActionResult>;
   signup: (input: AuthCredentials & { displayName?: string }) => Promise<AuthActionResult>;
   requestPasswordReset: (email: string) => Promise<AuthActionResult>;
+  requestEmailVerification: (email?: string) => Promise<AuthActionResult>;
   resetPassword: (input: { password: string }) => Promise<AuthActionResult>;
   verifyEmail: (token: string) => Promise<AuthActionResult>;
   completeAuthCallback: (input: { code?: string | null; errorDescription?: string | null }) => Promise<AuthActionResult>;
   signInWithProvider: (provider: SocialAuthProvider) => Promise<AuthActionResult>;
+  signInWithPasskey: () => Promise<AuthActionResult>;
+  registerPasskey: () => Promise<AuthActionResult>;
   completeOnboarding: (input: OnboardingInput) => Promise<AuthActionResult>;
   updateProfile: (input: Partial<Pick<UserProfile, "displayName" | "email" | "avatarUrl" | "privateProfile" | "motivationEnabled" | "leaderboardEnabled">>) => Promise<AuthActionResult>;
   logout: () => Promise<void>;
@@ -140,7 +144,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { data, error: loginError } = await supabase.auth.signInWithPassword({
         email: input.email.trim().toLowerCase(),
-        password: input.password
+        password: input.password,
+        options: {
+          captchaToken: input.captchaToken
+        }
       });
 
       if (loginError || !data.session) {
@@ -168,6 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password: input.password,
         options: {
           emailRedirectTo: authRuntime.emailRedirectUrl,
+          captchaToken: input.captchaToken,
           data: {
             display_name: input.displayName?.trim() || displayNameFromEmail(email),
             onboarding_completed: false,
@@ -196,7 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (authRuntime.mode === "mock") {
         if (!email.includes("@")) {
-          setError("Bitte gib eine gueltige E-Mail-Adresse ein.");
+          setError("Bitte gib eine gültige E-Mail-Adresse ein.");
           return { ok: false };
         }
         return { ok: true };
@@ -217,12 +225,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return { ok: true };
     },
+    async requestEmailVerification(email) {
+      setError(null);
+
+      const targetEmail = email?.trim().toLowerCase() || profile?.email.trim().toLowerCase() || "";
+      if (!targetEmail.includes("@")) {
+        setError("Bitte nutze eine gÃ¼ltige E-Mail-Adresse.");
+        return { ok: false };
+      }
+
+      if (authRuntime.mode === "mock") {
+        if (profile) {
+          const nextProfile = withUpdatedAt({ ...profile, email: targetEmail, emailVerified: true });
+          storeDevProfile(nextProfile);
+          setProfile(nextProfile);
+        }
+        return { ok: true };
+      }
+
+      if (!supabase) {
+        return failWithSetupError(setError);
+      }
+
+      const { error: resendError } = await supabase.auth.resend({
+        type: "signup",
+        email: targetEmail,
+        options: {
+          emailRedirectTo: authRuntime.emailRedirectUrl
+        }
+      });
+
+      if (resendError) {
+        setError(mapAuthError(resendError.message));
+        return { ok: false };
+      }
+
+      return { ok: true };
+    },
     async resetPassword(input) {
       setError(null);
 
       if (authRuntime.mode === "mock") {
         if (input.password.length < 8) {
-          setError("Bitte nutze mindestens 8 Zeichen fuer dein neues Passwort.");
+          setError("Bitte nutze mindestens 8 Zeichen für dein neues Passwort.");
           return { ok: false };
         }
         return { ok: true, nextPath: "/login" };
@@ -331,11 +376,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return { ok: true };
     },
+    async signInWithPasskey() {
+      setError(null);
+
+      if (!authRuntime.passkeyProvider.configured) {
+        setError("Passkeys sind noch nicht konfiguriert.");
+        return { ok: false };
+      }
+
+      if (!window.PublicKeyCredential) {
+        setError("Dieser Browser unterstützt Passkeys nicht.");
+        return { ok: false };
+      }
+
+      if (!supabase) {
+        return failWithSetupError(setError);
+      }
+
+      const { data, error: passkeyError } = await supabase.auth.signInWithPasskey();
+
+      if (passkeyError || !data.session) {
+        setError(mapAuthError(passkeyError?.message ?? "Passkey login failed"));
+        return { ok: false };
+      }
+
+      applySession(data.session, setProfile, setStatus);
+      return { ok: true, nextPath: data.user?.user_metadata?.onboarding_completed ? "/app" : "/onboarding" };
+    },
+    async registerPasskey() {
+      setError(null);
+
+      if (!authRuntime.passkeyProvider.configured) {
+        setError("Passkeys sind noch nicht konfiguriert.");
+        return { ok: false };
+      }
+
+      if (!window.PublicKeyCredential) {
+        setError("Dieser Browser unterstützt Passkeys nicht.");
+        return { ok: false };
+      }
+
+      if (!supabase) {
+        return failWithSetupError(setError);
+      }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        setError("Bitte melde dich zuerst an, bevor du einen Passkey einrichtest.");
+        return { ok: false };
+      }
+
+      const { error: passkeyError } = await supabase.auth.registerPasskey();
+
+      if (passkeyError) {
+        setError(mapAuthError(passkeyError.message));
+        return { ok: false };
+      }
+
+      return { ok: true };
+    },
     async completeOnboarding(input) {
       setError(null);
 
       if (!input.displayName.trim()) {
-        setError("Bitte gib einen Namen fuer dein Profil ein.");
+        setError("Bitte gib einen Namen für dein Profil ein.");
         return { ok: false };
       }
 
@@ -392,7 +496,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (input.email !== undefined && !input.email.includes("@")) {
-        setError("Bitte nutze eine gueltige E-Mail-Adresse.");
+        setError("Bitte nutze eine gültige E-Mail-Adresse.");
         return { ok: false };
       }
 
@@ -402,11 +506,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (authRuntime.mode === "mock") {
+        const nextEmail = input.email?.trim().toLowerCase() ?? profile.email;
+        const emailChanged = nextEmail !== profile.email;
         const nextProfile = withUpdatedAt({
           ...profile,
           ...input,
           displayName: input.displayName?.trim() ?? profile.displayName,
-          email: input.email?.trim().toLowerCase() ?? profile.email
+          email: nextEmail,
+          emailVerified: emailChanged ? false : profile.emailVerified
         });
         storeDevProfile(nextProfile);
         setProfile(nextProfile);
@@ -426,6 +533,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           motivation_enabled: input.motivationEnabled ?? profile.motivationEnabled,
           leaderboard_enabled: input.leaderboardEnabled ?? profile.leaderboardEnabled
         }
+      }, {
+        emailRedirectTo: authRuntime.emailRedirectUrl
       });
 
       if (updateError || !data.user) {
@@ -509,7 +618,7 @@ function profileFromSupabaseUser(user: SupabaseUser): UserProfile {
 
 function loginWithDevProfile(input: AuthCredentials, setProfile: (profile: UserProfile | null) => void, setStatus: (status: AuthStatus) => void, setError: (error: string | null) => void): AuthActionResult {
   if (!input.email.includes("@") || input.password.length < 6) {
-    setError("Login fehlgeschlagen. Bitte pruefe deine Eingaben.");
+    setError("Login fehlgeschlagen. Bitte prüfe deine Eingaben.");
     return { ok: false };
   }
 
@@ -527,7 +636,7 @@ function loginWithDevProfile(input: AuthCredentials, setProfile: (profile: UserP
 
 function signupWithDevProfile(input: AuthCredentials & { displayName?: string }, setProfile: (profile: UserProfile | null) => void, setStatus: (status: AuthStatus) => void, setError: (error: string | null) => void): AuthActionResult {
   if (!input.email.includes("@") || input.password.length < 6) {
-    setError("Bitte nutze eine gueltige E-Mail und mindestens 6 Zeichen Passwort.");
+    setError("Bitte nutze eine gültige E-Mail und mindestens 6 Zeichen Passwort.");
     return { ok: false };
   }
 
@@ -613,7 +722,7 @@ function mapAuthError(message: string) {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("invalid login") || normalized.includes("invalid credentials")) {
-    return "Login fehlgeschlagen. Bitte pruefe deine Eingaben.";
+    return "Login fehlgeschlagen. Bitte prüfe deine Eingaben.";
   }
 
   if (normalized.includes("already registered") || normalized.includes("already exists")) {
@@ -621,11 +730,19 @@ function mapAuthError(message: string) {
   }
 
   if (normalized.includes("email not confirmed") || normalized.includes("not confirmed")) {
-    return "Bitte bestaetige zuerst deine E-Mail.";
+    return "Bitte bestätige zuerst deine E-Mail.";
   }
 
   if (normalized.includes("expired") || normalized.includes("invalid token")) {
     return "Der Link ist abgelaufen. Fordere einfach einen neuen an.";
+  }
+
+  if (normalized.includes("code verifier") || normalized.includes("pkce")) {
+    return `Der Google-Login wurde in einem anderen Browser oder unter einer anderen lokalen Adresse gestartet. Öffne Avareno Über ${new URL(authRuntime.redirectUrl).origin}, starte den Google-Login dort erneut und bleib im selben Browserfenster.`;
+  }
+
+  if (normalized.includes("passkey") || normalized.includes("webauthn")) {
+    return "Passkey konnte nicht abgeschlossen werden. Prüfe, ob Passkeys in Supabase aktiviert sind und ob du im selben Browser und auf derselben Adresse angemeldet bist.";
   }
 
   if (normalized.includes("cancel")) {

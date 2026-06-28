@@ -28,7 +28,7 @@ export function FriendsListPage() {
         <div>
           <span>Privat</span>
           <h1>Freunde</h1>
-          <p>Eine minimalistische Wochenuebersicht fuer enge Freunde. Nur dein Kreis ist sichtbar.</p>
+          <p>Eine minimalistische WochenÜbersicht für enge Freunde. Nur dein Kreis ist sichtbar.</p>
         </div>
         <button className="friends-primary-action" onClick={copyInvite} type="button">
           <Copy size={16} />
@@ -36,13 +36,13 @@ export function FriendsListPage() {
         </button>
       </section>
 
-      <section className="friends-board" aria-label="Private Freunde Uebersicht">
+      <section className="friends-board" aria-label="Private Freunde Übersicht">
         <div className="friends-board-head">
           <div>
             <span>Diese Woche</span>
             <h2>Freundliche Rangfolge</h2>
           </div>
-          <small>{friends.length} Personen · kein oeffentliches Ranking</small>
+          <small>{friends.length} Personen · kein Öffentliches Ranking</small>
         </div>
 
         <div className="friends-board-list">
@@ -56,7 +56,7 @@ export function FriendsListPage() {
         <UserPlus size={17} />
         <div>
           <strong>{mockFriendInvite.inviteCode}</strong>
-          <span>Einladungscode fuer deinen privaten Kreis</span>
+          <span>Einladungscode für deinen privaten Kreis</span>
         </div>
       </section>
     </main>
@@ -80,7 +80,7 @@ export function FriendProfilePage() {
         <section className="friends-profile-card">
           <Link className="friend-detail-back" to={basePath}>
             <ArrowLeft size={16} />
-            Zurueck zu Freunde
+            Zurück zu Freunde
           </Link>
           <p>Dieser Freund ist nicht in deinem privaten Kreis sichtbar.</p>
         </section>
@@ -96,7 +96,7 @@ export function FriendProfilePage() {
       <section className="friends-profile-card">
         <Link className="friend-detail-back" to={basePath}>
           <ArrowLeft size={16} />
-          Zurueck zu Freunde
+          Zurück zu Freunde
         </Link>
 
         <div className="friends-profile-hero">
@@ -116,7 +116,7 @@ export function FriendProfilePage() {
 
         <div className="friends-profile-note">
           <LockKeyhole size={17} />
-          <p>Ihr seid privat verbunden. Sichtbare Werte koennen jederzeit ausgeblendet werden.</p>
+          <p>Ihr seid privat verbunden. Sichtbare Werte können jederzeit ausgeblendet werden.</p>
         </div>
 
         <div className="friends-source-list">

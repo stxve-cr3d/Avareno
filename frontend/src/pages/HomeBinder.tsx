@@ -38,7 +38,7 @@ export function HomeBinder() {
           <p>
             {missingItems.length > 0
               ? `${missingItems.length} Dinge brauchen noch einen Beleg, eine Garantie oder einen Standort.`
-              : "Alle wichtigen Dinge haben aktuell genug Kontext fuer Garantie, Versicherung und Support."}
+              : "Alle wichtigen Dinge haben aktuell genug Kontext für Garantie, Versicherung und Support."}
           </p>
           <ProgressBar value={report.summary.readiness} />
         </div>

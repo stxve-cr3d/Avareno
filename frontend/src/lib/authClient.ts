@@ -14,6 +14,8 @@ type ProviderState = {
 export type AuthRuntimeConfig = {
   mode: AuthRuntimeMode;
   ready: boolean;
+  turnstileEnabled: boolean;
+  turnstileSiteKey: string;
   redirectUrl: string;
   emailRedirectUrl: string;
   resetPasswordUrl: string;
@@ -22,6 +24,8 @@ export type AuthRuntimeConfig = {
   emailFromName: string;
   emailReplyTo: string;
   providers: Record<SocialAuthProvider, ProviderState>;
+  phoneProvider: ProviderState;
+  passkeyProvider: ProviderState;
   setupMissing: string[];
 };
 
@@ -31,6 +35,8 @@ const supabasePublishableKey =
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim()
   || import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()
   || "";
+const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? "";
+const turnstileRequested = import.meta.env.VITE_AUTH_TURNSTILE_ENABLED === "true";
 const origin = window.location.origin;
 
 const mode: AuthRuntimeMode = requestedProvider === "mock"
@@ -41,7 +47,9 @@ const mode: AuthRuntimeMode = requestedProvider === "mock"
 
 export const authRuntime: AuthRuntimeConfig = {
   mode,
-  ready: mode === "supabase" || mode === "mock",
+  ready: (mode === "supabase" || mode === "mock") && !(mode === "supabase" && turnstileRequested && !turnstileSiteKey),
+  turnstileEnabled: mode === "supabase" && turnstileRequested && Boolean(turnstileSiteKey),
+  turnstileSiteKey,
   redirectUrl: import.meta.env.VITE_AUTH_REDIRECT_URL ?? `${origin}/auth/callback`,
   emailRedirectUrl: import.meta.env.VITE_AUTH_EMAIL_REDIRECT_URL ?? `${origin}/auth/callback`,
   resetPasswordUrl: import.meta.env.VITE_AUTH_PASSWORD_RESET_URL ?? `${origin}/reset-password`,
@@ -63,11 +71,24 @@ export const authRuntime: AuthRuntimeConfig = {
       setupNote: "Apple OAuth im Supabase Dashboard aktivieren und danach VITE_AUTH_APPLE_ENABLED=true setzen."
     }
   },
+  phoneProvider: {
+    label: "SMS / Twilio",
+    configured: mode === "supabase" && import.meta.env.VITE_AUTH_PHONE_ENABLED === "true",
+    envName: "VITE_AUTH_PHONE_ENABLED",
+    setupNote: "Phone Auth im Supabase Dashboard mit Twilio aktivieren und danach VITE_AUTH_PHONE_ENABLED=true setzen."
+  },
+  passkeyProvider: {
+    label: "Passkey",
+    configured: mode === "supabase" && import.meta.env.VITE_AUTH_PASSKEY_ENABLED === "true",
+    envName: "VITE_AUTH_PASSKEY_ENABLED",
+    setupNote: "Passkeys im Supabase Dashboard aktivieren und danach VITE_AUTH_PASSKEY_ENABLED=true setzen."
+  },
   setupMissing: requestedProvider === "mock"
     ? []
     : [
       ...(!supabaseUrl ? ["VITE_SUPABASE_URL"] : []),
-      ...(!supabasePublishableKey ? ["VITE_SUPABASE_PUBLISHABLE_KEY"] : [])
+      ...(!supabasePublishableKey ? ["VITE_SUPABASE_PUBLISHABLE_KEY"] : []),
+      ...(turnstileRequested && !turnstileSiteKey ? ["VITE_TURNSTILE_SITE_KEY"] : [])
     ]
 };
 
@@ -75,7 +96,10 @@ export const supabase = mode === "supabase"
   ? createClient(supabaseUrl, supabasePublishableKey, {
     auth: {
       autoRefreshToken: true,
-      detectSessionInUrl: true,
+      detectSessionInUrl: false,
+      experimental: {
+        passkey: import.meta.env.VITE_AUTH_PASSKEY_ENABLED === "true"
+      },
       flowType: "pkce",
       persistSession: true,
       storageKey: "avareno-supabase-auth"

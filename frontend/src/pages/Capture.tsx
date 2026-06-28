@@ -16,7 +16,7 @@ const kinds: { value: CaptureKind; label: string; helper: string; icon: React.Co
 const examples = [
   "Miesa am Freitag antworten",
   "MediaMarkt LG OLED 1499 EUR Garantie",
-  "Vertrag Stromanbieter bis naechsten Monat pruefen"
+  "Vertrag Stromanbieter bis nächsten Monat prüfen"
 ];
 
 export function Capture() {
@@ -89,7 +89,7 @@ export function Capture() {
               value={text}
               onChange={(event) => setText(event.target.value)}
               className="min-h-32 w-full resize-none bg-transparent text-lg font-bold leading-8 outline-none placeholder:text-ink/25 md:min-h-48 md:text-xl"
-              placeholder="Zum Beispiel: Miesa Freitag antworten, MediaMarkt LG OLED 1499 EUR, Vertrag naechsten Monat pruefen ..."
+              placeholder="Zum Beispiel: Miesa Freitag antworten, MediaMarkt LG OLED 1499 EUR, Vertrag nächsten Monat prüfen ..."
             />
           </div>
 
@@ -128,7 +128,7 @@ export function Capture() {
                   <p className="mt-1 text-xl font-black text-ink">{result.title}</p>
                   <p className="mt-1 text-sm font-bold text-ink/58">{result.summary}</p>
                   <button className="mt-4 rounded-full bg-leaf px-4 py-2 text-sm font-black text-white" onClick={() => navigate(result.route)}>
-                    Oeffnen
+                    Öffnen
                   </button>
                 </div>
               </div>
@@ -140,7 +140,7 @@ export function Capture() {
           <div className="rounded-[1.5rem] bg-[#fffaf2] p-5 shadow-soft">
             <h2 className="font-serif text-3xl italic leading-tight">Ein Satz reicht.</h2>
             <p className="mt-3 text-sm font-bold leading-6 text-ink/58">
-              avareno erkennt erstmal lokal und regelbasiert, was du meinst. Spaeter haengt hier echte AI dran.
+              avareno erkennt erstmal lokal und regelbasiert, was du meinst. Später hängt hier echte AI dran.
             </p>
           </div>
 

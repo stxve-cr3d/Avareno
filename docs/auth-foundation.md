@@ -25,6 +25,8 @@ Use `frontend/.env.example` as the local template.
 - `VITE_AUTH_PASSWORD_RESET_URL`
 - `VITE_AUTH_GOOGLE_ENABLED=true` only after Google is enabled in Supabase
 - `VITE_AUTH_APPLE_ENABLED=true` only after Apple is enabled in Supabase
+- `VITE_AUTH_PHONE_ENABLED=true` only after Phone Auth is enabled in Supabase with Twilio
+- `VITE_AUTH_PASSKEY_ENABLED=true` only after Passkeys are enabled in Supabase
 
 Legacy Supabase projects can still use `VITE_SUPABASE_ANON_KEY`; the frontend prefers `VITE_SUPABASE_PUBLISHABLE_KEY` when both are present.
 
@@ -76,8 +78,8 @@ Recommended DMARC rollout:
 
 Add these URLs in Supabase Auth URL Configuration:
 
-- `http://127.0.0.1:5173/auth/callback`
-- `http://127.0.0.1:5173/reset-password`
+- `http://localhost:5173/auth/callback`
+- `http://localhost:5173/reset-password`
 - production app URL `/auth/callback`
 - production app URL `/reset-password`
 
@@ -94,6 +96,38 @@ Add these URLs in Supabase Auth URL Configuration:
 2. Add the Supabase callback URL from the Supabase Apple provider settings.
 3. Store Apple client id/team id/key id/private key only in Supabase provider settings.
 4. Set `VITE_AUTH_APPLE_ENABLED=true` after the provider is active.
+
+## Twilio / Phone Auth Setup
+
+Twilio is used as the SMS provider for Supabase Phone Auth. Keep Twilio credentials in Supabase only; do not add Twilio account tokens to frontend or backend env files.
+
+1. Create or use an existing Twilio account.
+2. Create a Twilio Messaging Service or choose a verified Twilio sender/phone number.
+3. In Supabase, open Authentication -> Sign In / Providers -> Phone.
+4. Enable Phone provider and configure Twilio with the Account SID, Auth Token, and Messaging Service SID or sender number required by the Supabase form.
+5. Keep SMS templates short and clearly branded as Avareno.
+6. Set `VITE_AUTH_PHONE_ENABLED=true` only after Supabase Phone Auth is active and a real SMS test succeeds.
+
+Avareno currently exposes Phone/Twilio as a prepared provider status. A dedicated phone OTP login UI should be added separately before enabling phone login for users.
+
+## Passkey Setup
+
+Passkeys use Supabase's experimental WebAuthn support. Keep the feature gated until the Supabase project is configured and tested on the exact app origin.
+
+1. Enable Passkeys / WebAuthn in the Supabase Auth settings for the project.
+2. Configure the allowed relying party/origin values for the local app and production app.
+3. Test locally on one exact origin. Use `localhost` for local passkeys; `127.0.0.1` is not a valid WebAuthn relying party id.
+4. Register a passkey from Account -> Account & Sicherheit while signed in.
+5. Test `Mit Passkey fortfahren` on the login screen.
+6. Set `VITE_AUTH_PASSKEY_ENABLED=true` only after registration and sign-in both work.
+
+The frontend opts into Supabase passkeys through `auth.experimental.passkey` only when `VITE_AUTH_PASSKEY_ENABLED=true`.
+
+Local passkey settings:
+
+- Relying Party Display Name: `Avareno`
+- Relying Party ID: `localhost`
+- Relying Party Origins: `http://localhost:5173`
 
 ## Profile And RLS Notes
 

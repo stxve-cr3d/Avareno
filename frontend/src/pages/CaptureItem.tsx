@@ -146,7 +146,7 @@ export function CaptureItem() {
   );
 
   return (
-    <form className="mx-auto max-w-6xl space-y-5" onSubmit={createItem}>
+    <form className="capture-item-page mx-auto max-w-6xl space-y-5" onSubmit={createItem}>
       <BarcodeScannerDialog onClose={() => setScannerOpen(false)} onDetected={handleBarcodeDetected} open={scannerOpen} />
 
       <section className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">

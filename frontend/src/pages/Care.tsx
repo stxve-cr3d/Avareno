@@ -42,8 +42,8 @@ const mockCareLoops: Loop[] = [
   {
     id: "care_return_monitor",
     itemId: "item_monitor",
-    title: "Rueckgabe Monitor pruefen",
-    description: "Rueckgabefenster endet bald. Beleg und Originalverpackung liegen im Arbeitszimmer.",
+    title: "Rückgabe Monitor prüfen",
+    description: "Rückgabefenster endet bald. Beleg und Originalverpackung liegen im Arbeitszimmer.",
     sourceType: "MANUAL",
     priority: "HIGH",
     status: "OPEN",
@@ -73,7 +73,7 @@ const mockCareLoops: Loop[] = [
     item: {
       id: "item_bike",
       name: "VanMoof S3",
-      category: "Mobilitaet",
+      category: "Mobilität",
       currency: "EUR",
       completenessScore: 76,
       status: "ACTIVE"
@@ -546,21 +546,21 @@ function careLongDateLabel(value?: string | null) {
 
 function careStateLabel(loop: Loop) {
   if (loop.status === "SNOOZED") return "Pausiert";
-  if (dateScore(loop.dueDate ?? loop.reminderAt) < Date.now()) return "Faellig";
+  if (dateScore(loop.dueDate ?? loop.reminderAt) < Date.now()) return "Fällig";
   if (isWithinDays(loop.dueDate ?? loop.reminderAt, 7)) return "Bald";
   return "Offen";
 }
 
 function careReason(loop: Loop) {
   const item = loop.item?.name ? `${loop.item.name}: ` : "";
-  if (loop.priority === "HIGH" || loop.priority === "BOSS") return `${item}Frist oder Entscheidung sollte zeitnah geklaert werden.`;
+  if (loop.priority === "HIGH" || loop.priority === "BOSS") return `${item}Frist oder Entscheidung sollte zeitnah geklärt werden.`;
   if (loop.status === "SNOOZED") return `${item}Pausiert, aber nicht vergessen.`;
   return `${item}Offener Punkt mit Datum und Kontext.`;
 }
 
 function careSourceLabel(sourceType: Loop["sourceType"]) {
   const labels: Record<Loop["sourceType"], string> = {
-    DEVICE: "Geraet",
+    DEVICE: "Gerät",
     DOCUMENT: "Dokument",
     MANUAL: "Manuell",
     MESSAGE: "Nachricht",
@@ -570,5 +570,5 @@ function careSourceLabel(sourceType: Loop["sourceType"]) {
 }
 
 function errorText(error: unknown) {
-  return error instanceof Error ? error.message : "Aktion konnte nicht ausgefuehrt werden.";
+  return error instanceof Error ? error.message : "Aktion konnte nicht ausgeführt werden.";
 }

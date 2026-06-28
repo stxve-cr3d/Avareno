@@ -1,6 +1,23 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { ArrowLeft, CheckCircle2, ChevronRight, Copy, LockKeyhole, PauseCircle, Sparkles, UserPlus, UserRound } from "lucide-react";
+import {
+  ArrowLeft,
+  Brain,
+  CheckCircle2,
+  ChevronRight,
+  Copy,
+  Database,
+  Download,
+  History,
+  Link2Off,
+  LockKeyhole,
+  PauseCircle,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
+  UserPlus,
+  UserRound
+} from "lucide-react";
 import { Link, NavLink, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "../lib/authProvider";
 import {
@@ -31,7 +48,11 @@ export function Rewards() {
   }, [acceptedFriends, currentUserProgress]);
   const section = getProfileSection(location.pathname);
   const selectedFriend = friendId ? progressRows.find((friend) => friend.id === friendId) ?? null : null;
-  const profileBasePath = location.pathname.startsWith("/app") ? "/app/rewards" : "/rewards";
+  const profileBasePath = location.pathname.startsWith("/app/ich")
+    ? "/app/ich"
+    : location.pathname.startsWith("/app")
+      ? "/app/profile"
+      : "/rewards";
 
   if (!profile || !currentUserProgress) return <div className="profile-loading">Profil wird geladen...</div>;
 
@@ -52,7 +73,7 @@ export function Rewards() {
     <main className="profile-page">
       <section className="profile-hero">
         <div className="profile-avatar" aria-hidden="true">
-          {profile.displayName.slice(0, 1).toUpperCase()}
+          {profile.avatarUrl ? <img src={profile.avatarUrl} alt="" /> : profile.displayName.slice(0, 1).toUpperCase()}
         </div>
         <div>
           <h1>Ich</h1>
@@ -73,16 +94,21 @@ export function Rewards() {
         </button>
       </section>
 
-      <section className="profile-stats" aria-label="Profil Ueberblick">
+      <section className="profile-stats" aria-label="Profil Überblick">
         <ProfileStat icon={<Sparkles size={18} />} label="Diese Woche" value={preferences.hideXpFromFriends ? "Privat" : `${profile.weeklyXp} XP`} />
         <ProfileStat icon={<CheckCircle2 size={18} />} label="Streak" value={preferences.hideStreakFromFriends ? "Privat" : `${profile.currentStreakDays} Tage`} />
         <ProfileStat icon={<PauseCircle size={18} />} label="Pausentage" value={String(profile.freezeDaysAvailable)} />
       </section>
 
-      <ProfileSectionNav />
+      <ProfileSectionNav basePath={profileBasePath} />
 
       {section === "overview" ? (
-        <ProfileOverview acceptedFriends={acceptedFriends} preferences={preferences} progressRows={progressRows} />
+        <ProfileOverview
+          acceptedFriends={acceptedFriends}
+          basePath={profileBasePath}
+          preferences={preferences}
+          progressRows={progressRows}
+        />
       ) : null}
 
       {section === "friends" ? (
@@ -103,7 +129,14 @@ export function Rewards() {
         <FriendDetailPage basePath={profileBasePath} friend={selectedFriend} />
       ) : null}
 
-      {section === "privacy" ? <PrivacyPanel preferences={preferences} onChange={updatePreferences} /> : null}
+      {section === "privacy" ? (
+        <PrivacyPanel
+          preferences={preferences}
+          profileEmail={profile.email}
+          profileName={profile.displayName}
+          onChange={updatePreferences}
+        />
+      ) : null}
     </main>
   );
 }
@@ -115,12 +148,12 @@ function getProfileSection(pathname: string) {
   return "overview";
 }
 
-function ProfileSectionNav() {
+function ProfileSectionNav({ basePath }: { basePath: string }) {
   const items = [
-    { to: "/app/rewards", label: "Uebersicht", end: true },
-    { to: "/app/friends", label: "Freunde" },
-    { to: "/app/rewards/privacy", label: "Privatsphaere" },
-    { to: "/app/settings/account", label: "Konto" }
+    { to: basePath, label: "Übersicht", end: true },
+    { to: `${basePath}/friends`, label: "Freunde" },
+    { to: `${basePath}/privacy`, label: "Datenschutz" },
+    { to: `${basePath}/settings`, label: "Settings" }
   ];
 
   return (
@@ -136,10 +169,12 @@ function ProfileSectionNav() {
 
 function ProfileOverview({
   acceptedFriends,
+  basePath,
   preferences,
   progressRows
 }: {
   acceptedFriends: FriendProgress[];
+  basePath: string;
   preferences: MotivationPrivacyPreferences;
   progressRows: FriendProgress[];
 }) {
@@ -150,7 +185,7 @@ function ProfileOverview({
       <article className="profile-panel">
         <div className="profile-panel-head">
           <div>
-            <span>Naechster Bereich</span>
+            <span>Nächster Bereich</span>
             <h2>Freundeskreis</h2>
             <p>{acceptedFriends.length} Freunde sind verbunden. Fortschritt bleibt privat und ohne Platzierungen.</p>
           </div>
@@ -160,23 +195,23 @@ function ProfileOverview({
           <span>{sharedActions} kleine Aktionen</span>
           <span>{preferences.leaderboardEnabled ? "Sichtbar im Kreis" : "Ausgeblendet"}</span>
         </div>
-        <Link className="profile-secondary-action" to="/app/friends">Freunde ansehen</Link>
+        <Link className="profile-secondary-action" to={`${basePath}/friends`}>Freunde ansehen</Link>
       </article>
 
       <article className="profile-panel">
         <div className="profile-panel-head">
           <div>
-            <span>Einstellungen</span>
-            <h2>Privatsphaere</h2>
-            <p>XP und Streaks lassen sich jederzeit ausblenden. Freundliche Motivation bleibt optional.</p>
+            <span>Datenschutz</span>
+            <h2>Kontrolle</h2>
+            <p>Freundes-Sichtbarkeit, Export, Löschung und AI-Verarbeitung werden hier getrennt vorbereitet.</p>
           </div>
           <LockKeyhole size={18} />
         </div>
         <div className="profile-preview-row">
           <span>{preferences.hideXpFromFriends ? "XP privat" : "XP teilbar"}</span>
-          <span>{preferences.hideStreakFromFriends ? "Streak privat" : "Streak teilbar"}</span>
+          <span>Export in Vorbereitung</span>
         </div>
-        <Link className="profile-secondary-action" to="/app/rewards/privacy">Privatsphaere pruefen</Link>
+        <Link className="profile-secondary-action" to={`${basePath}/privacy`}>Datenschutz prüfen</Link>
       </article>
     </section>
   );
@@ -214,8 +249,8 @@ function FriendsPage({
         <div className="profile-panel-head">
           <div>
             <span>Freundeskreis</span>
-            <h2>Wer dazugehoert</h2>
-            <p>{mockFriendCircle.name} ist ein privater Kreis fuer sanfte Motivation. Fortschritt bleibt ein kurzer Status, nicht ein Vergleich.</p>
+            <h2>Wer dazugehört</h2>
+            <p>{mockFriendCircle.name} ist ein privater Kreis für sanfte Motivation. Fortschritt bleibt ein kurzer Status, nicht ein Vergleich.</p>
           </div>
           <UserPlus size={18} />
         </div>
@@ -234,7 +269,7 @@ function FriendsPage({
         ) : (
           <div className="private-empty-state">
             <UserRound size={18} />
-            <p>Fuege enge Freunde hinzu, wenn ihr euch gegenseitig motivieren wollt.</p>
+            <p>Füge enge Freunde hinzu, wenn ihr euch gegenseitig motivieren wollt.</p>
           </div>
         )}
       </article>
@@ -243,7 +278,7 @@ function FriendsPage({
         <div className="profile-panel-head">
           <div>
             <span>Einladen</span>
-            <h2>Freund hinzufuegen</h2>
+            <h2>Freund hinzufügen</h2>
             <p>Teile einen privaten Code nur mit Menschen, die du wirklich in deinem Kreis haben willst.</p>
           </div>
         </div>
@@ -306,7 +341,7 @@ function FriendDetailPage({ basePath, friend }: { basePath: string; friend: Frie
       <section className="profile-panel friend-detail-panel">
         <Link className="friend-detail-back" to={`${basePath}/friends`}>
           <ArrowLeft size={16} />
-          Zurueck zu Freunde
+          Zurück zu Freunde
         </Link>
         <div className="private-empty-state">
           <UserRound size={18} />
@@ -323,7 +358,7 @@ function FriendDetailPage({ basePath, friend }: { basePath: string; friend: Frie
     <section className="profile-panel friend-detail-panel">
       <Link className="friend-detail-back" to={`${basePath}/friends`}>
         <ArrowLeft size={16} />
-        Zurueck zu Freunde
+        Zurück zu Freunde
       </Link>
 
       <div className="friend-detail-hero">
@@ -343,7 +378,7 @@ function FriendDetailPage({ basePath, friend }: { basePath: string; friend: Frie
 
       <div className="friend-detail-context">
         <strong>Warum sichtbar?</strong>
-        <p>Ihr seid in einem privaten Freundeskreis verbunden. Geteilte Werte bleiben optional und koennen jederzeit ausgeblendet werden.</p>
+        <p>Ihr seid in einem privaten Freundeskreis verbunden. Geteilte Werte bleiben optional und können jederzeit ausgeblendet werden.</p>
       </div>
 
       {friend.sourceBreakdown.length ? (
@@ -359,12 +394,17 @@ function FriendDetailPage({ basePath, friend }: { basePath: string; friend: Frie
 
 function PrivacyPanel({
   preferences,
+  profileEmail,
+  profileName,
   onChange
 }: {
   preferences: MotivationPrivacyPreferences;
+  profileEmail: string;
+  profileName: string;
   onChange: (next: Partial<MotivationPrivacyPreferences>) => void;
 }) {
   const [leaveState, setLeaveState] = useState<"idle" | "confirm" | "left">("idle");
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
 
   function leaveCircle() {
     if (leaveState === "idle") {
@@ -379,15 +419,141 @@ function PrivacyPanel({
     setLeaveState("left");
   }
 
+  const overviewRows = [
+    { label: "Account", value: profileEmail },
+    { label: "Profil", value: profileName },
+    { label: "Dinge & Dokumente", value: "Über Objekt- und Dokumentenspeicher verwaltet" },
+    { label: "AI Memory Build", value: "Foundation markiert, keine Garantie- oder Rechtsprüfung" }
+  ];
+  const connectedSources = [
+    { label: "Supabase Auth", status: "Aktive Anmeldung" },
+    { label: "Cloudflare Turnstile", status: "Bot-Schutz bei Login/Signup" },
+    { label: "Avareno Connect", status: "Noch keine produktive Verbindung" }
+  ];
+  const consentRows = [
+    { label: "Login-Session", status: "Technisch notwendig" },
+    { label: "AI-Verarbeitung", status: "Explizite Kontrolle noch offen" },
+    { label: "Marketing/Analytics", status: "Nicht aktiv im aktuellen Frontend" }
+  ];
+
   return (
-    <section className="profile-panel privacy-panel">
+    <section className="profile-panel privacy-panel privacy-center-panel">
       <div className="profile-panel-head">
         <div>
-          <span>Privatsphaere</span>
-          <h2>Du entscheidest, was Freunde sehen duerfen.</h2>
-          <p>Freundliche Motivation ist optional. Es gibt kein oeffentliches Ranking, und XP oder Streaks lassen sich jederzeit ausblenden.</p>
+          <span>Datenschutz & Kontrolle</span>
+          <h2>Was Avareno über dich vorbereitet.</h2>
+          <p>Diese Seite ist die ehrliche Foundation: Sichtbarkeit ist steuerbar, Export und Löschung sind markiert, aber noch nicht als vollständig erledigt dargestellt.</p>
         </div>
         <LockKeyhole size={18} />
+      </div>
+
+      <div className="privacy-center-grid" aria-label="Datenschutz Kontrollzentrum">
+        <article className="privacy-center-card">
+          <span><Database size={16} /></span>
+          <div>
+            <h3>Data Overview</h3>
+            <p>Aktuelle Kategorien, ohne Rohdokumente oder sensible Inhalte in der UI auszulesen.</p>
+          </div>
+          <div className="privacy-control-list">
+            {overviewRows.map((row) => (
+              <div key={row.label}>
+                <strong>{row.label}</strong>
+                <small>{row.value}</small>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="privacy-center-card">
+          <span><Download size={16} /></span>
+          <div>
+            <h3>Daten exportieren</h3>
+            <p>Der Export-Plan existiert als Backend-Foundation. Der vollständige Download ist noch nicht produktiv freigeschaltet.</p>
+          </div>
+          <button className="profile-secondary-action is-muted" disabled type="button">Export vorbereiten</button>
+        </article>
+
+        <article className="privacy-center-card is-danger-zone">
+          <span><Trash2 size={16} /></span>
+          <div>
+            <h3>Account & Daten löschen</h3>
+            <p>Löschung braucht eine saubere Orchestrierung für Auth, Datenbank, Storage, lokale Uploads, Connectors und Backups.</p>
+          </div>
+          <label className="privacy-confirm-field">
+            <span>Zum späteren Bestätigen: DELETE eingeben</span>
+            <input
+              onChange={(event) => setDeleteConfirmation(event.target.value)}
+              placeholder="DELETE"
+              type="text"
+              value={deleteConfirmation}
+            />
+          </label>
+          <button className="profile-secondary-action is-muted" disabled type="button">
+            {deleteConfirmation === "DELETE" ? "Löschung noch nicht aktiv" : "Löschung gesperrt"}
+          </button>
+        </article>
+
+        <article className="privacy-center-card">
+          <span><Link2Off size={16} /></span>
+          <div>
+            <h3>Connected Sources</h3>
+            <p>Connect bleibt read-only und minimal, bis Token-Löschung, Scopes und SSRF-Schutz vollständig geprüft sind.</p>
+          </div>
+          <div className="privacy-control-list">
+            {connectedSources.map((source) => (
+              <div key={source.label}>
+                <strong>{source.label}</strong>
+                <small>{source.status}</small>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="privacy-center-card">
+          <span><Brain size={16} /></span>
+          <div>
+            <h3>AI Analysis Controls</h3>
+            <p>AI-Fakten müssen als AI-assisted erkennbar bleiben, korrigierbar sein und dürfen keine Garantie- oder Rechtsentscheidung versprechen.</p>
+          </div>
+          <div className="profile-preview-row">
+            <span>Prompt-Minimierung</span>
+            <span>Vault opt-in offen</span>
+            <span>Korrekturpflicht</span>
+          </div>
+        </article>
+
+        <article className="privacy-center-card">
+          <span><ShieldCheck size={16} /></span>
+          <div>
+            <h3>Private Vault Controls</h3>
+            <p>Sensible Dokumente bekommen eine eigene Schutzschicht. Re-Auth, PIN/Passkey und stärkere Verschlüsselung sind bewusst noch TODO.</p>
+          </div>
+          <div className="profile-preview-row">
+            <span>Keine Auto-Analyse</span>
+            <span>Explizite Bestätigung nötig</span>
+          </div>
+        </article>
+
+        <article className="privacy-center-card">
+          <span><History size={16} /></span>
+          <div>
+            <h3>Consent & Permissions History</h3>
+            <p>Eine echte Historie ist vorbereitet, aber erst sinnvoll, sobald produktive Consent-Events geschrieben werden.</p>
+          </div>
+          <div className="privacy-control-list">
+            {consentRows.map((row) => (
+              <div key={row.label}>
+                <strong>{row.label}</strong>
+                <small>{row.status}</small>
+              </div>
+            ))}
+          </div>
+        </article>
+      </div>
+
+      <div className="privacy-foundation-note">
+        <strong>Foundation-Status</strong>
+        <span>Export, Löschung, Connector-Disconnect, Vault-Analyse und Consent-History sind nicht als abgeschlossen freigeschaltet.</span>
       </div>
 
       <div className="privacy-toggle-list">
@@ -412,7 +578,7 @@ function PrivacyPanel({
         <PrivacyToggle
           checked={preferences.hideStreakFromFriends}
           label="Meinen Streak vor Freunden verbergen"
-          note="Aktiviert als Beispiel fuer eine private Standardeinstellung."
+          note="Aktiviert als Beispiel für eine private Standardeinstellung."
           onChange={(checked) => onChange({ hideStreakFromFriends: checked })}
         />
         <PrivacyToggle
@@ -424,10 +590,10 @@ function PrivacyPanel({
       </div>
 
       {leaveState === "left" ? (
-        <p className="leave-circle-note">Freundeskreis-Funktionen sind pausiert. Bestehende Mock-Freunde bleiben fuer die Demo sichtbar.</p>
+        <p className="leave-circle-note">Freundeskreis-Funktionen sind pausiert. Bestehende Mock-Freunde bleiben für die Demo sichtbar.</p>
       ) : null}
       <button className={leaveState === "confirm" ? "leave-circle-button is-danger" : "leave-circle-button"} onClick={leaveCircle} type="button">
-        {leaveState === "confirm" ? "Verlassen bestaetigen" : "Freundeskreis verlassen"}
+        {leaveState === "confirm" ? "Verlassen bestätigen" : "Freundeskreis verlassen"}
       </button>
     </section>
   );

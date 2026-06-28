@@ -52,10 +52,10 @@ export function UniversalCapture() {
         <div>
           <p className="text-xs font-black uppercase text-leaf">Universal capture</p>
           <h1 className="mt-3 max-w-4xl text-[clamp(3rem,7vw,7rem)] font-black leading-[0.9] text-white">
-            ein Eingang fuer alles
+            ein Eingang für alles
           </h1>
           <p className="mt-5 max-w-2xl text-base font-semibold leading-7 text-white/62">
-            Schreib, fotografiere oder scanne. Avareno macht daraus ein Objektprofil, ohne dass User Datenbank-Felder denken muessen.
+            Schreib, fotografiere oder scanne. Avareno macht daraus ein Objektprofil, ohne dass User Datenbank-Felder denken müssen.
           </p>
         </div>
         <div className="capture-mode-grid">

@@ -1,52 +1,98 @@
 import { Link } from "react-router-dom";
 import avarenoMark from "../assets/avareno-mark.svg";
 
-const legalLinks = [
-  { to: "/pricing", label: "Preise" },
-  { to: "/impressum", label: "Impressum" },
-  { to: "/datenschutz", label: "Datenschutz" },
-  { to: "/cookies", label: "Cookies" }
+const navLinks = [
+  { to: "/#product", label: "Product" },
+  { to: "/#dinge", label: "Dinge" },
+  { to: "/#memory-gallery", label: "Memory" },
+  { to: "/#how-it-works", label: "How it works" },
+  { to: "/datenschutz", label: "Sicherheit" },
+  { to: "/#pricing", label: "Preise" }
+];
+
+const footerColumns = [
+  {
+    title: "Product",
+    links: [
+      { to: "/#dinge", label: "Dinge" },
+      { to: "/#dinge", label: "Resolve" },
+      { to: "/#dinge", label: "Care" },
+      { to: "/datenschutz", label: "Private Vault" }
+    ]
+  },
+  {
+    title: "Resources",
+    links: [
+      { to: "/#how-it-works", label: "How it works" },
+      { to: "/cookies", label: "Cookies" },
+      { to: "/datenschutz", label: "Privacy" },
+      { to: "/pricing", label: "Pricing" }
+    ]
+  },
+  {
+    title: "Company",
+    links: [
+      { to: "/impressum", label: "Imprint" },
+      { to: "/datenschutz", label: "Privacy" },
+      { to: "/cookies", label: "Cookies" },
+      { to: "/login", label: "Open app" }
+    ]
+  }
 ];
 
 export function MarketingHeader() {
   return (
-    <header className="avareno-site-nav" aria-label="Avareno website navigation">
-      <Link className="avareno-brand-lockup" to="/" aria-label="Avareno Startseite">
-        <span className="avareno-brand-symbol" aria-hidden="true">
+    <header className="site-nav" aria-label="Avareno website navigation">
+      <Link className="site-brand-lockup" to="/" aria-label="Avareno homepage">
+        <span className="site-brand-symbol" aria-hidden="true">
           <img src={avarenoMark} alt="" />
         </span>
-        <span className="avareno-brand-text">avareno</span>
+        <span className="site-brand-text">avareno</span>
       </Link>
-      <nav className="avareno-site-links" aria-label="Website sections">
-        <Link to="/#product">Produkt</Link>
-        <Link to="/pricing">Preise</Link>
-        <Link to="/#modules">Module</Link>
-        <Link to="/datenschutz">Datenschutz</Link>
+
+      <nav className="site-nav-links" aria-label="Website sections">
+        {navLinks.map((link) => (
+          <Link to={link.to} key={link.to}>
+            {link.label}
+          </Link>
+        ))}
       </nav>
-      <Link className="avareno-site-action" to="/app">
-        Starten
-      </Link>
+
+      <div className="site-nav-actions">
+        <Link className="site-nav-login" to="/login">
+          App
+        </Link>
+        <Link className="site-nav-cta" to="/signup">
+          Get started
+        </Link>
+      </div>
     </header>
   );
 }
 
 export function MarketingFooter() {
   return (
-    <footer className="avareno-site-footer">
-      <div>
-        <Link className="avareno-footer-brand" to="/" aria-label="Avareno Startseite">
-          <span className="avareno-brand-symbol" aria-hidden="true">
+    <footer className="site-footer">
+      <div className="site-footer-brand">
+        <Link className="site-footer-logo" to="/" aria-label="Avareno homepage">
+          <span className="site-brand-symbol" aria-hidden="true">
             <img src={avarenoMark} alt="" />
           </span>
           <span>avareno</span>
         </Link>
-        <p>Dein zweites Gedächtnis für dein echtes Leben.</p>
+        <p>A private memory for products, receipts, warranties and the next actions real life keeps asking for.</p>
       </div>
-      <nav aria-label="Legal navigation">
-        {legalLinks.map((link) => (
-          <Link to={link.to} key={link.to}>
-            {link.label}
-          </Link>
+
+      <nav className="site-footer-links" aria-label="Footer navigation">
+        {footerColumns.map((column) => (
+          <div key={column.title}>
+            <h2>{column.title}</h2>
+            {column.links.map((link) => (
+              <Link to={link.to} key={`${column.title}-${link.label}`}>
+                {link.label}
+              </Link>
+            ))}
+          </div>
         ))}
       </nav>
     </footer>
