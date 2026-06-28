@@ -31,6 +31,43 @@
   --av-success:       #7CE7B2;
   --av-danger:        #EF7D7D;
   --av-danger-bg:     rgba(239,125,125,0.10);
+
+  /* /app non-color tokens — extracted from the /app home (source of truth).
+     Additive contract: new + migrated routes reference these instead of
+     re-guessing values. Calm rhythm, no decorative effects. */
+
+  /* Radius — pill for chips, lg for cards/sections, md for inner panels. */
+  --av-radius-sm:   0.6rem;   /* chips, tiles, small controls */
+  --av-radius-md:   0.85rem;  /* inner panels, list rows */
+  --av-radius-lg:   1rem;     /* cards, sections */
+  --av-radius-pill: 999px;    /* status chips, tags, avatars */
+
+  /* Spacing — 4px rhythm. */
+  --av-space-1: 0.25rem;  /* 4  */
+  --av-space-2: 0.5rem;   /* 8  */
+  --av-space-3: 0.75rem;  /* 12 */
+  --av-space-4: 1rem;     /* 16 */
+  --av-space-5: 1.5rem;   /* 24 */
+  --av-space-6: 2rem;     /* 32 */
+
+  /* Type scale — matches home labels → headings. */
+  --av-type-xs:   0.72rem; /* kickers, micro-labels */
+  --av-type-sm:   0.82rem; /* secondary copy, chips */
+  --av-type-base: 0.9rem;  /* body */
+  --av-type-lg:   1rem;    /* lead / section titles */
+  --av-type-xl:   1.35rem; /* page + hero headings */
+  --av-leading-tight: 1.25;
+  --av-leading-body:  1.5;
+
+  /* Elevation — restrained. Calm by default, no glow. */
+  --av-shadow-1: 0 1px 2px rgba(0,0,0,0.25);
+  --av-shadow-2: 0 8px 24px rgba(0,0,0,0.35);
+
+  /* Motion — short, gentle, reduced-motion aware in components. */
+  --av-dur-fast: 130ms;
+  --av-dur:      180ms;
+  --av-ease:     cubic-bezier(0.22, 0.61, 0.36, 1); /* ease-out, calm */
+
   color: #1b1c1c;
   background: #eef2f0;
   font-family: var(--avareno-font);
@@ -1132,10 +1169,10 @@ select {
 
 .profile-page {
   display: grid;
-  gap: 1rem;
+  gap: var(--av-space-4);
   max-width: 980px;
   margin: 0 auto;
-  color: #ffffff;
+  color: var(--av-text-primary);
 }
 
 .profile-hero,
@@ -1143,12 +1180,10 @@ select {
 .profile-stats,
 .profile-panel,
 .profile-links {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 1rem;
-  background:
-    radial-gradient(circle at 100% 0%, rgba(52, 160, 164, 0.08), transparent 22rem),
-    rgba(255, 255, 255, 0.045);
-  box-shadow: 0 1.2rem 3.5rem rgba(0, 0, 0, 0.16);
+  border: 1px solid var(--av-border-subtle);
+  border-radius: var(--av-radius-lg);
+  background: var(--av-surface-1);
+  box-shadow: var(--av-shadow-1);
 }
 
 .profile-hero {
@@ -1165,16 +1200,16 @@ select {
   height: 4.8rem;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 1.1rem;
-  background: rgba(255, 255, 255, 0.09);
-  color: #ffffff;
+  border-radius: var(--av-radius-lg);
+  background: var(--av-accent-bg);
+  color: var(--av-accent);
   font-size: 2rem;
   font-weight: 520;
 }
 
 .profile-hero h1 {
   margin: 0;
-  color: #ffffff;
+  color: var(--av-text-primary);
   font-size: clamp(2.8rem, 8vw, 5.6rem);
   font-weight: 520;
   letter-spacing: 0;
@@ -1186,17 +1221,17 @@ select {
 .profile-panel p,
 .profile-link small {
   margin: 0.45rem 0 0;
-  color: rgba(255, 255, 255, 0.62);
+  color: var(--av-text-secondary);
   font-size: 0.94rem;
   font-weight: 430;
-  line-height: 1.5;
+  line-height: var(--av-leading-body);
 }
 
 .profile-hero span {
   display: block;
   margin-top: 0.2rem;
-  color: rgba(255, 255, 255, 0.48);
-  font-size: 0.86rem;
+  color: var(--av-text-muted);
+  font-size: var(--av-type-sm);
   font-weight: 430;
 }
 
@@ -1209,8 +1244,8 @@ select {
 }
 
 .profile-focus span {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.72rem;
+  color: var(--av-text-muted);
+  font-size: var(--av-type-xs);
   font-weight: 560;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1219,7 +1254,7 @@ select {
 .profile-focus h2,
 .profile-panel h2 {
   margin: 0.35rem 0 0;
-  color: #ffffff;
+  color: var(--av-text-primary);
   font-size: clamp(1.35rem, 3vw, 2.1rem);
   font-weight: 520;
   line-height: 1.05;
@@ -1255,24 +1290,24 @@ select {
 }
 
 .profile-stat:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--av-surface-1);
 }
 
 .profile-stat span,
 .profile-panel-head > svg,
 .profile-link > span {
-  color: #34A0A4;
+  color: var(--av-accent);
 }
 
 .profile-stat small {
-  color: rgba(255, 255, 255, 0.52);
-  font-size: 0.72rem;
+  color: var(--av-text-muted);
+  font-size: var(--av-type-xs);
   font-weight: 520;
 }
 
 .profile-stat strong {
-  color: #ffffff;
-  font-size: 1.35rem;
+  color: var(--av-text-primary);
+  font-size: var(--av-type-xl);
   font-weight: 560;
 }
 
@@ -1306,10 +1341,10 @@ select {
 .profile-link {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  border-radius: 0.8rem;
-  background: rgba(255, 255, 255, 0.045);
-  padding: 0.75rem;
+  gap: var(--av-space-3);
+  border-radius: var(--av-radius-md);
+  background: var(--av-surface-1);
+  padding: var(--av-space-3);
 }
 
 .profile-badge {
@@ -1388,9 +1423,9 @@ select {
   display: flex;
   gap: 0.35rem;
   overflow-x: auto;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid var(--av-border-subtle);
+  border-radius: var(--av-radius-lg);
+  background: var(--av-surface-1);
   padding: 0.35rem;
 }
 
@@ -1400,16 +1435,17 @@ select {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  border-radius: 0.75rem;
+  border-radius: var(--av-radius-md);
   padding: 0 0.9rem;
-  color: rgba(255, 255, 255, 0.58);
-  font-size: 0.84rem;
+  color: var(--av-text-secondary);
+  font-size: var(--av-type-sm);
   font-weight: 560;
+  transition: color var(--av-dur) var(--av-ease), background var(--av-dur) var(--av-ease);
 }
 
 .profile-section-nav a.is-active {
-  background: rgba(255, 255, 255, 0.09);
-  color: #ffffff;
+  background: var(--av-accent-bg);
+  color: var(--av-accent);
 }
 
 .profile-overview-grid {
@@ -1426,11 +1462,11 @@ select {
 }
 
 .profile-preview-row span {
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.055);
+  border-radius: var(--av-radius-pill);
+  background: var(--av-surface-2);
   padding: 0.38rem 0.62rem;
-  color: rgba(255, 255, 255, 0.66);
-  font-size: 0.76rem;
+  color: var(--av-text-secondary);
+  font-size: var(--av-type-xs);
   font-weight: 520;
 }
 
@@ -1440,12 +1476,17 @@ select {
   align-items: center;
   justify-content: center;
   margin-top: 1rem;
-  border-radius: 0.78rem;
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--av-radius-md);
+  background: var(--av-surface-2);
   padding: 0 0.9rem;
-  color: #ffffff;
-  font-size: 0.84rem;
+  color: var(--av-text-primary);
+  font-size: var(--av-type-sm);
   font-weight: 560;
+  transition: background var(--av-dur) var(--av-ease);
+}
+
+.profile-secondary-action:hover {
+  background: var(--av-surface-3);
 }
 
 .private-profile-grid {
