@@ -18,6 +18,23 @@ import {
 } from "lucide-react";
 import { api, dateInputValue } from "../lib/api";
 import type { Item, Loop } from "../lib/types";
+import {
+  ActionButton,
+  AppMainColumn,
+  AppMainGrid,
+  AppPage,
+  AppPageHeader,
+  AppSection,
+  AppSideColumn,
+  CareTimeline,
+  EmptyState,
+  IconTile,
+  MetadataRow,
+  ObjectMemoryGraph,
+  OpenLoopRow,
+  SecondaryAction
+} from "../components/app/AppKit";
+import type { CareStep, GraphEdge, StatusTone } from "../components/app/AppKit";
 
 type CareStatus = "loading" | "ready";
 
@@ -140,84 +157,67 @@ function CareOverview({ basePath, loading, loops, usingDemo }: { basePath: strin
   const snoozed = openLoops.filter((loop) => loop.status === "SNOOZED");
 
   return (
-    <main className="care-page care-workspace">
-      <section className="care-hero care-overview-hero">
-        <div>
-          <span>Care</span>
-          <h1>Was braucht Aufmerksamkeit?</h1>
-          <p>Garantien, Rueckgaben, Reparaturen und offene Zusagen bleiben hier sichtbar, bis sie erledigt sind.</p>
-        </div>
-        <Link className="care-primary-action" to="/app/capture/loop">
-          <Plus size={16} />
-          Erinnerung hinzufuegen
-        </Link>
-      </section>
+    <AppPage>
+      <AppPageHeader
+        kicker="Care · Support & Fristen"
+        title="Was braucht Aufmerksamkeit?"
+        subtitle="Garantien, Rückgaben, Reparaturen und offene Zusagen bleiben sichtbar, bis sie erledigt sind."
+        actions={
+          <ActionButton to="/app/capture/loop" icon={<Plus size={15} />}>
+            Erinnerung hinzufügen
+          </ActionButton>
+        }
+      />
+
+      <div className="av-stat-grid">
+        <CareStatCard icon={<AlertCircle size={16} />} tone="teal" label="Offen" value={openLoops.length} />
+        <CareStatCard icon={<CalendarClock size={16} />} tone="amber" label="Nächste 7 Tage" value={dueSoon.length} />
+        <CareStatCard icon={<PauseCircle size={16} />} tone="neutral" label="Pausiert" value={snoozed.length} />
+      </div>
 
       {focus ? (
-        <section className="care-focus care-next-card">
-          <div>
-            <span>Naechster offener Punkt</span>
-            <h2>{focus.title}</h2>
-            <p>{careReason(focus)}</p>
-          </div>
-          <Link className="care-secondary-action" to={`${basePath}/${focus.id}`}>
-            Oeffnen
-            <ChevronRight size={16} />
-          </Link>
-        </section>
-      ) : (
-        <section className="care-focus care-empty-focus">
-          <div>
-            <span>{loading ? "Wird geladen" : "Alles ruhig"}</span>
-            <h2>{loading ? "Care wird vorbereitet." : "Keine offenen Care-Punkte."}</h2>
-            <p>{loading ? "Avareno sucht nach Erinnerungen und Fristen." : "Neue Fristen kannst du jederzeit als Erinnerung hinzufuegen."}</p>
-          </div>
-        </section>
-      )}
-
-      <section className="care-stat-grid" aria-label="Care Status">
-        <CareStat icon={<AlertCircle size={17} />} label="Offen" value={String(openLoops.length)} />
-        <CareStat icon={<CalendarClock size={17} />} label="Naechste 7 Tage" value={String(dueSoon.length)} />
-        <CareStat icon={<PauseCircle size={17} />} label="Pausiert" value={String(snoozed.length)} />
-      </section>
-
-      <section className="care-list-panel">
-        <div className="care-panel-head">
-          <div>
-            <span>Offene Punkte</span>
-            <h2>Eine Liste, keine Wand.</h2>
-          </div>
-          {usingDemo ? <small>Demo-Daten</small> : null}
-        </div>
-
-        <div className="care-list" aria-label="Offene Care Punkte">
-          {loading ? <CareLoadingRows /> : null}
-          {!loading && openLoops.length === 0 ? (
-            <div className="care-empty-state">
-              <CheckCircle2 size={20} />
-              <strong>Nichts faellig.</strong>
-              <p>Wenn etwas wieder auftauchen soll, lege eine Care-Erinnerung an.</p>
+        <AppSection title="Nächster offener Punkt" slim>
+          <Link className="av-focus-row" to={`${basePath}/${focus.id}`}>
+            <IconTile tone={loopTone(focus)}>
+              <CareTypeIcon loop={focus} />
+            </IconTile>
+            <div className="av-focus-copy">
+              <strong>{focus.title}</strong>
+              <p>{careReason(focus)}</p>
             </div>
-          ) : null}
-          {!loading
-            ? openLoops.map((loop) => (
-                <Link className="care-list-row" key={loop.id} to={`${basePath}/${loop.id}`}>
-                  <span className="care-row-icon">
-                    <CareTypeIcon loop={loop} />
-                  </span>
-                  <span className="care-row-copy">
-                    <strong>{loop.title}</strong>
-                    <small>{loop.item?.name ?? careSourceLabel(loop.sourceType)}</small>
-                  </span>
-                  <span className={`care-row-status ${careStateClass(loop)}`}>{careStateLabel(loop)}</span>
-                  <span className="care-row-date">{careDateLabel(loop.dueDate ?? loop.reminderAt)}</span>
-                  <ChevronRight size={16} />
-                </Link>
-              ))
-            : null}
-        </div>
-      </section>
-    </main>
+            <span className="av-focus-go">
+              Öffnen <ChevronRight size={15} />
+            </span>
+          </Link>
+        </AppSection>
+      ) : null}
+
+      <AppSection title="Offene Punkte" link={usingDemo ? undefined : undefined}>
+        {loading ? (
+          <div className="av-loop-list">
+            <div className="av-skeleton-row" />
+            <div className="av-skeleton-row" />
+            <div className="av-skeleton-row" />
+          </div>
+        ) : openLoops.length === 0 ? (
+          <EmptyState title="Nichts fällig.">Wenn etwas wieder auftauchen soll, lege eine Care-Erinnerung an.</EmptyState>
+        ) : (
+          <div className="av-loop-list">
+            {openLoops.map((loop) => (
+              <OpenLoopRow
+                key={loop.id}
+                to={`${basePath}/${loop.id}`}
+                tone={loopTone(loop)}
+                icon={<CareTypeIcon loop={loop} />}
+                title={loop.title}
+                product={`${loop.item?.name ?? careSourceLabel(loop.sourceType)} · ${careDateLabel(loop.dueDate ?? loop.reminderAt)}`}
+                signal={careStateLabel(loop)}
+              />
+            ))}
+          </div>
+        )}
+      </AppSection>
+    </AppPage>
   );
 }
 
@@ -345,185 +345,171 @@ function CareDetail({
 
   if (loading) {
     return (
-      <main className="care-page care-workspace">
-        <section className="care-focus care-empty-focus">
-          <div>
-            <span>Wird geladen</span>
-            <h2>Care-Punkt wird geoeffnet.</h2>
-            <p>Einen Moment, Avareno holt den Kontext.</p>
-          </div>
-        </section>
-      </main>
+      <AppPage>
+        <AppSection title="Care-Punkt wird geöffnet" slim>
+          <p className="av-note">Einen Moment, Avareno holt den Kontext.</p>
+        </AppSection>
+      </AppPage>
     );
   }
 
   if (!loop) {
     return (
-      <main className="care-page care-workspace">
-        <section className="care-focus care-empty-focus">
-          <div>
-            <span>Nicht gefunden</span>
-            <h2>Dieser Care-Punkt ist nicht verfuegbar.</h2>
-            <p>Zurueck zur Uebersicht, dort siehst du alle offenen Punkte.</p>
-          </div>
-          <Link className="care-secondary-action" to={basePath}>
-            Zurueck
-          </Link>
-        </section>
-      </main>
+      <AppPage>
+        <Link className="av-back" to={basePath}>
+          <ArrowLeft size={15} /> Zurück zu Care
+        </Link>
+        <EmptyState title="Dieser Care-Punkt ist nicht verfügbar.">
+          Zurück zur Übersicht, dort siehst du alle offenen Punkte.
+        </EmptyState>
+      </AppPage>
     );
   }
 
   const isDone = loop.status === "DONE" || loop.status === "ARCHIVED";
   const itemBasePath = basePath.startsWith("/app") ? "/app/items" : "/items";
+  const overdue = dateScore(loop.dueDate ?? loop.reminderAt) < Date.now();
+  const steps = buildCareSteps(loop, linkedItem, isDone, overdue);
 
   return (
-    <main className="care-page care-workspace">
-      <Link className="care-back-link" to={basePath}>
-        <ArrowLeft size={16} />
-        Zurueck zu Care
+    <AppPage>
+      <Link className="av-back" to={basePath}>
+        <ArrowLeft size={15} /> Zurück zu Care
       </Link>
 
-      <section className="care-detail-card">
-        <div className="care-detail-head">
-          <span className={`care-row-status ${careStateClass(loop)}`}>{careStateLabel(loop)}</span>
-          <h1>{loop.title}</h1>
-          <p>{loop.description || "Kein zusaetzlicher Kontext hinterlegt."}</p>
-        </div>
+      <AppPageHeader
+        kicker={careStateLabel(loop)}
+        title={loop.title}
+        subtitle={loop.description || "Kein zusätzlicher Kontext hinterlegt."}
+      />
 
-        <div className="care-detail-grid">
-          <CareFact icon={<CalendarClock size={17} />} label="Faellig" value={careDateLabel(loop.dueDate)} />
-          <CareFact icon={<Clock3 size={17} />} label="Erinnerung" value={careDateLabel(loop.reminderAt)} />
-          <CareFact icon={<PackageCheck size={17} />} label="Verbunden mit" value={loop.item?.name ?? careSourceLabel(loop.sourceType)} />
-        </div>
+      <AppMainGrid>
+        <AppMainColumn>
+          <AppSection title="Verlauf">
+            <CareTimeline steps={steps} />
+          </AppSection>
 
-        {linkedItem ? <CareProductContext item={linkedItem} itemPath={`${itemBasePath}/${linkedItem.id}`} /> : null}
+          {linkedItem ? (
+            <AppSection title="Produktkontext" link={{ to: `${itemBasePath}/${linkedItem.id}`, label: "Ding öffnen" }}>
+              <ObjectMemoryGraph
+                title={linkedItem.name}
+                category={linkedItem.category || "Produkt"}
+                icon={<PackageCheck size={14} />}
+                edges={careGraphEdges(linkedItem)}
+              />
+            </AppSection>
+          ) : null}
 
-        <div className="care-detail-note">
-          <span>Warum offen?</span>
-          <p>{careReason(loop)}</p>
-        </div>
+          <AppSection title="Warum offen?" slim>
+            <p className="av-note">{careReason(loop)}</p>
+          </AppSection>
+        </AppMainColumn>
 
-        <div className="care-detail-actions">
-          <button className="care-primary-action" disabled={saving || isDone} onClick={completeLoop} type="button">
-            <CheckCircle2 size={16} />
-            Als erledigt markieren
-          </button>
-          <button className="care-secondary-action" disabled={saving || isDone} onClick={snoozeLoop} type="button">
-            <PauseCircle size={16} />
-            2 Tage verschieben
-          </button>
-        </div>
-        {actionMessage ? <p className={`care-action-message is-${actionMessage.tone}`}>{actionMessage.text}</p> : null}
-      </section>
+        <AppSideColumn>
+          <AppSection title="Status" slim>
+            <dl className="av-metalist">
+              <MetadataRow label="Fällig" value={careDateLabel(loop.dueDate)} tone={overdue && !isDone ? "red" : "neutral"} />
+              <MetadataRow label="Erinnerung" value={careDateLabel(loop.reminderAt)} />
+              <MetadataRow label="Verbunden mit" value={loop.item?.name ?? careSourceLabel(loop.sourceType)} />
+            </dl>
+          </AppSection>
 
-      <section className="care-date-panel">
-        <div className="care-panel-head">
-          <div>
-            <span>Zeitpunkt</span>
-            <h2>Nur die wichtigen Daten.</h2>
-          </div>
-        </div>
-        <div className="care-date-grid">
-          <label>
-            Faellig am
-            <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
-          </label>
-          <label>
-            Erinnern am
-            <input type="date" value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} />
-          </label>
-        </div>
-        <button className="care-secondary-action care-save-date" disabled={saving} onClick={saveDates} type="button">
-          Datum speichern
-        </button>
-      </section>
-    </main>
+          <AppSection title="Aktionen" slim>
+            <div className="av-action-stack">
+              <ActionButton onClick={completeLoop} disabled={saving || isDone} icon={<CheckCircle2 size={14} />}>
+                Als erledigt markieren
+              </ActionButton>
+              <SecondaryAction onClick={snoozeLoop} disabled={saving || isDone} icon={<PauseCircle size={15} />}>
+                2 Tage verschieben
+              </SecondaryAction>
+            </div>
+            {actionMessage ? <p className={`av-msg is-${actionMessage.tone}`}>{actionMessage.text}</p> : null}
+          </AppSection>
+
+          <AppSection title="Zeitpunkt" slim>
+            <div className="av-date-grid">
+              <label className="av-field">
+                Fällig am
+                <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+              </label>
+              <label className="av-field">
+                Erinnern am
+                <input type="date" value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} />
+              </label>
+            </div>
+            <SecondaryAction onClick={saveDates} disabled={saving}>
+              Datum speichern
+            </SecondaryAction>
+          </AppSection>
+        </AppSideColumn>
+      </AppMainGrid>
+    </AppPage>
   );
 }
 
-function CareStat({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+function CareStatCard({ icon, tone, label, value }: { icon: ReactNode; tone: StatusTone; label: string; value: number }) {
   return (
-    <div className="care-stat">
-      <span>{icon}</span>
-      <small>{label}</small>
-      <strong>{value}</strong>
+    <div className="av-stat-card">
+      <IconTile tone={tone}>{icon}</IconTile>
+      <div className="av-stat-copy">
+        <small>{label}</small>
+        <strong>{value}</strong>
+      </div>
     </div>
   );
 }
 
-function CareFact({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
-  return (
-    <div className="care-fact">
-      <span>{icon}</span>
-      <small>{label}</small>
-      <strong>{value}</strong>
-    </div>
-  );
+/* Lifecycle steps for the CareTimeline — opened → context → reminder → due → resolved. */
+function buildCareSteps(loop: Loop, item: Item | null, isDone: boolean, overdue: boolean): CareStep[] {
+  const steps: CareStep[] = [];
+  steps.push({ title: "Care-Punkt geöffnet", detail: careSourceLabel(loop.sourceType), state: "done", tone: "teal" });
+  if (item?.warrantyUntil) {
+    steps.push({ title: "Garantie aktiv", detail: `bis ${careLongDateLabel(item.warrantyUntil)}`, state: "done", tone: "amber" });
+  }
+  if (loop.reminderAt) {
+    steps.push({ title: "Erinnerung", detail: careDateLabel(loop.reminderAt), state: isDone ? "done" : "todo" });
+  }
+  if (loop.dueDate) {
+    steps.push({
+      title: "Fällig",
+      detail: careDateLabel(loop.dueDate),
+      state: isDone ? "done" : overdue ? "active" : "todo",
+      tone: "amber"
+    });
+  }
+  steps.push({
+    title: isDone ? "Erledigt" : "Abschluss offen",
+    detail: isDone ? "Care-Punkt geschlossen" : "Als erledigt markieren, wenn gelöst",
+    state: isDone ? "done" : "todo",
+    tone: isDone ? "green" : undefined
+  });
+  return steps;
 }
 
-function CareProductContext({ item, itemPath }: { item: Item; itemPath: string }) {
+/* Product memory edges for the Care detail graph. */
+function careGraphEdges(item: Item): GraphEdge[] {
   const hasReceipt = item.documents?.some((document) => document.type.toUpperCase() === "RECEIPT") ?? false;
-  const facts = [
+  return [
+    { tone: hasReceipt ? "green" : "red", label: hasReceipt ? "Beleg gespeichert" : "Beleg fehlt" },
     {
-      icon: <ReceiptText size={16} />,
-      label: "Beleg",
-      value: hasReceipt ? "Gespeichert" : "Fehlt",
-      ready: hasReceipt
+      tone: item.warrantyUntil ? "amber" : "neutral",
+      label: item.warrantyUntil ? `Garantie bis ${careLongDateLabel(item.warrantyUntil)}` : "Garantie unbekannt"
     },
-    {
-      icon: <ShieldCheck size={16} />,
-      label: "Garantie",
-      value: item.warrantyUntil ? careLongDateLabel(item.warrantyUntil) : "Kein Datum",
-      ready: Boolean(item.warrantyUntil)
-    },
-    {
-      icon: <ScanBarcode size={16} />,
-      label: "Seriennummer",
-      value: item.serialNumber ? "Gespeichert" : "Fehlt",
-      ready: Boolean(item.serialNumber)
-    }
+    { tone: item.serialNumber ? "green" : "red", label: item.serialNumber ? "Seriennummer ✓" : "Seriennummer fehlt" }
   ];
+}
 
-  return (
-    <div className="care-product-context">
-      <div className="care-context-head">
-        <div>
-          <span>Produktkontext</span>
-          <strong>{item.name}</strong>
-        </div>
-        <Link className="care-context-link" to={itemPath}>
-          Ding oeffnen
-          <ChevronRight size={15} />
-        </Link>
-      </div>
-      <div className="care-context-list">
-        {facts.map((fact) => (
-          <div className={fact.ready ? "care-context-line is-ready" : "care-context-line"} key={fact.label}>
-            <span>{fact.icon}</span>
-            <small>{fact.label}</small>
-            <strong>{fact.value}</strong>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+function loopTone(loop: Loop): StatusTone {
+  if (loop.status === "SNOOZED") return "neutral";
+  if (dateScore(loop.dueDate ?? loop.reminderAt) < Date.now()) return "red";
+  if (isWithinDays(loop.dueDate ?? loop.reminderAt, 7)) return "amber";
+  return "teal";
 }
 
 function CareTypeIcon({ loop }: { loop: Loop }) {
   if (loop.sourceType === "RECEIPT") return <FileText size={17} />;
   if (loop.itemId) return <PackageCheck size={17} />;
   return <CalendarClock size={17} />;
-}
-
-function CareLoadingRows() {
-  return (
-    <>
-      <div className="care-list-row is-loading" />
-      <div className="care-list-row is-loading" />
-      <div className="care-list-row is-loading" />
-    </>
-  );
 }
 
 function sortOpenLoops(loops: Loop[]) {
@@ -563,13 +549,6 @@ function careStateLabel(loop: Loop) {
   if (dateScore(loop.dueDate ?? loop.reminderAt) < Date.now()) return "Faellig";
   if (isWithinDays(loop.dueDate ?? loop.reminderAt, 7)) return "Bald";
   return "Offen";
-}
-
-function careStateClass(loop: Loop) {
-  if (loop.status === "SNOOZED") return "is-muted";
-  if (dateScore(loop.dueDate ?? loop.reminderAt) < Date.now()) return "is-due";
-  if (isWithinDays(loop.dueDate ?? loop.reminderAt, 7)) return "is-soon";
-  return "";
 }
 
 function careReason(loop: Loop) {

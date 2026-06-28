@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
+  ArrowLeft,
+  BellRing,
   BookOpen,
   CalendarClock,
   CheckCircle2,
@@ -42,6 +44,15 @@ import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
 import { LoopCard } from "../components/LoopCard";
 import { ProgressBar } from "../components/ProgressBar";
+import {
+  ActionButton,
+  AppPageHeader,
+  MetadataRow,
+  ObjectMemoryGraph,
+  ProgressLine,
+  WarrantyTimeline
+} from "../components/app/AppKit";
+import type { GraphEdge } from "../components/app/AppKit";
 
 type ImageSuggestion = {
   imageUrl: string;
@@ -340,69 +351,91 @@ export function ItemDetail() {
   const passportLinkCount = passportHelpers.filter(Boolean).length;
   const supportReadyScore = supportDraft ? Math.max(0, Math.min(100, supportDraft.readyScore)) : 0;
 
+  const receiptPresent = hasDocumentType(documents, "RECEIPT") || documents.length > 0;
+  const wDays = warrantyDaysLeft(item.warrantyUntil);
+  const openCount =
+    loops.filter((loop) => loop.status === "OPEN").length +
+    repairLogs.filter((repair) => repair.status !== "RESOLVED").length +
+    missing.length;
+  const profileEdges: GraphEdge[] = [
+    { tone: receiptPresent ? "green" : "red", label: receiptPresent ? "Beleg gespeichert" : "Beleg fehlt" },
+    { tone: "neutral", label: `${documents.length} Dokument${documents.length === 1 ? "" : "e"}` },
+    wDays === null
+      ? { tone: "neutral", label: "Garantie unbekannt" }
+      : wDays < 0
+        ? { tone: "red", label: "Garantie abgelaufen" }
+        : wDays < 60
+          ? { tone: "amber", label: `Garantie endet in ${wDays} Tagen` }
+          : { tone: "neutral", label: `Garantie bis ${formatDate(item.warrantyUntil)}` },
+    ...(openCount > 0 ? [{ tone: "teal" as const, label: `${openCount} offener Punkt${openCount === 1 ? "" : "e"}` }] : [])
+  ];
+
   return (
-    <div className="object-page mx-auto max-w-7xl space-y-5">
-      <section className="object-hero overflow-hidden rounded-lg">
-        <div className="grid lg:grid-cols-[minmax(0,1.12fr)_minmax(22rem,0.88fr)]">
-          <div className="object-stage">
-            <div className="flex items-center justify-between gap-3">
-              <Badge tone={warranty.tone}>{warranty.label}</Badge>
-              <span className="rounded-full bg-white/75 px-3 py-1.5 text-xs font-black text-muted ring-1 ring-white/80">{item.category}</span>
-            </div>
+    <main className="av-page">
+      <Link className="av-back" to="/app/items">
+        <ArrowLeft size={15} /> Zurück zu Dinge
+      </Link>
 
-            <div className="relative mt-5 min-h-[19rem] sm:min-h-[25rem]">
-              <div className="object-shadow" />
-              {item.imageUrl ? (
-                <img className="relative z-10 mx-auto h-[18rem] w-full object-contain sm:h-[25rem] lg:h-[31rem]" src={item.imageUrl} alt={item.name} />
-              ) : (
-                <div className="relative z-10 grid min-h-[18rem] place-items-center rounded-lg bg-white/70 text-muted">
-                  <div className="text-center">
-                    <ImageOff className="mx-auto" size={34} />
-                    <p className="mt-3 text-sm font-black uppercase">Produktfoto wird gesucht</p>
-                  </div>
-                </div>
-              )}
-            </div>
+      <AppPageHeader
+        kicker={item.category || itemTypeLabel(item.itemType)}
+        title={item.name}
+        subtitle={identity}
+        actions={
+          receiptPresent ? (
+            <ActionButton to="/app/care" icon={<BellRing size={15} />}>Erinnerung öffnen</ActionButton>
+          ) : (
+            <ActionButton to="/app/capture/receipt" icon={<Plus size={15} />}>Beleg hinzufügen</ActionButton>
+          )
+        }
+      />
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/70 pt-4">
-              <SmallFact icon={<Home size={16} />} label="Ort" value={item.location ?? "Raum fehlt"} />
-              <SmallFact icon={<Store size={16} />} label="Gekauft bei" value={item.merchant ?? "Unbekannt"} />
-              <SmallFact icon={<ReceiptText size={16} />} label="Dokumente" value={`${documents.length} gespeichert`} />
-            </div>
+      {/* Object Memory Profile hero */}
+      <section className="av-profile-hero">
+        <div className="av-profile-identity">
+          <div className="av-profile-image">
+            {item.imageUrl ? (
+              <img src={item.imageUrl} alt={item.name} />
+            ) : (
+              <div className="av-profile-image-empty">
+                <ImageOff size={26} />
+                <span>Produktfoto wird gesucht</span>
+              </div>
+            )}
           </div>
-
-          <div className="object-summary">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-black uppercase text-muted">Produktpass</p>
-                <h1 className="mt-3 max-w-xl break-words text-4xl font-black leading-[0.98] text-ink sm:text-5xl">{item.name}</h1>
-              </div>
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-ink text-white">
-                <Package size={22} />
-              </span>
-            </div>
-
-            <p className="mt-4 text-base font-semibold leading-7 text-muted">{identity}</p>
-
-            <div className="mt-7 rounded-lg border border-line bg-white p-4">
-              <div className="mb-2 flex items-center justify-between text-xs font-black uppercase text-muted">
+          <div className="av-profile-facts">
+            <div className="av-profile-complete">
+              <div className="av-profile-complete-head">
                 <span>Gespeicherte Details</span>
-                <span className="text-ink">{item.completenessScore}%</span>
+                <strong>{item.completenessScore}%</strong>
               </div>
-              <ProgressBar value={item.completenessScore} />
-              <p className={`mt-3 text-sm font-bold ${missing.length ? "text-amber" : "text-moss"}`}>
+              <ProgressLine value={item.completenessScore} tone={missing.length ? "amber" : "teal"} />
+              <p className={`av-profile-missing ${missing.length ? "av-th-amber" : "av-th-ok"}`}>
                 {missing.length ? `Fehlt noch: ${missing.join(", ")}` : "Alles Wichtige ist verbunden."}
               </p>
             </div>
+            <dl className="av-metalist">
+              <MetadataRow label="Marke / Modell" value={identity} />
+              <MetadataRow label="Gekauft bei" value={item.merchant ?? "Unbekannt"} />
+              <MetadataRow label="Gekauft am" value={formatDate(item.purchaseDate)} />
+              <MetadataRow label="Preis" value={`${item.price ?? 0} ${item.currency}`} />
+              <MetadataRow label="Standort" value={item.space?.name ?? item.location ?? "Unbekannt"} />
+            </dl>
+          </div>
+        </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <HeroFact label="Garantie bis" value={formatDate(item.warrantyUntil)} icon={<ShieldCheck size={18} />} />
-              <HeroFact label="Kauf" value={formatDate(item.purchaseDate)} icon={<CalendarClock size={18} />} />
-              <HeroFact label="Preis" value={`${item.price ?? 0} ${item.currency}`} icon={<CreditCard size={18} />} />
-              <HeroFact label="Ort" value={item.space?.name ?? item.location ?? "Unbekannt"} icon={<MapPin size={18} />} />
-            </div>
-
-            {imageSource ? <p className="mt-4 text-xs font-bold text-muted">Produktbild gefunden über {imageSource.sourceName}</p> : null}
+        <div className="av-profile-side">
+          <div className="av-profile-block">
+            <span className="av-label-sm">Object Memory Graph</span>
+            <ObjectMemoryGraph title={item.name} category={item.category || "Produkt"} icon={<Package size={14} />} edges={profileEdges} />
+          </div>
+          <div className="av-profile-block">
+            <span className="av-label-sm">Garantie</span>
+            <WarrantyTimeline
+              elapsedPct={warrantyElapsedPct(item.purchaseDate, item.warrantyUntil)}
+              daysLeft={wDays}
+              purchaseLabel={`Kauf · ${formatDate(item.purchaseDate)}`}
+              endLabel={`Ende · ${formatDate(item.warrantyUntil)}`}
+            />
           </div>
         </div>
       </section>
@@ -839,8 +872,23 @@ export function ItemDetail() {
           </section>
         </aside>
       </section>
-    </div>
+    </main>
   );
+}
+
+function warrantyDaysLeft(value?: string | null): number | null {
+  if (!value) return null;
+  return Math.ceil((new Date(value).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+function warrantyElapsedPct(purchase?: string | null, end?: string | null): number {
+  if (!end) return 0;
+  const endT = new Date(end).getTime();
+  const startT = purchase ? new Date(purchase).getTime() : endT - 1000 * 60 * 60 * 24 * 365 * 2;
+  const now = Date.now();
+  if (now <= startT) return 0;
+  if (now >= endT) return 100;
+  return ((now - startT) / (endT - startT)) * 100;
 }
 
 function hasDocumentType(documents: { type: string }[], type: string) {

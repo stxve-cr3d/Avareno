@@ -1,15 +1,16 @@
 import type { ReactNode } from "react";
 
+/* Maps legacy badge tones onto the av-* status vocabulary. */
 const tones = {
-  green: "bg-leaf/10 text-moss ring-leaf/20",
-  amber: "bg-amber-50 text-amber ring-amber-200",
-  red: "bg-red-50 text-ember ring-red-200",
-  dark: "bg-coal text-white ring-coal",
-  gray: "bg-mist text-ink ring-line",
-  sky: "bg-sky-50 text-sky ring-sky-200",
-  coral: "bg-orange-50 text-coral ring-orange-200"
+  green: "av-tone-green",
+  amber: "av-tone-amber",
+  red: "av-tone-red",
+  dark: "av-tone-neutral",
+  gray: "av-tone-neutral",
+  sky: "av-tone-teal",
+  coral: "av-tone-red"
 };
 
 export function Badge({ children, tone = "gray" }: { children: ReactNode; tone?: keyof typeof tones }) {
-  return <span className={`rounded-full px-2.5 py-1 text-xs font-black ring-1 ${tones[tone]}`}>{children}</span>;
+  return <span className={`av-chip ${tones[tone]}`}>{children}</span>;
 }

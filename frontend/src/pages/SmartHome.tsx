@@ -1,64 +1,33 @@
-import { useEffect, useMemo, useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import {
   Archive,
   ArrowRight,
   BellRing,
-  Bot,
-  CheckCircle2,
-  ChevronDown,
   ChevronRight,
-  CircleDot,
   FileText,
-  FolderOpen,
-  Home,
+  Flame,
   LifeBuoy,
-  Link2,
-  MessageCircle,
   Monitor,
   Package,
-  Plus,
-  PlugZap,
-  RadioTower,
-  RefreshCw,
   ReceiptText,
-  Search,
   ShieldCheck,
-  Sparkles,
-  UserRound,
   Volume2,
-  Wifi,
   Wrench
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api, isoDate } from "../lib/api";
-import { MotivationWidget } from "../components/Motivation";
-import type { Item, LocalDiscoveryCandidate, LocalDiscoveryPayload, MotivationSummary, SmartHomeDevice, SmartHomeInsight, SmartHomePayload } from "../lib/types";
-import homeMemoryCube from "../assets/generated/avareno-home-memory-cube-dark.png";
+import type {
+  Item,
+  LocalDiscoveryCandidate,
+  LocalDiscoveryPayload,
+  MotivationSummary,
+  SmartHomeDevice,
+  SmartHomeInsight,
+  SmartHomePayload
+} from "../lib/types";
 
-const providerLabels: Record<string, string> = {
-  SAMSUNG_SMARTTHINGS: "Samsung SmartThings",
-  BAMBU_LAB: "Device setup",
-  ALEXA: "Alexa",
-  GOOGLE_HOME: "Google Home",
-  APPLE_HOME: "Apple Home",
-  HOME_ASSISTANT: "Home Assistant",
-  MATTER: "Matter",
-  LOCAL_DISCOVERY: "Local Discovery"
-};
-
-const discoveryFilterLabels: Record<string, string> = {
-  all: "All",
-  printer: "Devices",
-  hub: "Hubs",
-  media: "TV / media",
-  network: "Router / web",
-  camera: "Cameras",
-  storage: "Storage",
-  unknown: "Unknown"
-};
-
-const discoveryFilterOrder = ["all", "media", "hub", "network", "camera", "storage", "unknown"];
+/* ── constants ──────────────────────────────────────────────── */
 
 const uiTextReplacements: [RegExp, string][] = [
   [/3d[-\s]?printer/gi, "device"],
@@ -77,36 +46,13 @@ const uiTextReplacements: [RegExp, string][] = [
 
 function cleanUiText(value: string | null | undefined) {
   if (!value) return "";
-  return uiTextReplacements.reduce((text, [pattern, replacement]) => text.replace(pattern, replacement), value);
+  return uiTextReplacements.reduce(
+    (text, [pattern, replacement]) => text.replace(pattern, replacement),
+    value
+  );
 }
 
-function deviceTypeLabel(deviceType: string | null | undefined) {
-  if (!deviceType) return "";
-  return cleanUiText(deviceType.replace(/_/g, " "));
-}
-
-type BambuDiagnostic = {
-  target: string;
-  status: string;
-  summary: string;
-  ports: { port: number; label: string; meaning: string; open: boolean }[];
-  nextSteps: string[];
-  canPrepareSetup: boolean;
-  suggestedSetup: {
-    host: string;
-    model: string;
-    roomName: string;
-  };
-  matchedItem?: {
-    id: string;
-    name: string;
-    location?: string | null;
-  } | null;
-};
-
-type HomeRewardsPayload = {
-  motivation: MotivationSummary;
-};
+/* ── fallback demo data ─────────────────────────────────────── */
 
 const smartFallbackPayload: SmartHomePayload = {
   mode: "DEMO",
@@ -151,13 +97,7 @@ const smartFallbackPayload: SmartHomePayload = {
       capabilities: ["documents", "warranty", "networkPresence", "maintenance"],
       status: "ONLINE",
       powerState: "on",
-      rawJson: {
-        accessMode: "DEMO",
-        documents: 18,
-        warrantyProgress: 72,
-        openLoops: 3,
-        rooms: 6
-      },
+      rawJson: { accessMode: "DEMO", documents: 18, warrantyProgress: 72, openLoops: 3 },
       lastSeenAt: "2026-06-23T18:00:00.000Z"
     }
   ],
@@ -209,66 +149,8 @@ const smartFallbackPayload: SmartHomePayload = {
     }
   ],
   quickActions: [],
-  localDiscovery: {
-    mode: "DEMO",
-    enabled: false,
-    note: "Demo fallback keeps the Smart UI visible when backend data is unavailable."
-  },
-  wow: {
-    label: "object-aware control",
-    promise: "Connect devices to the real things they belong to."
-  }
-};
-
-const smartFallbackDiscovery: LocalDiscoveryPayload = {
-  mode: "DEMO",
-  enabled: false,
-  scannedAt: "2026-06-23T18:00:00.000Z",
-  scope: "demo",
-  candidates: [
-    {
-      id: "demo-local-tv",
-      name: "LG OLED C3",
-      host: "192.168.1.55",
-      provider: "LOCAL_DISCOVERY",
-      deviceType: "tv",
-      category: "media",
-      roomName: "Wohnzimmer",
-      confidence: 0.92,
-      confidenceLabel: "92%",
-      signals: ["LAN candidate", "media device", "known room"],
-      capabilities: ["documents", "warranty", "networkPresence"],
-      identity: {
-        label: "Very likely the living room TV",
-        evidence: ["Media-like local service", "Room match"]
-      },
-      connectHint: "Link this device to the matching product memory.",
-      recommendedAction: "Link device",
-      manualCheck: "Confirm the name in your router client list.",
-      filterTags: ["media", "tv"]
-    },
-    {
-      id: "demo-local-router",
-      name: "Home network gateway",
-      host: "192.168.1.1",
-      provider: "LOCAL_DISCOVERY",
-      deviceType: "router",
-      category: "network",
-      roomName: "Home",
-      confidence: 0.68,
-      confidenceLabel: "68%",
-      signals: ["gateway", "web admin", "network service"],
-      capabilities: ["networkPresence"],
-      identity: {
-        label: "Likely network infrastructure",
-        evidence: ["Gateway-style address", "Router-like service"]
-      },
-      connectHint: "Use the router client list to confirm the device IP.",
-      recommendedAction: "Identify first",
-      manualCheck: "Look for known device names in the router client list.",
-      filterTags: ["network", "router"]
-    }
-  ]
+  localDiscovery: { mode: "DEMO", enabled: false, note: "Demo fallback." },
+  wow: { label: "object-aware control", promise: "Connect devices to the real things they belong to." }
 };
 
 const fallbackHomeMotivation: MotivationSummary = {
@@ -285,11 +167,7 @@ const fallbackHomeMotivation: MotivationSummary = {
   statusText: "6 Tage gut gepflegt",
   nudgeText: "Heute reicht schon eine kleine Aktion.",
   pauseText: "Kein Stress — Avareno belohnt Fortschritt, nicht Perfektion.",
-  freezeState: {
-    active: true,
-    title: "Pausentag verfügbar",
-    body: "Pausentage schützen deine Serie, ohne daraus Druck zu machen."
-  },
+  freezeState: { active: true, title: "Pausentag verfügbar", body: "Pausentage schützen deine Serie." },
   recentXPEvents: [
     { id: "mock-receipt", label: "Rechnung für MacBook hinzugefügt", points: 25, createdAt: new Date().toISOString() },
     { id: "mock-warranty", label: "Garantie für Sony Kopfhörer erkannt", points: 15, createdAt: new Date().toISOString() }
@@ -297,24 +175,39 @@ const fallbackHomeMotivation: MotivationSummary = {
   xpRules: []
 };
 
+/* ── types ──────────────────────────────────────────────────── */
+
+type HomeRewardsPayload = { motivation: MotivationSummary };
+
+type ImportantHomeItem = {
+  action: string;
+  detail: string;
+  icon: ReactNode;
+  progress: number;
+  product: string;
+  signal: string;
+  title: string;
+  to: string;
+  type: "warranty" | "invoice" | "care";
+};
+
+type RecentHomeThing = {
+  category: string;
+  completeness: number;
+  invoiceStatus: string;
+  name: string;
+  openPoints: number;
+  to: string;
+  warrantyStatus: string;
+};
+
+/* ── main component ─────────────────────────────────────────── */
+
 export function SmartHome() {
   const [payload, setPayload] = useState<SmartHomePayload | null>(null);
-  const [discovery, setDiscovery] = useState<LocalDiscoveryPayload | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [motivation, setMotivation] = useState<MotivationSummary | null>(null);
   const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState("");
-  const [probeHost, setProbeHost] = useState("");
-  const [discoveryFilter, setDiscoveryFilter] = useState("all");
-  const [bambuDiagnostic, setBambuDiagnostic] = useState<BambuDiagnostic | null>(null);
-  const [bambuSetup, setBambuSetup] = useState({
-    host: "192.168.1.55",
-    model: "Smart device",
-    serial: "",
-    accessCode: "",
-    roomName: "Wohnzimmer",
-    createItem: true
-  });
 
   async function load() {
     try {
@@ -334,425 +227,494 @@ export function SmartHome() {
     }
   }
 
-  useEffect(() => {
-    void load();
-  }, []);
+  useEffect(() => { void load(); }, []);
 
-  const linkedCount = payload?.devices.filter((device) => device.itemId).length ?? 0;
-  const liveReady = payload?.providers.some((provider) => provider.id === "SAMSUNG_SMARTTHINGS" && provider.tokenConfigured) ?? false;
-  const mainDevice = payload?.devices.find((device) => device.deviceType !== "3d_printer") ?? payload?.devices[0] ?? null;
-  const localDiscovery = payload?.localDiscovery ?? { mode: "DEMO", enabled: false, note: "Local search only runs when the user starts it." };
-  const insights = payload?.insights ?? [];
-  const discoveryCandidates = discovery?.candidates ?? [];
-  const discoveryFilterCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: discoveryCandidates.length };
-    for (const candidate of discoveryCandidates) {
-      for (const filter of discoveryFilterOrder.filter((entry) => entry !== "all")) {
-        if (candidateMatchesDiscoveryFilter(candidate, filter)) {
-          counts[filter] = (counts[filter] ?? 0) + 1;
-        }
-      }
-    }
-    return counts;
-  }, [discoveryCandidates]);
-  const filteredDiscoveryCandidates = useMemo(
-    () => discoveryCandidates.filter((candidate) => candidateMatchesDiscoveryFilter(candidate, discoveryFilter)),
-    [discoveryCandidates, discoveryFilter]
-  );
-
-  async function connect(provider: string) {
-    setBusy(`connect-${provider}`);
-    try {
-      await api("/api/smart-home/providers/connect", {
-        method: "POST",
-        body: JSON.stringify({ provider })
-      });
-      setMessage(`${providerLabels[provider] ?? provider} prepared`);
-      await load();
-    } finally {
-      setBusy("");
-    }
+  if (!payload) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", color: "var(--av-text-muted)", fontSize: "0.85rem" }}>
+        Privater Speicher wird geladen…
+      </div>
+    );
   }
 
-  async function sync(provider: string) {
-    setBusy(`sync-${provider}`);
-    try {
-      const result = await api<{ source: string; synced: number }>(`/api/smart-home/providers/${provider}/sync`, { method: "POST" });
-      setMessage(`${result.synced} devices synced from ${result.source}`);
-      await load();
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function command(deviceId: string, action: string) {
-    setBusy(`${deviceId}-${action}`);
-    try {
-      const result = await api<{ status: string }>(`/api/smart-home/devices/${deviceId}/commands`, {
-        method: "POST",
-        body: JSON.stringify({ command: action })
-      });
-      setMessage(`${action.replace("_", " ")} ${result.status.toLowerCase()}`);
-      await load();
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function linkItem(deviceId: string, itemId: string) {
-    setBusy(`link-${deviceId}`);
-    try {
-      await api(`/api/smart-home/devices/${deviceId}/link`, {
-        method: "PATCH",
-        body: JSON.stringify({ itemId: itemId || null })
-      });
-      setMessage(itemId ? "Smart thing linked to product" : "Smart thing unlinked");
-      await load();
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function discoverLocal() {
-    setBusy("local-discover");
-    try {
-      const result = await api<LocalDiscoveryPayload>("/api/smart-home/local/discover", { method: "POST" });
-      setDiscovery(result);
-      setMessage(`${result.candidates.length} local candidates found in ${result.mode}`);
-    } catch (error) {
-      console.warn("Local discovery unavailable; using demo candidates.", error);
-      setDiscovery(smartFallbackDiscovery);
-      setMessage(`${smartFallbackDiscovery.candidates.length} demo local candidates found`);
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function probeLocal(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!probeHost.trim()) return;
-    setBusy("local-probe");
-    try {
-      const result = await api<LocalDiscoveryPayload>("/api/smart-home/local/probe", {
-        method: "POST",
-        body: JSON.stringify({ host: probeHost.trim() })
-      });
-      setDiscovery(result);
-      setMessage(
-        result.candidates.length
-          ? `${result.candidates[0].host} answered in targeted probe`
-          : `${result.target ?? probeHost} did not answer on known smart-home ports`
-      );
-    } catch (error) {
-      console.warn("Local probe unavailable; using demo probe result.", error);
-      setDiscovery({ ...smartFallbackDiscovery, target: probeHost.trim() });
-      setMessage(`${probeHost.trim()} prepared as demo probe result`);
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function importCandidate(candidate: LocalDiscoveryCandidate) {
-    setBusy(`import-${candidate.id}`);
-    try {
-      await api("/api/smart-home/local/import", {
-        method: "POST",
-        body: JSON.stringify({ candidateId: candidate.id, host: candidate.host })
-      });
-      setMessage("Local device imported as smart thing");
-      await load();
-    } finally {
-      setBusy("");
-    }
-  }
-
-  function useCandidateForBambu(candidate: LocalDiscoveryCandidate) {
-    const host = candidate.host.split(":")[0];
-    setBambuSetup((current) => ({
-      ...current,
-      host,
-      roomName: candidate.roomName || current.roomName
-    }));
-    setMessage(`${host} prepared for device setup`);
-  }
-
-  async function activateInsight(insight: SmartHomeInsight) {
-    if (insight.actionType === "DISCOVER_LOCAL") {
-      await discoverLocal();
-      return;
-    }
-    if (insight.actionType === "LINK_ITEM") {
-      setMessage("Choose a physical product in the smart thing card below");
-      return;
-    }
-    setBusy(`insight-${insight.id}`);
-    try {
-      const result = await api<{ message: string }>(`/api/smart-home/insights/${insight.id}/activate`, { method: "POST" });
-      setMessage(result.message);
-      await load();
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function setupBambu(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy("bambu-setup");
-    try {
-      const result = await api<{ message: string }>("/api/smart-home/bambu/setup", {
-        method: "POST",
-        body: JSON.stringify(bambuSetup)
-      });
-      setMessage(result.message);
-      await load();
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function diagnoseBambu() {
-    if (!bambuSetup.host.trim()) return;
-    setBusy("bambu-diagnose");
-    try {
-      const result = await api<BambuDiagnostic>("/api/smart-home/bambu/diagnose", {
-        method: "POST",
-        body: JSON.stringify({ host: bambuSetup.host.trim() })
-      });
-      setBambuDiagnostic(result);
-      setBambuSetup((current) => ({
-        ...current,
-        host: result.suggestedSetup.host || current.host,
-        model: current.model || result.suggestedSetup.model,
-        roomName: current.roomName || result.suggestedSetup.roomName
-      }));
-      setMessage(result.summary);
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function recordBambuEvent(deviceId: string, eventType: string) {
-    setBusy(`${deviceId}-event-${eventType}`);
-    try {
-      const result = await api<{ message: string }>("/api/smart-home/bambu/events", {
-        method: "POST",
-        body: JSON.stringify({
-          deviceId,
-          eventType,
-          jobName: eventType === "FILAMENT_LOW" ? "Loaded spool" : "Avareno test print",
-          filamentRemaining: eventType === "FILAMENT_LOW" ? 8 : undefined,
-          nozzleTemp: eventType === "STARTED" ? 218 : eventType === "FINISHED" ? 38 : undefined,
-          bedTemp: eventType === "STARTED" ? 62 : eventType === "FINISHED" ? 31 : undefined
-        })
-      });
-      setMessage(result.message);
-      await load();
-    } finally {
-      setBusy("");
-    }
-  }
-
-  function updateBambu(field: keyof typeof bambuSetup, value: string | boolean) {
-    setBambuSetup((current) => ({ ...current, [field]: value }));
-  }
-
-  const suggestions = useMemo(() => {
-    const map = new Map<string, Item[]>();
-    for (const device of payload?.devices ?? []) {
-      map.set(device.id, rankItems(device, items));
-    }
-    return map;
-  }, [items, payload?.devices]);
-
-  if (!payload) return <div className="smart-loading-screen">Loading Smart Home...</div>;
-
-  const isOnline = mainDevice ? !["offline", "error"].includes(String(mainDevice.status ?? "").toLowerCase()) : true;
-  const roomName = (mainDevice?.roomName ?? bambuSetup.roomName) || "Wohnzimmer";
-  const openInsightCount = insights.filter((insight) => insight.status !== "ACTIVE").length;
-  const dashboardDocumentCount = items.reduce((count, item) => count + (item.documents?.length ?? 0), 0) || 18;
+  const insights = payload.insights ?? [];
+  const openInsightCount = insights.filter((i) => i.status !== "ACTIVE").length;
+  const dashboardDocumentCount = items.reduce((n, item) => n + (item.documents?.length ?? 0), 0) || 18;
   const matchItem = items.find((item) => /oled|tv|fernseher/i.test([item.name, item.category, item.manufacturer, item.model].join(" "))) ?? null;
   const matchName = matchItem?.name ?? "LG OLED C3";
   const itemCount = items.length || payload.devices.length || 7;
+
   const nextItems = buildHomeNextItems(items, matchName, dashboardDocumentCount, openInsightCount);
   const importantItems = buildTodayImportantItems(items, matchName);
   const recentThings = buildRecentThings(items, matchName);
+
   const appPath = (path: string) => (path === "/" ? "/app" : `/app${path}`);
 
   return (
-    <main className="smart-calm-page">
-      <section className="smart-calm-hero">
-        <div>
-          <h1>Guten Morgen, Stefan</h1>
-          <p>3 Dinge brauchen heute deine Aufmerksamkeit.</p>
+    <main className="av-home">
+
+      {/* ── Daily Memory Brief hero ── */}
+      <section className="av-hero">
+        <div className="av-hero-left">
+          <span className="av-kicker">Privater Speicher · Heute</span>
+          <h1 className="av-greeting">Guten Morgen,<br />Stefan.</h1>
+
+          {/* Structured morning brief card */}
+          <div className="av-hero-brief">
+            <div className="av-hero-brief-head">
+              <span className="av-hero-brief-label">Heute sortiert</span>
+              <span className="av-tag av-tag-warranty">{openInsightCount || 2} offen</span>
+            </div>
+            <div className="av-hero-brief-rows">
+              <div className="av-hero-brief-row">
+                <span className="av-hbd av-hbd-warn" />
+                <span>Garantie läuft ab — <strong>{importantItems[0]?.product}</strong></span>
+              </div>
+              <div className="av-hero-brief-row">
+                <span className="av-hbd av-hbd-danger" />
+                <span>Rechnung fehlt — <strong>{importantItems[1]?.product}</strong></span>
+              </div>
+              <div className="av-hero-brief-row">
+                <span className="av-hbd av-hbd-teal" />
+                <span>Care offen — <strong>{importantItems[2]?.product}</strong></span>
+              </div>
+            </div>
+            <div className="av-hero-brief-foot">
+              <Link className="av-hero-brief-btn" to={appPath("/care")}>
+                Offene Punkte prüfen <ArrowRight size={14} />
+              </Link>
+              <span className="av-hero-facts">
+                {itemCount} Dinge · {dashboardDocumentCount} Dokumente
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="smart-calm-hero-card">
-          <span>Privater Speicher</span>
-          <strong>{isOnline ? "Bereit" : "Prüfen"}</strong>
-          <small>{roomName} · {itemCount} Dinge</small>
-        </div>
+
+        {/* Larger Object Memory Map */}
+        <MemoryMap items={importantItems} />
       </section>
 
-      <section className="smart-calm-home-grid" aria-label="Home Inbox">
-        <div className="smart-calm-main-column">
-          <article className="smart-calm-focus">
-            <div className="smart-calm-panel-head">
-              <div>
-                <span>Home Inbox</span>
-                <h2>Heute wichtig</h2>
-              </div>
-              <Link to={appPath("/care")}>Care öffnen</Link>
+      {/* ── Main content + sidebar ── */}
+      <div className="av-grid">
+        <div className="av-main">
+
+          <article className="av-section">
+            <div className="av-section-head">
+              <h2 className="av-section-title">Was braucht Aufmerksamkeit?</h2>
+              <Link className="av-section-link" to={appPath("/care")}>Care öffnen</Link>
             </div>
-            <div className="smart-calm-important-list">
-              {importantItems.map((item, index) => (
-                <ImportantItemCard key={item.product + item.title} item={item} primary={index === 0} />
+            <div className="av-attention-list">
+              {importantItems.map((item, i) => (
+                <AttentionCard key={item.product + item.title} item={item} primary={i === 0} />
               ))}
             </div>
           </article>
 
-          <article className="smart-calm-activity" aria-label="Zuletzt gespeicherte Dinge">
-            <div className="smart-calm-panel-head">
-              <div>
-                <span>Dinge</span>
-                <h2>Zuletzt gespeicherte Dinge</h2>
-              </div>
-              <Link to={appPath("/items")}>Alle Dinge</Link>
+          <article className="av-section">
+            <div className="av-section-head">
+              <h2 className="av-section-title">Zuletzt gespeichert</h2>
+              <Link className="av-section-link" to={appPath("/items")}>Alle Dinge</Link>
             </div>
-            <div className="smart-calm-thing-grid">
+            <div className="av-things-grid">
               {recentThings.map((thing) => (
-                <RecentThingCard key={thing.name} thing={thing} />
+                <ThingCard key={thing.name} thing={thing} />
               ))}
             </div>
           </article>
 
-          <article className="smart-calm-next">
-            <div className="smart-calm-panel-head">
-              <div>
-                <span>Weiterarbeiten</span>
-                <h2>Nächste Schritte</h2>
-              </div>
-            </div>
-            <div className="smart-calm-next-list">
+          <article className="av-section av-section-slim">
+            <h2 className="av-section-title">Nächste Schritte</h2>
+            <div className="av-next-list">
               {nextItems.map((item) => (
-                <Link className="smart-calm-next-row" key={item.to + item.title} to={item.to}>
-                  <span>{item.icon}</span>
+                <Link className="av-next-row" key={item.to + item.title} to={item.to}>
+                  <span className="av-next-icon">{item.icon}</span>
                   <div>
                     <strong>{item.title}</strong>
                     <small>{item.body}</small>
                   </div>
-                  <ChevronRight size={16} />
+                  <ChevronRight size={14} />
                 </Link>
               ))}
             </div>
           </article>
+
         </div>
 
-        <aside className="smart-calm-side-column">
-          <section className="smart-calm-actions" aria-label="Schnell erfassen">
-            <div className="smart-calm-panel-head">
-              <div>
-                <span>Quick Capture</span>
-                <h2>Etwas speichern</h2>
-              </div>
-            </div>
-            <div className="smart-calm-action-list">
-              <CalmActionLink className="is-primary" icon={<Archive size={18} />} label="Produkt hinzufügen" body="Ein Ding mit Kontext starten" to={appPath("/capture/item")} />
-              <CalmActionLink icon={<ReceiptText size={18} />} label="Rechnung scannen" body="Beleg und Garantie sichern" to={appPath("/capture/receipt")} />
-              <CalmActionLink icon={<LifeBuoy size={18} />} label="Ticket erstellen" body="Problem zu einem Produkt öffnen" to={appPath("/resolve/create")} />
-              <CalmActionLink icon={<BellRing size={18} />} label="Erinnerung anlegen" body="Offenen Punkt nicht verlieren" to={appPath("/capture/loop")} />
-            </div>
-          </section>
-
-          {motivation ? (
-            <section className="smart-calm-motivation" aria-label="Motivation">
-              <MotivationWidget motivation={motivation} />
-            </section>
-          ) : null}
-
-          <section className="smart-calm-sections" aria-label="Avareno Bereiche">
-            <CalmSectionLink label="Dinge" body={`${dashboardDocumentCount} Dokumente und Produktakten`} to={appPath("/items")} />
-            <CalmSectionLink label="Resolve" body={`${openInsightCount || 2} offene Fragen und Hilfe-Tickets`} to={appPath("/resolve")} />
-            <CalmSectionLink label="Care" body="Garantien, Reparaturen und Erinnerungen" to={appPath("/care")} />
-          </section>
+        <aside className="av-sidebar">
+          <QuickCapture appPath={appPath} />
+          <MemoryStatus itemCount={itemCount} docCount={dashboardDocumentCount} openCount={openInsightCount} />
+          <ModuleNav appPath={appPath} itemCount={itemCount} openCount={openInsightCount} />
+          {motivation ? <StreakBar motivation={motivation} /> : null}
         </aside>
-      </section>
+      </div>
 
-      {message ? <p className="smart-calm-message">{message}</p> : null}
+      {message ? <div className="av-toast">{message}</div> : null}
     </main>
   );
 }
 
-function buildHomeNextItems(items: Item[], matchName: string, documentCount: number, openInsightCount: number) {
+/* ── presentation components ────────────────────────────────── */
+
+/*
+ * Object Memory Map
+ * Primary node: x=70 y=8 w=200 h≈104 → bottom-center (170, 112)
+ * Secondary-0:  x=0  y=184 w=155 h≈60 → top-center (77.5, 184)
+ * Secondary-1:  x=185 y=184 w=155 h≈60 → top-center (262.5, 184)
+ * SVG stage: 340 × 248
+ */
+function MemoryMap({ items }: { items: ImportantHomeItem[] }) {
+  const typeColor: Record<string, string> = {
+    warranty: "#E8C56E",
+    invoice: "#EF7D7D",
+    care: "#6FE7DF"
+  };
+  const cats = ["TV · Media", "Audio", "Werkstatt"];
+
+  return (
+    <div className="av-mm-wrap">
+      <p className="av-mm-label">Object Memory Map</p>
+      <div className="av-mm-stage">
+
+        <svg className="av-mm-lines" viewBox="0 0 384 270" preserveAspectRatio="none" aria-hidden="true">
+          {/* Lines from primary bottom-center (192,115) to secondary top-centers */}
+          <path
+            d="M 192 115 C 192 158 86 158 86 196"
+            fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="1.2" strokeDasharray="4 5"
+          />
+          <path
+            d="M 192 115 C 192 158 298 158 298 196"
+            fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="1.2" strokeDasharray="4 5"
+          />
+          {/* Junction dots */}
+          <circle cx="192" cy="115" r="2.5" fill="rgba(255,255,255,0.14)" />
+          <circle cx="86"  cy="196" r="2"   fill="rgba(255,255,255,0.10)" />
+          <circle cx="298" cy="196" r="2"   fill="rgba(255,255,255,0.10)" />
+        </svg>
+
+        {/* Primary node — shows product + 3 status chips + progress */}
+        {items[0] && (
+          <div className={`av-mm-card av-mm-primary av-mm-t-${items[0].type}`}>
+            <div className="av-mm-head">
+              <strong>{items[0].product}</strong>
+              <span className={`av-mm-dot av-mm-d-${items[0].type}`} />
+            </div>
+            <small>{cats[0]}</small>
+            <div className="av-mm-chip-row">
+              <span className="av-mm-ic av-mm-ic-ok">
+                <FileText size={9} /> Beleg ✓
+              </span>
+              <span className="av-mm-ic av-mm-ic-warn">
+                <ShieldCheck size={9} /> {items[0].signal}
+              </span>
+              <span className="av-mm-ic av-mm-ic-care">
+                <BellRing size={9} /> Erinnerung
+              </span>
+            </div>
+            <div className="av-mm-bar">
+              <div className="av-mm-fill" style={{ width: `${items[0].progress}%`, background: typeColor[items[0].type] }} />
+            </div>
+          </div>
+        )}
+
+        {/* Secondary nodes */}
+        {items.slice(1, 3).map((item, i) => (
+          <div key={item.product} className={`av-mm-card av-mm-secondary av-mm-sec${i} av-mm-t-${item.type}`}>
+            <div className="av-mm-head">
+              <strong>{item.product.length > 14 ? item.product.slice(0, 14) + "…" : item.product}</strong>
+              <span className={`av-mm-dot av-mm-d-${item.type}`} />
+            </div>
+            <small>{cats[i + 1]}</small>
+            <span className={`av-mm-ic av-mm-ic-${item.type === "invoice" ? "danger" : "care"}`}>
+              {item.type === "invoice" ? <FileText size={9} /> : <BellRing size={9} />}
+              {item.type === "invoice" ? "Beleg fehlt" : "Care offen"}
+            </span>
+            <div className="av-mm-bar">
+              <div className="av-mm-fill" style={{ width: `${item.progress}%`, background: typeColor[item.type] }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AttentionCard({ item, primary = false }: { item: ImportantHomeItem; primary?: boolean }) {
+  return (
+    <Link
+      className={`av-attention-card av-att-${item.type}${primary ? " av-att-primary" : ""}`}
+      to={item.to}
+    >
+      <span className="av-att-icon">{item.icon}</span>
+      <div className="av-att-copy">
+        <small>{item.title}</small>
+        <strong>{item.product}</strong>
+        <p>{item.detail}</p>
+      </div>
+      <div className="av-att-right">
+        <span className={`av-tag av-tag-${item.type}`}>{item.signal}</span>
+        <em className="av-att-cta">{item.action}</em>
+      </div>
+      {/* Progress strip spanning full card width — shows warranty/completeness */}
+      {primary && (
+        <div className="av-att-track">
+          <div className="av-att-bar" style={{ width: `${item.progress}%` }} />
+        </div>
+      )}
+    </Link>
+  );
+}
+
+function ThingCard({ thing }: { thing: RecentHomeThing }) {
+  const invoiceMissing = thing.invoiceStatus.toLowerCase().includes("fehlt");
+  const warranty = shortWarranty(thing.warrantyStatus);
+
+  return (
+    <Link className="av-thing-card" to={thing.to}>
+      <div className="av-thing-head">
+        {/* Layered icon — pseudo-elements behind suggest a document stack */}
+        <span className="av-thing-icon av-thing-stack">{categoryIcon(thing.category)}</span>
+        <div className="av-thing-info">
+          <span className="av-thing-cat">{thing.category}</span>
+          <span className="av-thing-name">{thing.name}</span>
+        </div>
+        <span className="av-thing-pct">{thing.completeness}%</span>
+      </div>
+
+      {/* Completeness bar */}
+      <div className="av-thing-bar">
+        <div className="av-thing-fill" style={{ width: `${thing.completeness}%` }} />
+      </div>
+
+      {/* Memory layers — Beleg / Garantie / Offen */}
+      <div className="av-thing-layers">
+        <div className="av-thing-layer">
+          <span className="av-layer-ic"><FileText size={12} /></span>
+          <span className="av-layer-label">Beleg</span>
+          <span className={`av-layer-val ${invoiceMissing ? "av-th-warn" : "av-th-ok"}`}>
+            {invoiceMissing ? "Fehlt" : "Gespeichert"}
+          </span>
+        </div>
+        <div className="av-thing-layer">
+          <span className="av-layer-ic"><ShieldCheck size={12} /></span>
+          <span className="av-layer-label">Garantie</span>
+          <span className={`av-layer-val ${warranty.urgent ? "av-th-amber" : ""}`}>{warranty.text}</span>
+        </div>
+        <div className="av-thing-layer">
+          <span className="av-layer-ic"><BellRing size={12} /></span>
+          <span className="av-layer-label">Offen</span>
+          <span className={`av-layer-val ${thing.openPoints > 0 ? "av-th-amber" : "av-th-ok"}`}>
+            {thing.openPoints > 0 ? `${thing.openPoints} Punkt${thing.openPoints === 1 ? "" : "e"}` : "Keine"}
+          </span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function shortWarranty(status: string): { text: string; urgent: boolean } {
+  const s = status.toLowerCase();
+  if (s.includes("unbekannt")) return { text: "Unbekannt", urgent: false };
+  if (s.includes("fällig")) return { text: "Fällig", urgent: true };
+  const dayMatch = status.match(/(\d+)\s*Tag/i);
+  if (dayMatch) return { text: `${dayMatch[1]} Tage`, urgent: true };
+  if (s.includes("bis")) return { text: status.replace(/.*bis\s*/i, "bis "), urgent: false };
+  if (s.includes("offen")) return { text: "Offen", urgent: false };
+  return { text: status, urgent: false };
+}
+
+function QuickCapture({ appPath }: { appPath: (path: string) => string }) {
+  return (
+    <div className="av-capture">
+      <span className="av-capture-label">Quick Capture</span>
+      <Link className="av-capture-lead" to={appPath("/capture/item")}>
+        {/* Scan corner brackets — two spans give all four corners */}
+        <span className="av-scan-frame av-scan-a" aria-hidden="true" />
+        <span className="av-scan-frame av-scan-b" aria-hidden="true" />
+        <span className="av-capture-icon"><Archive size={21} /></span>
+        <div>
+          <strong>Produkt hinzufügen</strong>
+          <small>Ein Ding mit Beleg, Garantie und Care-Kontext starten</small>
+        </div>
+        <ChevronRight size={15} />
+      </Link>
+      <div className="av-capture-actions">
+        <Link className="av-capture-action" to={appPath("/capture/receipt")}>
+          <ReceiptText size={15} /> Rechnung scannen
+        </Link>
+        <Link className="av-capture-action" to={appPath("/resolve/create")}>
+          <LifeBuoy size={15} /> Ticket erstellen
+        </Link>
+        <Link className="av-capture-action" to={appPath("/capture/loop")}>
+          <BellRing size={15} /> Erinnerung anlegen
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function MemoryStatus({ itemCount, docCount, openCount }: {
+  itemCount: number;
+  docCount: number;
+  openCount: number;
+}) {
+  return (
+    <div className="av-mem-status">
+      <span className="av-mem-label">Privater Speicher</span>
+      <div className="av-mem-numbers">
+        <div className="av-mem-number">
+          <strong>{itemCount}</strong>
+          <small>Dinge</small>
+        </div>
+        <div className="av-mem-number">
+          <strong>{docCount}</strong>
+          <small>Dokumente</small>
+        </div>
+        <div className={`av-mem-number${openCount > 0 ? " is-warn" : ""}`}>
+          <strong>{openCount || 3}</strong>
+          <small>Offen</small>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModuleNav({ appPath, itemCount, openCount }: {
+  appPath: (path: string) => string;
+  itemCount: number;
+  openCount: number;
+}) {
+  return (
+    <div className="av-module-list">
+      <Link className="av-module-row av-mod-teal" to={appPath("/items")}>
+        <span className="av-module-icon"><Archive size={14} /></span>
+        <div className="av-module-copy">
+          <strong>Dinge</strong>
+          <small>Produktakten</small>
+        </div>
+        <em className="av-module-count">{itemCount}</em>
+        <ChevronRight size={13} />
+      </Link>
+      <Link className="av-module-row av-mod-warn" to={appPath("/resolve")}>
+        <span className="av-module-icon"><LifeBuoy size={14} /></span>
+        <div className="av-module-copy">
+          <strong>Resolve</strong>
+          <small>Offene Anfragen</small>
+        </div>
+        <em className="av-module-count">{openCount || 2}</em>
+        <ChevronRight size={13} />
+      </Link>
+      <Link className="av-module-row" to={appPath("/care")}>
+        <span className="av-module-icon"><BellRing size={14} /></span>
+        <div className="av-module-copy">
+          <strong>Care</strong>
+          <small>Garantien & Erinnerungen</small>
+        </div>
+        <em className="av-module-count">3</em>
+        <ChevronRight size={13} />
+      </Link>
+    </div>
+  );
+}
+
+function StreakBar({ motivation }: { motivation: MotivationSummary }) {
+  return (
+    <Link className="av-streak" to="/app/rewards">
+      <span className="av-streak-icon"><Flame size={14} /></span>
+      <div className="av-streak-copy">
+        <strong>{motivation.statusText}</strong>
+        <small>{motivation.weeklyXP} XP · {motivation.freezeDaysAvailable} Pausentage</small>
+      </div>
+      <div className="av-streak-track">
+        <div className="av-streak-fill" style={{ width: `${motivation.levelProgress}%` }} />
+      </div>
+    </Link>
+  );
+}
+
+function categoryIcon(category: string) {
+  const n = category.toLowerCase();
+  if (n.includes("audio") || n.includes("sound")) return <Volume2 size={14} />;
+  if (n.includes("werkstatt") || n.includes("repair")) return <Wrench size={14} />;
+  if (n.includes("tv") || n.includes("media")) return <Monitor size={14} />;
+  return <Package size={14} />;
+}
+
+/* ── data helpers ───────────────────────────────────────────── */
+
+function buildHomeNextItems(
+  items: Item[],
+  matchName: string,
+  documentCount: number,
+  openInsightCount: number
+) {
   const itemWithMissingContext = items.find((item) => (item.documents?.length ?? 0) === 0 || !item.warrantyUntil);
   const itemWithWarranty = items.find((item) => item.warrantyUntil);
 
   return [
     {
       body: `${openInsightCount || 2} offene Punkte sinnvoll einordnen`,
-      icon: <LifeBuoy size={18} />,
+      icon: <LifeBuoy size={16} />,
       title: "Resolve fortsetzen",
       to: "/app/resolve"
     },
     {
-      body: itemWithMissingContext ? `${displayHomeItemName(itemWithMissingContext.name)} braucht noch einen Beleg` : `${documentCount} Dokumente sind abgelegt`,
-      icon: <FileText size={18} />,
-      title: "Dokument ansehen",
+      body: itemWithMissingContext
+        ? `${displayHomeItemName(itemWithMissingContext.name)} braucht noch einen Beleg`
+        : `${documentCount} Dokumente sind abgelegt`,
+      icon: <FileText size={16} />,
+      title: "Beleg ergänzen",
       to: itemWithMissingContext ? `/app/items/${itemWithMissingContext.id}` : "/app/reports/home-binder"
     },
     {
-      body: itemWithWarranty?.warrantyUntil ? `Garantie bis ${displayHomeDate(itemWithWarranty.warrantyUntil)}` : `${displayHomeItemName(matchName)} in 45 Tagen prüfen`,
-      icon: <ShieldCheck size={18} />,
-      title: "Erinnerung prüfen",
+      body: itemWithWarranty?.warrantyUntil
+        ? `Garantie bis ${displayHomeDate(itemWithWarranty.warrantyUntil)}`
+        : `${displayHomeItemName(matchName)} in 45 Tagen prüfen`,
+      icon: <ShieldCheck size={16} />,
+      title: "Garantie prüfen",
       to: itemWithWarranty ? `/app/items/${itemWithWarranty.id}` : "/app/care"
     }
   ];
 }
 
-type ImportantHomeItem = {
-  action: string;
-  detail: string;
-  icon: ReactNode;
-  product: string;
-  title: string;
-  to: string;
-};
-
-type RecentHomeThing = {
-  category: string;
-  invoiceStatus: string;
-  name: string;
-  openPoints: number;
-  to: string;
-  warrantyStatus: string;
-};
-
 function buildTodayImportantItems(items: Item[], matchName: string): ImportantHomeItem[] {
   const itemWithMissingInvoice = items.find((item) => (item.documents?.length ?? 0) === 0);
-  const itemWithOpenLoop = items.find((item) => (item.loops ?? []).some((loop) => loop.status === "OPEN")) ?? items.find((item) => item.repairLogs?.some((repair) => repair.status !== "RESOLVED"));
+  const itemWithOpenLoop =
+    items.find((item) => (item.loops ?? []).some((loop) => loop.status === "OPEN")) ??
+    items.find((item) => item.repairLogs?.some((repair) => repair.status !== "RESOLVED"));
 
   return [
     {
       action: "Erinnerung öffnen",
       detail: "Garantie läuft in 45 Tagen ab",
-      icon: <ShieldCheck size={18} />,
+      icon: <ShieldCheck size={16} />,
+      progress: 74,
       product: displayHomeItemName(matchName),
+      signal: "45 Tage",
       title: "Garantie endet bald",
-      to: "/app/care"
+      to: "/app/care",
+      type: "warranty"
     },
     {
       action: "Beleg hinzufügen",
       detail: "Rechnung fehlt noch",
-      icon: <ReceiptText size={18} />,
+      icon: <ReceiptText size={16} />,
+      progress: 38,
       product: displayHomeItemName(itemWithMissingInvoice?.name ?? "Sony WH-1000XM5"),
+      signal: "Beleg fehlt",
       title: "Nachweis unvollständig",
-      to: itemWithMissingInvoice ? `/app/items/${itemWithMissingInvoice.id}` : "/app/capture/receipt"
+      to: itemWithMissingInvoice ? `/app/items/${itemWithMissingInvoice.id}` : "/app/capture/receipt",
+      type: "invoice"
     },
     {
       action: "Ansehen",
       detail: "Wartung offen",
-      icon: <Wrench size={18} />,
+      icon: <Wrench size={16} />,
+      progress: 62,
       product: displayHomeItemName(itemWithOpenLoop?.name ?? "Bambu Lab X1C"),
+      signal: "Offen",
       title: "Care-Punkt offen",
-      to: itemWithOpenLoop ? `/app/items/${itemWithOpenLoop.id}` : "/app/care"
+      to: itemWithOpenLoop ? `/app/items/${itemWithOpenLoop.id}` : "/app/care",
+      type: "care"
     }
   ];
 }
@@ -760,21 +722,28 @@ function buildTodayImportantItems(items: Item[], matchName: string): ImportantHo
 function buildRecentThings(items: Item[], matchName: string): RecentHomeThing[] {
   if (items.length) {
     return items.slice(0, 3).map((item) => {
-      const openPoints = (item.missingFields?.length ?? 0) + (item.loops?.filter((loop) => loop.status === "OPEN").length ?? 0) + (item.repairLogs?.filter((repair) => repair.status !== "RESOLVED").length ?? 0);
+      const openPoints =
+        (item.missingFields?.length ?? 0) +
+        (item.loops?.filter((loop) => loop.status === "OPEN").length ?? 0) +
+        (item.repairLogs?.filter((repair) => repair.status !== "RESOLVED").length ?? 0);
       return {
         category: cleanUiText(item.category || item.itemType || "Ding"),
+        completeness: item.completenessScore ?? 64,
         invoiceStatus: (item.documents?.length ?? 0) > 0 ? "Rechnung gespeichert" : "Rechnung fehlt",
         name: displayHomeItemName(item.name),
         openPoints,
         to: `/app/items/${item.id}`,
-        warrantyStatus: item.warrantyUntil ? `Garantie bis ${displayHomeDate(item.warrantyUntil)}` : "Garantie unbekannt"
+        warrantyStatus: item.warrantyUntil
+          ? `Garantie bis ${displayHomeDate(item.warrantyUntil)}`
+          : "Garantie unbekannt"
       };
     });
   }
 
   return [
     {
-      category: "TV / Media",
+      category: "TV · Media",
+      completeness: 86,
       invoiceStatus: "Rechnung gespeichert",
       name: displayHomeItemName(matchName),
       openPoints: 1,
@@ -783,6 +752,7 @@ function buildRecentThings(items: Item[], matchName: string): RecentHomeThing[] 
     },
     {
       category: "Audio",
+      completeness: 48,
       invoiceStatus: "Rechnung fehlt",
       name: "Sony WH-1000XM5",
       openPoints: 1,
@@ -791,6 +761,7 @@ function buildRecentThings(items: Item[], matchName: string): RecentHomeThing[] 
     },
     {
       category: "Werkstatt",
+      completeness: 72,
       invoiceStatus: "Beleg gespeichert",
       name: "Bambu Lab X1C",
       openPoints: 2,
@@ -798,115 +769,6 @@ function buildRecentThings(items: Item[], matchName: string): RecentHomeThing[] 
       warrantyStatus: "Wartung fällig"
     }
   ];
-}
-
-function ImportantItemCard({ item, primary = false }: { item: ImportantHomeItem; primary?: boolean }) {
-  return (
-    <Link className={primary ? "smart-calm-important-row is-primary" : "smart-calm-important-row"} to={item.to}>
-      <span>{item.icon}</span>
-      <div>
-        <small>{item.title}</small>
-        <strong>{item.product}</strong>
-        <p>{item.detail}</p>
-      </div>
-      <em>{item.action}</em>
-    </Link>
-  );
-}
-
-function RecentThingCard({ thing }: { thing: RecentHomeThing }) {
-  return (
-    <Link className="smart-calm-thing-card" to={thing.to}>
-      <div>
-        <small>{thing.category}</small>
-        <strong>{thing.name}</strong>
-      </div>
-      <dl>
-        <div>
-          <dt>Beleg</dt>
-          <dd>{thing.invoiceStatus}</dd>
-        </div>
-        <div>
-          <dt>Garantie</dt>
-          <dd>{thing.warrantyStatus}</dd>
-        </div>
-        <div>
-          <dt>Offen</dt>
-          <dd>{thing.openPoints ? `${thing.openPoints} Punkt${thing.openPoints === 1 ? "" : "e"}` : "Nichts offen"}</dd>
-        </div>
-      </dl>
-    </Link>
-  );
-}
-
-function SmartTelemetryPill({
-  className,
-  icon,
-  label,
-  onClick,
-  to,
-  value
-}: {
-  className: string;
-  icon: ReactNode;
-  label: string;
-  onClick?: () => void;
-  to?: string;
-  value: string;
-}) {
-  const content = (
-    <>
-      <span>{icon}</span>
-      <div>
-        <p>{label}</p>
-        <strong>{value}</strong>
-      </div>
-    </>
-  );
-
-  if (to) {
-    return (
-      <Link className={`smart-telemetry-pill ${className}`} to={to}>
-        {content}
-      </Link>
-    );
-  }
-
-  if (onClick) {
-    return (
-      <button className={`smart-telemetry-pill ${className}`} onClick={onClick} type="button">
-        {content}
-      </button>
-    );
-  }
-
-  return (
-    <div className={`smart-telemetry-pill ${className}`}>
-      {content}
-    </div>
-  );
-}
-
-function CalmSectionLink({ body, label, to }: { body: string; label: string; to: string }) {
-  return (
-    <Link className="smart-calm-section-link" to={to}>
-      <span>
-        <strong>{label}</strong>
-        <small>{body}</small>
-      </span>
-      <ChevronRight size={18} />
-    </Link>
-  );
-}
-
-function CalmActionLink({ body, className = "", icon, label, to }: { body: string; className?: string; icon: ReactNode; label: string; to: string }) {
-  return (
-    <Link className={`smart-calm-action-link ${className}`} to={to}>
-      <span>{icon}</span>
-      <strong>{label}</strong>
-      <small>{body}</small>
-    </Link>
-  );
 }
 
 function displayHomeDate(value?: string | null) {
@@ -920,353 +782,20 @@ function displayHomeItemName(name: string) {
   return name;
 }
 
-function SmartBottomNav({ appPath }: { appPath: (path: string) => string }) {
-  return (
-    <nav className="smart-bottom-nav" aria-label="Avareno mobile sections">
-      <Link to={appPath("/items")}>
-        <Archive size={24} />
-        <span>Dinge</span>
-      </Link>
-      <Link className="active" to={appPath("/")}>
-        <Home size={25} />
-        <span>Smart</span>
-      </Link>
-      <Link to={appPath("/ask")}>
-        <MessageCircle size={25} />
-        <span>Ask</span>
-      </Link>
-      <Link to={appPath("/rewards")}>
-        <UserRound size={24} />
-        <span>Ich</span>
-      </Link>
-    </nav>
-  );
-}
-
-function InsightCard({
-  busy,
-  insight,
-  onActivate
-}: {
-  busy: string;
-  insight: SmartHomeInsight;
-  onActivate: (insight: SmartHomeInsight) => void;
-}) {
-  const isActive = insight.status === "ACTIVE";
-  return (
-    <article className={`smart-insight-card ${isActive ? "smart-insight-card-active" : ""}`}>
-      <div className="flex items-start justify-between gap-3">
-        <span className="smart-insight-icon">
-          {isActive ? <CheckCircle2 size={18} /> : <Sparkles size={18} />}
-        </span>
-        <span className="smart-insight-priority">{isActive ? "planned" : insight.priority}</span>
-      </div>
-      <p className="mt-4 text-xs font-black uppercase text-muted">{cleanUiText(insight.signal)}</p>
-      <h3 className="mt-1 text-xl font-black leading-tight text-ink">{cleanUiText(insight.title)}</h3>
-      <p className="mt-2 text-sm font-semibold leading-6 text-muted">{cleanUiText(insight.subtitle)}</p>
-      {insight.itemName ? <p className="mt-3 truncate text-sm font-black text-ink">{cleanUiText(insight.itemName)}</p> : null}
-      {insight.automation ? (
-        <div className="smart-automation-preview">
-          <div>
-            <span>Trigger</span>
-            <strong>{cleanUiText(insight.automation.trigger)}</strong>
-          </div>
-          <div>
-            <span>Action</span>
-            <strong>{cleanUiText(insight.automation.action)}</strong>
-          </div>
-          <div>
-            <span>Outcome</span>
-            <strong>{cleanUiText(insight.automation.outcome)}</strong>
-          </div>
-          <div className="smart-automation-meta">
-            {insight.automation.nextRun ? <small>{insight.automation.nextRun}</small> : null}
-            {insight.automation.channels?.slice(0, 3).map((channel) => (
-              <small key={channel}>{channel}</small>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      <button
-        className="smart-mini-action mt-4 w-full"
-        disabled={isActive || busy === `insight-${insight.id}`}
-        onClick={() => onActivate(insight)}
-        type="button"
-      >
-        {isActive ? "Already planned" : busy === `insight-${insight.id}` ? "Creating..." : cleanUiText(insight.cta)}
-      </button>
-    </article>
-  );
-}
-
-function BambuDiagnosticPanel({ diagnostic }: { diagnostic: BambuDiagnostic }) {
-  return (
-    <div className="bambu-diagnostic">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-black uppercase text-muted">{diagnostic.status.replace("_", " ")}</p>
-          <h3 className="mt-1 text-lg font-black text-ink">{cleanUiText(diagnostic.target)}</h3>
-        </div>
-        <span className={`bambu-diagnostic-status ${diagnostic.status === "LAN_READY" ? "bambu-diagnostic-status-good" : ""}`}>
-          {diagnostic.status === "LAN_READY" ? <CheckCircle2 size={15} /> : <RadioTower size={15} />}
-          {diagnostic.status === "LAN_READY" ? "Ready" : "Check"}
-        </span>
-      </div>
-      <p className="mt-3 text-sm font-semibold leading-6 text-muted">{cleanUiText(diagnostic.summary)}</p>
-
-      <div className="bambu-port-grid">
-        {diagnostic.ports.map((port) => (
-          <div className={`bambu-port ${port.open ? "bambu-port-open" : ""}`} key={port.port}>
-            <p>{cleanUiText(port.label)}</p>
-            <strong>
-              {port.port} {port.open ? "open" : "closed"}
-            </strong>
-          </div>
-        ))}
-      </div>
-
-      <div className="bambu-next-steps">
-        {diagnostic.nextSteps.slice(0, 4).map((step) => (
-          <p key={step}>{cleanUiText(step)}</p>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SmartDeviceCard({
-  busy,
-  device,
-  items,
-  onCommand,
-  onLink
-}: {
-  busy: string;
-  device: SmartHomeDevice;
-  items: Item[];
-  onCommand: (deviceId: string, action: string) => void;
-  onLink: (deviceId: string, itemId: string) => void;
-}) {
-  const linked = Boolean(device.itemId);
-  const imageUrl = device.deviceType === "3d_printer" ? "" : device.itemImageUrl;
-  return (
-    <article className="smart-device-card">
-      <div className="smart-device-media">
-        {imageUrl ? <img src={imageUrl} alt="" /> : <Bot size={28} />}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-black uppercase text-muted">{providerLabels[device.provider] ?? device.provider}</p>
-            <h2 className="mt-1 break-words text-2xl font-black text-ink">{device.name}</h2>
-            <p className="mt-1 text-sm font-semibold text-muted">
-              {[device.roomName, deviceTypeLabel(device.deviceType), cleanUiText(device.status)].filter(Boolean).join(" - ")}
-            </p>
-          </div>
-          <span className={`smart-link-badge ${linked ? "smart-link-badge-on" : ""}`}>
-            {linked ? <CheckCircle2 size={14} /> : <Link2 size={14} />}
-            {linked ? "linked" : "needs product"}
-          </span>
-        </div>
-
-        <div className="mt-4 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(14rem,0.42fr)]">
-          <div className="smart-device-object">
-            <p>Product match</p>
-            {linked ? (
-              <Link to={`/items/${device.itemId}`} className="group mt-1 inline-flex items-center gap-2 text-base font-black text-ink">
-                {device.itemName}
-                <ArrowRight className="transition group-hover:translate-x-0.5" size={16} />
-              </Link>
-            ) : (
-              <strong>Choose the physical thing this belongs to.</strong>
-            )}
-            <select value={device.itemId ?? ""} onChange={(event) => onLink(device.id, event.target.value)} className="smart-select">
-              <option value="">No linked product</option>
-              {items.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="smart-device-controls">
-            <button disabled={busy === `${device.id}-power_on`} onClick={() => onCommand(device.id, "power_on")} type="button">
-              <PlugZap size={15} /> On
-            </button>
-            <button disabled={busy === `${device.id}-power_off`} onClick={() => onCommand(device.id, "power_off")} type="button">
-              Off
-            </button>
-            <button disabled={busy === `${device.id}-volume_up`} onClick={() => onCommand(device.id, "volume_up")} type="button">
-              <Volume2 size={15} /> +
-            </button>
-            <button disabled={busy === `${device.id}-mute`} onClick={() => onCommand(device.id, "mute")} type="button">
-              Mute
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {device.capabilities.slice(0, 5).map((capability) => (
-            <span className="smart-capability" key={capability}>
-              {cleanUiText(capability)}
-            </span>
-          ))}
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function DiscoveryFilterBar({
-  activeFilter,
-  counts,
-  onChange
-}: {
-  activeFilter: string;
-  counts: Record<string, number>;
-  onChange: (filter: string) => void;
-}) {
-  const filters = discoveryFilterOrder.filter((filter) => filter === "all" || counts[filter]);
-  return (
-    <div className="smart-discovery-filter">
-      <div>
-        <p>Filter found devices</p>
-        <strong>Pick the type before connecting</strong>
-      </div>
-      <div className="smart-discovery-filter-chips">
-        {filters.map((filter) => (
-          <button className={activeFilter === filter ? "active" : ""} key={filter} onClick={() => onChange(filter)} type="button">
-            {discoveryFilterLabels[filter] ?? filter}
-            <span>{counts[filter] ?? 0}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function LocalCandidateCard({
-  busy,
-  candidate,
-  onImport,
-  onUseForBambu
-}: {
-  busy: string;
-  candidate: LocalDiscoveryCandidate;
-  onImport: (candidate: LocalDiscoveryCandidate) => void;
-  onUseForBambu: (candidate: LocalDiscoveryCandidate) => void;
-}) {
-  const category = candidate.category ?? candidate.deviceType ?? "unknown";
-  const canUseForSetup = category === "unknown" || category === "printer" || candidate.deviceType === "3d_printer" || candidate.filterTags?.includes("printer");
-  const confidence = candidate.confidenceLabel ?? `${Math.round(candidate.confidence * 100)}%`;
-  const identityLabel = cleanUiText(candidate.identity?.label ?? "Avareno needs more evidence");
-  const evidence = candidate.identity?.evidence ?? [];
-  return (
-    <article className="smart-local-candidate">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-black uppercase text-muted">{candidate.host}</p>
-          <h3 className="mt-1 break-words text-xl font-black text-ink">{candidate.name}</h3>
-          <p className="mt-1 text-sm font-semibold text-muted">
-            {[candidate.roomName, discoveryFilterLabels[category] ?? deviceTypeLabel(category), `${confidence} confidence`].filter(Boolean).join(" - ")}
-          </p>
-        </div>
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-leaf/10 text-leaf">
-          <RadioTower size={17} />
-        </span>
-      </div>
-
-      <div className="smart-candidate-identity">
-        <p>Likely identity</p>
-        <strong>{identityLabel}</strong>
-        {candidate.connectHint ? <span>{cleanUiText(candidate.connectHint)}</span> : null}
-        {evidence.length ? (
-          <div className="smart-candidate-evidence">
-            {evidence.slice(0, 2).map((entry) => (
-              <small key={entry}>{cleanUiText(entry)}</small>
-            ))}
-          </div>
-        ) : null}
-      </div>
-
-      {candidate.matchedItemName ? (
-        <div className="smart-local-match">
-          {candidate.matchedItemImageUrl ? <img src={candidate.matchedItemImageUrl} alt="" /> : <Link2 size={18} />}
-          <div className="min-w-0">
-            <p>Suggested product</p>
-            <strong>{cleanUiText(candidate.matchedItemName)}</strong>
-          </div>
-        </div>
-      ) : (
-        <div className="smart-local-match">
-          <Link2 size={18} />
-          <div>
-            <p>Suggested product</p>
-            <strong>No confident product match yet</strong>
-          </div>
-        </div>
-      )}
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        {candidate.signals.slice(0, 4).map((signal) => (
-          <span className="smart-capability" key={signal}>
-              {cleanUiText(signal)}
-          </span>
-        ))}
-      </div>
-
-      {candidate.manualCheck ? (
-        <div className="smart-candidate-guidance">
-          <span>Manual check</span>
-          <strong>{cleanUiText(candidate.manualCheck)}</strong>
-        </div>
-      ) : null}
-
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <button className="smart-mini-action w-full" onClick={() => onImport(candidate)} disabled={busy === `import-${candidate.id}`} type="button">
-          {busy === `import-${candidate.id}` ? "Importing..." : candidate.recommendedAction?.startsWith("Import") ? cleanUiText(candidate.recommendedAction) : "Import"}
-        </button>
-        {canUseForSetup ? (
-          <button className="smart-mini-action smart-mini-action-light w-full" onClick={() => onUseForBambu(candidate)} type="button">
-            <PlugZap size={15} /> Use for setup
-          </button>
-        ) : (
-          <div className="smart-local-action-note">{cleanUiText(candidate.recommendedAction ?? "Identify first")}</div>
-        )}
-      </div>
-    </article>
-  );
-}
-
-function Signal({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
-  return (
-    <div className="smart-signal">
-      <span>{icon}</span>
-      <p>{label}</p>
-      <strong>{value}</strong>
-    </div>
-  );
-}
+/* ── preserved rank helpers ─────────────────────────────────── */
 
 function rankItems(device: SmartHomeDevice, items: Item[]) {
-  return [...items].sort((left, right) => itemScore(device, right) - itemScore(device, left));
+  return [...items].sort((a, b) => itemScore(device, b) - itemScore(device, a));
 }
 
 function itemScore(device: SmartHomeDevice, item: Item) {
-  const haystack = [item.name, item.category, item.manufacturer, item.model, item.location, item.space?.name, item.itemType].join(" ").toLowerCase();
-  const words = device.name.toLowerCase().split(/\s+/).filter((word) => word.length > 2);
-  let score = words.filter((word) => haystack.includes(word)).length;
+  const haystack = [item.name, item.category, item.manufacturer, item.model, item.location, item.space?.name, item.itemType]
+    .join(" ")
+    .toLowerCase();
+  const words = device.name.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
+  let score = words.filter((w) => haystack.includes(w)).length;
   if (device.roomName && haystack.includes(device.roomName.toLowerCase())) score += 3;
   if (device.deviceType === "tv" && (haystack.includes("tv") || haystack.includes("oled"))) score += 5;
   if (device.deviceType === "light" && (haystack.includes("light") || haystack.includes("lampe"))) score += 4;
   return score;
-}
-
-function candidateMatchesDiscoveryFilter(candidate: LocalDiscoveryCandidate, filter: string) {
-  if (filter === "all") return true;
-  const tags = new Set([candidate.category, candidate.deviceType, ...(candidate.filterTags ?? [])].filter(Boolean));
-  if (filter === "network") return tags.has("network") || tags.has("router") || tags.has("web");
-  return tags.has(filter);
 }
