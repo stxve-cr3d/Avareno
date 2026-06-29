@@ -89,6 +89,21 @@ Logs should contain safe operational facts only:
 
 Logs must not contain raw document content, raw connector payloads, secrets, tokens, full email bodies, full receipt text, addresses, IDs, or private files.
 
+### Admin Access And Roles
+
+Platform admin access is internal and separate from household sharing roles. Admin roles include `SUPER_ADMIN`, `SUPPORT`, `BILLING_ADMIN`, `PRIVACY_ADMIN`, and `MODERATOR`.
+
+Admin access must follow least privilege:
+
+- no default access to private document contents, OCR text, file paths, Vault files, secrets, raw connector payloads, or payment details
+- support and moderation roles see only the metadata needed for their task
+- billing roles see subscription status and safe provider identifiers only
+- privacy roles see export/deletion/privacy status and safe audit records
+- role changes require a reason and an audit log entry
+- production role checks must use backend-controlled records or Supabase `app_metadata`, never user-editable `user_metadata`
+
+Admin audit logs are operational/security records. They must remain content-minimized and need a deliberate retention and deletion policy before production launch.
+
 ## Storage Areas
 
 Current or planned storage areas include:
@@ -106,6 +121,7 @@ Current or planned storage areas include:
 - future encrypted connector token storage
 - billing subscription state and safe billing event records
 - future audit/sync logs
+- admin membership and admin audit records
 
 Before public launch, production storage must have:
 

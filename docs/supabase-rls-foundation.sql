@@ -3,6 +3,8 @@
 -- Keep service-role keys server-side only; browser clients use the publishable key.
 
 alter table public."User" enable row level security;
+alter table public."AdminMembership" enable row level security;
+alter table public."AdminAuditLog" enable row level security;
 alter table public."Household" enable row level security;
 alter table public."HouseholdMember" enable row level security;
 alter table public."Space" enable row level security;
@@ -23,6 +25,9 @@ alter table public."SmartHomeDevice" enable row level security;
 alter table public."SmartHomeCommand" enable row level security;
 
 create index if not exists "User_auth_uid_idx" on public."User" ("id");
+create index if not exists "AdminMembership_userId_idx" on public."AdminMembership" ("userId");
+create index if not exists "AdminMembership_email_idx" on public."AdminMembership" ("email");
+create index if not exists "AdminAuditLog_createdAt_idx" on public."AdminAuditLog" ("createdAt");
 create index if not exists "Household_userId_idx" on public."Household" ("userId");
 create index if not exists "HouseholdMember_userId_idx" on public."HouseholdMember" ("userId");
 create index if not exists "HouseholdMember_householdId_idx" on public."HouseholdMember" ("householdId");
@@ -43,6 +48,8 @@ create index if not exists "SmartHomeDevice_userId_idx" on public."SmartHomeDevi
 create index if not exists "SmartHomeCommand_userId_idx" on public."SmartHomeCommand" ("userId");
 
 grant select, insert, update, delete on public."User" to authenticated;
+revoke all on public."AdminMembership" from anon, authenticated;
+revoke all on public."AdminAuditLog" from anon, authenticated;
 grant select, insert, update, delete on public."Household" to authenticated;
 grant select, insert, update, delete on public."HouseholdMember" to authenticated;
 grant select, insert, update, delete on public."Space" to authenticated;
@@ -80,6 +87,13 @@ on public."User" for update
 to authenticated
 using ((select auth.uid())::text = "id")
 with check ((select auth.uid())::text = "id");
+
+-- AdminMembership and AdminAuditLog intentionally have no authenticated
+-- browser-client policies. Admin role reads/writes must go through a trusted
+-- backend or Edge Function using server-side credentials, with minimized
+-- responses and safe audit entries. Do not add broad authenticated policies
+-- for these tables. If JWT admin claims are used, keep them in app_metadata,
+-- never user_metadata.
 
 drop policy if exists "Users can manage own households" on public."Household";
 create policy "Users can manage own households"

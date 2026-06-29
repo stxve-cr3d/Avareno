@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.auth import auth_middleware
 from app.db import PROJECT_ROOT
-from app.routers import assistant, billing, capture, dashboard, documents, extract, items, loops, me, mobile, notifications, planner, privacy, reports, rewards, search, smart_home, structure, webhooks
+from app.routers import admin, assistant, billing, capture, dashboard, documents, extract, items, loops, me, mobile, notifications, planner, privacy, reports, rewards, search, smart_home, structure, webhooks
 
 app = FastAPI(title="Avareno API")
 
@@ -43,6 +43,7 @@ uploads.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=Path(uploads)), name="uploads")
 
 app.include_router(me.router, prefix="/api/me", tags=["me"])
+app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
 app.include_router(extract.router, prefix="/api/extract", tags=["extract"])

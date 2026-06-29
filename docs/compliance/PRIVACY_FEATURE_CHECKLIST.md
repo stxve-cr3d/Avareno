@@ -164,6 +164,42 @@ Decision:
 - Needs lawyer/DSB review first: yes before production enablement
 - Notes: verify Supabase project region, Twilio DPA/AVV, SMS retention/deletion, and Datenschutzerklaerung disclosure before setting `VITE_AUTH_PHONE_ENABLED=true` in production.
 
+## Completed Review: Internal Admin Access And Role Management
+
+- Feature name: Internal Admin Access And Role Management
+- Owner: Engineering/Product
+- Route/module: `backend/app/routers/admin.py`, `backend/app/services/admin.py`, `frontend/src/pages/AdminDashboard.tsx`
+- Backend/API changes: `/api/admin/access`, `/api/admin/summary`, `/api/admin/memberships`
+- Database/storage changes: `AdminMembership`, `AdminAuditLog`
+- Third-party providers: no new provider; production uses existing Supabase Auth/Database
+- Launch state: internal MVP foundation
+
+Required questions:
+
+1. Personal data: admin role records, audit events, user id/email/name, aggregate user object/document/open-loop/subscription counts.
+2. Purpose: operate the product safely, manage internal access, support/privacy/billing workflows, and create accountability.
+3. Avoid collection: cannot avoid role/audit records for secure admin access; user-facing data is minimized.
+4. Data minimization: no document contents, file paths, OCR text, Vault files, raw connector payloads, tokens/secrets, or payment method details are returned.
+5. Storage: local SQLite MVP now; production Supabase Postgres with RLS/backend-only admin tables.
+6. Retention: admin audit retention TBD before production; role records retained while needed for access control.
+7. Export: export plan must include admin audit records that reference a user where legally required and safe.
+8. Deletion: account deletion must consider whether audit records are retained for security/legal reasons and whether identifiers should be minimized/anonymized.
+9. Third-party sharing: no new sharing; Supabase stores production records.
+10. AI: no.
+11. Consent/legal basis: likely legitimate interest/contract operations; lawyer/DSB review required before production.
+12. Connected accounts: no connector payload access in admin dashboard.
+13. Sensitive/private documents: the system may contain them, but admin dashboard explicitly excludes contents and file paths by default.
+14. Tokens/secrets/API credentials: service-role keys remain server-side only; no token/secret exposure.
+15. Logs: admin audit logs are content-minimized and must not contain sensitive content.
+16. Abuse/security risks: privilege escalation, overbroad support access, stale JWT claims, audit tampering, insider misuse, exposed service-role key, RLS/Data API misconfiguration.
+
+Decision:
+
+- Privacy review complete: yes for internal MVP foundation
+- Safe to implement now: yes with minimized responses and backend gates
+- Needs lawyer/DSB review first: yes before production admin access
+- Notes: production must verify Supabase RLS/Data API exposure, run advisors, test non-admin denial, define retention, and add re-auth/break-glass rules before sensitive admin actions.
+
 ## Completed Review: Supabase Email Magic Link Auth
 
 - Feature name: Supabase Email Magic Link Auth

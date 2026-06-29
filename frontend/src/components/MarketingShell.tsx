@@ -2,7 +2,7 @@ import { useEffect, useState, type MouseEvent } from "react";
 import type { ReactNode } from "react";
 import { Github, Instagram, Menu, X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import avarenoMark from "../assets/avareno-test-logo.png";
+import avarenoMark from "../assets/avareno-mark.svg";
 import { LanguageSwitch } from "./LanguageSwitch";
 import { useLanguage } from "../lib/language";
 

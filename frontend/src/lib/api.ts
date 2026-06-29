@@ -13,7 +13,8 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${apiOrigin}${path}`, {
+  const url = `${apiOrigin}${path}`;
+  const response = await fetch(url, {
     ...options,
     headers
   });
@@ -21,7 +22,8 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     const detail = Array.isArray(body.detail) ? body.detail.map((entry: { msg?: string }) => entry.msg).filter(Boolean).join(", ") : body.detail;
-    throw new Error(body.error ?? detail ?? "Request failed");
+    const method = options.method ?? "GET";
+    throw new Error(`${method} ${url} failed ${response.status}: ${body.error ?? detail ?? "Request failed"}`);
   }
 
   return response.json() as Promise<T>;

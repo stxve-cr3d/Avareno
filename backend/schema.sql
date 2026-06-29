@@ -1,6 +1,8 @@
 PRAGMA foreign_keys = ON;
 
 DROP TABLE IF EXISTS "AffiliateClick";
+DROP TABLE IF EXISTS "AdminAuditLog";
+DROP TABLE IF EXISTS "AdminMembership";
 DROP TABLE IF EXISTS "BillingEvent";
 DROP TABLE IF EXISTS "ItemActivity";
 DROP TABLE IF EXISTS "SmartHomeCommand";
@@ -29,6 +31,39 @@ CREATE TABLE "User" (
   "createdAt" TEXT NOT NULL,
   "updatedAt" TEXT NOT NULL
 );
+
+CREATE TABLE "AdminMembership" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "userId" TEXT,
+  "email" TEXT,
+  "role" TEXT NOT NULL,
+  "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+  "createdByUserId" TEXT,
+  "reason" TEXT NOT NULL,
+  "createdAt" TEXT NOT NULL,
+  "updatedAt" TEXT NOT NULL,
+  FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE,
+  FOREIGN KEY ("createdByUserId") REFERENCES "User" ("id") ON DELETE SET NULL
+);
+
+CREATE TABLE "AdminAuditLog" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "actorUserId" TEXT,
+  "action" TEXT NOT NULL,
+  "targetType" TEXT NOT NULL,
+  "targetId" TEXT,
+  "targetUserId" TEXT,
+  "role" TEXT,
+  "reason" TEXT NOT NULL,
+  "safeStatus" TEXT NOT NULL DEFAULT 'RECORDED',
+  "createdAt" TEXT NOT NULL,
+  FOREIGN KEY ("actorUserId") REFERENCES "User" ("id") ON DELETE SET NULL,
+  FOREIGN KEY ("targetUserId") REFERENCES "User" ("id") ON DELETE SET NULL
+);
+
+CREATE INDEX "AdminMembership_userId_idx" ON "AdminMembership" ("userId");
+CREATE INDEX "AdminMembership_email_idx" ON "AdminMembership" ("email");
+CREATE INDEX "AdminAuditLog_createdAt_idx" ON "AdminAuditLog" ("createdAt");
 
 CREATE TABLE "Household" (
   "id" TEXT NOT NULL PRIMARY KEY,

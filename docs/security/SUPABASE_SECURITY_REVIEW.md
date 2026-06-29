@@ -21,6 +21,7 @@ Supabase skill/changelog note: reviewed Supabase changelog on 2026-06-28. Releva
   - `docs/supabase-rls-foundation.sql`
   - `docs/supabase-storage-policies.sql`
 - RLS draft uses `TO authenticated` plus ownership checks with `(select auth.uid())::text = "userId"` or table-specific owner predicates.
+- Admin tables `AdminMembership` and `AdminAuditLog` are documented as backend-only and should not receive broad browser/Data API policies.
 - Storage policy draft expects buckets: `avatars`, `object-images`, `receipts`, `documents`, `support-files`.
 - Storage policy draft makes avatars public and all other listed buckets private.
 
@@ -62,6 +63,8 @@ Supabase skill/changelog note: reviewed Supabase changelog on 2026-06-28. Releva
 - [ ] Every policy combines role with ownership, not `TO authenticated` alone.
 - [ ] `UPDATE` policies include both `USING` and `WITH CHECK`.
 - [ ] No authorization decisions rely on user-editable `user_metadata`.
+- [ ] Admin roles are checked through backend-controlled records or Supabase `app_metadata`, never `user_metadata`.
+- [ ] `AdminMembership` and `AdminAuditLog` are not exposed to `anon` or broad `authenticated` Data API access.
 - [ ] Views use `security_invoker = true` or are not exposed to anon/authenticated.
 - [ ] `SECURITY DEFINER` functions are avoided unless reviewed, non-public, and tightly checked.
 - [ ] `anon` role has no access to private user tables.

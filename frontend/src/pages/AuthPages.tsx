@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { ArrowRight, CheckCircle2, CircleX, CreditCard, Fingerprint, KeyRound, Link2, LogOut, Mail, ShieldCheck, Smartphone, Trash2, Upload, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, CircleX, CreditCard, Fingerprint, KeyRound, Link2, LogOut, Mail, ShieldCheck, Smartphone, Trash2, Upload, UserRound } from "lucide-react";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { safeAppRedirect, supabase } from "../lib/authClient";
 import type { SocialAuthProvider } from "../lib/authClient";
@@ -12,6 +12,7 @@ import { formatUiText } from "../lib/uiText";
 import { AppLoadingBar } from "../components/app/AppKit";
 import { LanguageSwitch } from "../components/LanguageSwitch";
 import { useNotifications } from "../components/app/Notifications";
+import authLogoPreview from "../assets/auth-logo-preview.png";
 
 type AuthMode = "login" | "signup";
 type AuthLoginMethod = "email" | "phone";
@@ -1372,7 +1373,15 @@ function formatBillingDate(value: string) {
 }
 
 function AuthSurface({ label, children }: { label: string; children: ReactNode }) {
-  return <section className="auth-card" aria-label={label}>{children}</section>;
+  return (
+    <section className="auth-card" aria-label={label}>
+      <Link className="auth-home-link" to="/">
+        <ArrowLeft size={15} />
+        Zur Startseite
+      </Link>
+      {children}
+    </section>
+  );
 }
 
 function GoogleIcon() {
@@ -1398,7 +1407,7 @@ function AuthIntro({ eyebrow, title, body }: { eyebrow: string; title: string; b
   return (
     <header className="auth-intro">
       <div className="auth-mark" aria-hidden="true">
-        <ShieldCheck size={22} />
+        <img src={authLogoPreview} alt="" />
       </div>
       <p>{formatUiText(eyebrow)}</p>
       <h1>{formatUiText(title)}</h1>

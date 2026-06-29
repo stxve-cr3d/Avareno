@@ -125,6 +125,27 @@ High-risk trigger notes:
 
 Screening outcome: medium risk for foundation; high review requirement before paid launch. Proceed only with no card data stored, no raw webhook payload logging, signature-verified webhooks and no public claims of legal/tax certainty.
 
+## Screening: Internal Admin Access And Role Management
+
+- Feature name: Internal Admin Access And Role Management
+- Description: platform admin dashboard, role distribution, minimized user/account status overview, and admin audit log
+- Data categories: admin role records, admin audit events, user account metadata, aggregate object/document/open-loop/subscription counts
+- Users affected: internal admins/support and registered users whose metadata may appear in minimized admin views
+- Third parties: Supabase Auth/Database in production
+- Launch state: internal MVP foundation
+
+High-risk trigger notes:
+
+- Sensitive/highly personal documents: the system may contain them, but the admin dashboard must not expose contents, file paths, OCR text, or Vault files by default.
+- Large-volume processing: potential as the user base grows; dashboard must use minimization and pagination.
+- Connected accounts/imports: no direct connector data shown.
+- AI analysis/profiling: no AI in admin role management.
+- Exposure to other users/support agents: yes, internal admins/support can see minimized account metadata; this requires role-based access and audit.
+- Third-country transfer/new provider: no new provider beyond planned Supabase, but Supabase region/DPA/AVV must be verified.
+- Breach harm: high if admin controls are misconfigured, because admin access could become a path to private Avareno data.
+
+Screening outcome: medium/high. MVP foundation may proceed with minimized data, backend gates, no private document contents, and audit logging. Production launch needs RLS/advisor verification, retention policy, re-auth/break-glass design, and legal/DSB review.
+
 ## Required Follow-Ups
 
 - Update processing activities draft.

@@ -17,6 +17,7 @@ import { AskAvareno } from "./pages/AskAvareno";
 import { SmartHome } from "./pages/SmartHome";
 import { Resolve } from "./pages/Resolve";
 import { Care } from "./pages/Care";
+import { AdminDashboard } from "./pages/AdminDashboard";
 import { CookiesPage, DatenschutzPage, ImpressumPage, PricingPage } from "./pages/MarketingPages";
 import { AccountSettingsPage, AuthCallbackPage, EmailVerifyPage, ForgotPasswordPage, LoginPage, OnboardingPage, ResetPasswordPage, SignupPage } from "./pages/AuthPages";
 import { AuthProvider } from "./lib/authProvider";
@@ -108,7 +109,8 @@ const router = createBrowserRouter([
       { path: "app/friends", element: <Navigate to="/app/ich/friends" replace /> },
       { path: "app/friends/:friendId", element: <FriendProfilePage /> },
       { path: "app/settings", element: <AccountSettingsPage /> },
-      { path: "app/settings/account", element: <AccountSettingsPage /> }
+      { path: "app/settings/account", element: <AccountSettingsPage /> },
+      { path: "app/admin", element: <AdminDashboard /> }
     ]
   }
 ]);

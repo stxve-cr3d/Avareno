@@ -757,6 +757,87 @@ export type NotificationsPayload = {
   };
 };
 
+export type AdminRole = "SUPER_ADMIN" | "SUPPORT" | "BILLING_ADMIN" | "PRIVACY_ADMIN" | "MODERATOR" | string;
+
+export type AdminAccess = {
+  active: boolean;
+  roles: AdminRole[];
+  capabilities: string[];
+  devBootstrap: boolean;
+};
+
+export type AdminRoleCatalogItem = {
+  id: AdminRole;
+  label: string;
+  description: string;
+  capabilities: string[];
+};
+
+export type AdminMembership = {
+  id: string;
+  userId?: string | null;
+  userName?: string | null;
+  email?: string | null;
+  role: AdminRole;
+  status: "ACTIVE" | "SUSPENDED" | string;
+  reason: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminSafeUser = {
+  id: string;
+  name: string;
+  email: string;
+  contactVisible: boolean;
+  createdAt: string;
+  updatedAt: string;
+  itemCount: number;
+  documentCount: number;
+  openLoopCount: number;
+};
+
+export type AdminAuditEvent = {
+  id: string;
+  actorUserId?: string | null;
+  actorEmail?: string | null;
+  action: string;
+  targetType: string;
+  targetId?: string | null;
+  targetUserId?: string | null;
+  targetEmail?: string | null;
+  role?: AdminRole | null;
+  reason: string;
+  safeStatus: string;
+  createdAt: string;
+};
+
+export type AdminSummary = {
+  access: AdminAccess;
+  roleCatalog: AdminRoleCatalogItem[];
+  stats: {
+    users: number;
+    adminMembers: number;
+    openLoops: number;
+    documents: number;
+    auditEvents: number;
+  };
+  memberships: AdminMembership[];
+  users: AdminSafeUser[];
+  billing?: {
+    plans: { planKey: string; status: string; count: number }[];
+    note: string;
+  } | null;
+  privacy?: {
+    documentTypes: { type: string; count: number }[];
+    exportReady: boolean;
+    deletionReady: boolean;
+    note: string;
+  } | null;
+  audit: AdminAuditEvent[];
+  guardrails: string[];
+};
+
 export type PrivacyDataOverviewItem = {
   id: string;
   label: string;

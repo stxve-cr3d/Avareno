@@ -40,6 +40,11 @@ def _get_or_create_auth_user(conn: sqlite3.Connection) -> dict | None:
         return dict(existing)
 
     email = claims.get("email")
+    if isinstance(email, str) and email:
+        existing_by_email = conn.execute('SELECT * FROM "User" WHERE lower(email) = lower(?)', (email,)).fetchone()
+        if existing_by_email:
+            return dict(existing_by_email)
+
     metadata = claims.get("user_metadata") if isinstance(claims.get("user_metadata"), dict) else {}
     display_name = metadata.get("display_name") or metadata.get("full_name") or metadata.get("name")
     now = now_iso()

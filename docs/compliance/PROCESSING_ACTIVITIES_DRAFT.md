@@ -78,6 +78,59 @@ Examples:
 
 ### Subprocessors
 
+## Internal Admin Access And Role Management
+
+### Purpose
+
+Operate Avareno safely through least-privilege internal roles, role assignment, support/privacy/billing overview, and auditability.
+
+### Data Categories
+
+- admin membership records
+- admin role and capability metadata
+- admin audit logs: actor user id, action, target type/id, target user id where needed, role, reason, safe status, timestamp
+- minimized user account metadata for admin overview
+- aggregated product/document/open-loop/subscription counts
+
+Private document contents, file paths, OCR/extracted text, raw connector payloads, tokens/secrets, payment method details, and Vault contents must not be shown in the Admin Dashboard by default.
+
+### User Categories
+
+- internal admins/support
+- registered users whose account metadata may appear in minimized admin views
+
+### Recipients
+
+- Avareno backend/database
+- Supabase Database/Auth for production storage/authentication
+
+No new third-party provider is added by the admin dashboard itself.
+
+### Legal Basis
+
+Legitimate interest / contract operations likely, but must be reviewed by lawyer/DSB. Access to user data must remain limited to the concrete internal purpose.
+
+### Retention
+
+Admin membership records are retained while access is active and for a defined post-access audit period. Admin audit log retention is TBD and must be documented before production.
+
+### Security Measures
+
+- least-privilege roles
+- no authorization from Supabase `user_metadata`
+- production role management server-side only
+- service-role credentials never exposed to frontend
+- no broad browser RLS policies for admin tables
+- audit log for role changes
+- minimized Admin API responses
+
+### Open Items
+
+- Define audit retention period.
+- Define break-glass process and re-auth requirement for sensitive admin actions.
+- Verify Supabase RLS/Data API exposure and run advisors before production.
+- Add multi-user tests for admin and non-admin access.
+
 ## Supabase Phone/SMS OTP Authentication
 
 ### Purpose

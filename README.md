@@ -15,7 +15,7 @@ Avareno is a mobile-first web app for real-life open loops: receipts, devices, d
 
 ```bash
 npm install
-python3 -m pip install -r backend/requirements.txt
+python -m pip install -r backend/requirements.txt
 npm run db:init
 npm run dev
 ```

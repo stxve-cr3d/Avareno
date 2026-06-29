@@ -176,6 +176,37 @@ For production Supabase tables, add a `profiles` table keyed by `auth.users.id`,
 
 The current SQLite MVP schema is mirrored by `docs/supabase-rls-foundation.sql` as a first Supabase Postgres RLS baseline. Apply it only after the matching public tables exist, then run Supabase advisors before production use.
 
+## Admin Roles And Access
+
+Avareno platform admin roles are separate from household roles.
+
+Household roles remain user-facing sharing roles:
+
+- `OWNER`
+- `EDITOR`
+- `VIEWER`
+
+Platform admin roles are internal only:
+
+- `SUPER_ADMIN`: manages admin roles, system status, safe audit visibility; no default access to private document contents.
+- `SUPPORT`: safe user/support metadata and Resolve moderation; no private document contents.
+- `BILLING_ADMIN`: subscription status and safe billing metadata only; no payment method data or documents.
+- `PRIVACY_ADMIN`: export/deletion/privacy status and audit visibility; no private document contents by default.
+- `MODERATOR`: Resolve moderation context only.
+
+Production authorization must not rely on Supabase `user_metadata`. If JWT-backed admin claims are used, store them in Supabase `app_metadata` / `raw_app_meta_data`, for example `avareno_admin_roles`, and remember that JWT claims are not fresh until token refresh. The preferred production path is a backend/Edge Function that checks `AdminMembership`, writes `AdminAuditLog`, and uses service-role credentials only server-side.
+
+Admin APIs must return minimized data:
+
+- no document file paths
+- no OCR/extracted text
+- no raw connector payloads
+- no tokens/secrets
+- no private Vault contents
+- no full payment details
+
+Admin role changes require a clear reason and an audit entry. Before production, verify Supabase RLS/Data API exposure, run Supabase advisors, test cross-user access with multiple accounts, and confirm retention/deletion rules for `AdminAuditLog`.
+
 ## Security Notes
 
 - Redirects after login are limited to internal app routes.

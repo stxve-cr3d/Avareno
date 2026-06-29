@@ -60,6 +60,7 @@ def ensure_runtime_schema(conn: sqlite3.Connection) -> None:
             conn.execute(f'ALTER TABLE "Item" ADD COLUMN "{name}" {definition}')
     if columns:
         conn.execute('CREATE INDEX IF NOT EXISTS "Item_userId_barcode_idx" ON "Item" ("userId", "barcode")')
+    _ensure_admin_tables(conn)
     device_columns = {row["name"] for row in conn.execute('PRAGMA table_info("DeviceToken")').fetchall()}
     if not device_columns:
         conn.execute(
@@ -79,6 +80,43 @@ def ensure_runtime_schema(conn: sqlite3.Connection) -> None:
     _ensure_smart_home_tables(conn)
     _ensure_default_product_structure(conn)
     _ensure_default_smart_home_devices(conn)
+
+
+def _ensure_admin_tables(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS "AdminMembership" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "userId" TEXT,
+          "email" TEXT,
+          "role" TEXT NOT NULL,
+          "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+          "createdByUserId" TEXT,
+          "reason" TEXT NOT NULL,
+          "createdAt" TEXT NOT NULL,
+          "updatedAt" TEXT NOT NULL,
+          FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE,
+          FOREIGN KEY ("createdByUserId") REFERENCES "User" ("id") ON DELETE SET NULL
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS "AdminAuditLog" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "actorUserId" TEXT,
+          "action" TEXT NOT NULL,
+          "targetType" TEXT NOT NULL,
+          "targetId" TEXT,
+          "targetUserId" TEXT,
+          "role" TEXT,
+          "reason" TEXT NOT NULL,
+          "safeStatus" TEXT NOT NULL DEFAULT 'RECORDED',
+          "createdAt" TEXT NOT NULL,
+          FOREIGN KEY ("actorUserId") REFERENCES "User" ("id") ON DELETE SET NULL,
+          FOREIGN KEY ("targetUserId") REFERENCES "User" ("id") ON DELETE SET NULL
+        )"""
+    )
+    conn.execute('CREATE INDEX IF NOT EXISTS "AdminMembership_userId_idx" ON "AdminMembership" ("userId")')
+    conn.execute('CREATE INDEX IF NOT EXISTS "AdminMembership_email_idx" ON "AdminMembership" ("email")')
+    conn.execute('CREATE INDEX IF NOT EXISTS "AdminAuditLog_createdAt_idx" ON "AdminAuditLog" ("createdAt")')
 
 
 def _ensure_product_tables(conn: sqlite3.Connection) -> None:

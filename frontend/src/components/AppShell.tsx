@@ -1,8 +1,10 @@
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Archive, ChevronDown, FileText, Home, LifeBuoy, LogOut, MessageSquareText, Package, PenLine, Plus, ReceiptText, ShieldCheck, UserRound, UsersRound, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import avarenoMark from "../assets/avareno-test-logo.png";
+import avarenoMark from "../assets/avareno-mark.svg";
 import { useAuth } from "../lib/authProvider";
+import { api } from "../lib/api";
+import type { AdminAccess } from "../lib/types";
 
 const nav = [
   { to: "/app", label: "Zuhause", icon: Home },
@@ -25,6 +27,7 @@ export function AppShell() {
   const [open, setOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const [adminAccess, setAdminAccess] = useState<AdminAccess | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const auth = useAuth();
@@ -32,9 +35,29 @@ export function AppShell() {
   const isAuthSurface = ["/login", "/signup", "/forgot-password", "/reset-password", "/auth/callback", "/auth/verify-email", "/onboarding"].includes(location.pathname);
   const isProtectedSurface = !isMarketingSurface && !isAuthSurface;
 
+  function refreshAdminAccess() {
+    if (auth.status !== "authenticated") {
+      setAdminAccess(null);
+      return;
+    }
+
+    api<AdminAccess>("/api/admin/access")
+      .then(setAdminAccess)
+      .catch(() => setAdminAccess(null));
+  }
+
   useEffect(() => {
     setProfileMenuOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (auth.status !== "authenticated") {
+      setAdminAccess(null);
+      return;
+    }
+
+    refreshAdminAccess();
+  }, [auth.status]);
 
   useEffect(() => {
     if (!profileMenuOpen) return;
@@ -116,7 +139,10 @@ export function AppShell() {
             <div className="avareno-profile-menu" ref={profileMenuRef}>
               <button
                 className="avareno-profile-trigger"
-                onClick={() => setProfileMenuOpen((current) => !current)}
+                onClick={() => {
+                  if (!profileMenuOpen) refreshAdminAccess();
+                  setProfileMenuOpen((current) => !current);
+                }}
                 type="button"
                 aria-expanded={profileMenuOpen}
                 aria-haspopup="menu"
@@ -145,6 +171,12 @@ export function AppShell() {
                     <ShieldCheck size={15} />
                     Privatsphäre
                   </Link>
+                  {adminAccess?.active ? (
+                    <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" to="/app/admin">
+                      <ShieldCheck size={15} />
+                      Admin
+                    </Link>
+                  ) : null}
                   <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" to="/">
                     <Home size={15} />
                     Website
