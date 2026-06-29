@@ -12,7 +12,7 @@ export type UserProfile = {
   displayName: string;
   email: string;
   avatarUrl?: string | null;
-  authProvider: "email" | "google" | "apple";
+  authProvider: "email" | "phone" | "google" | "apple";
   createdAt: string;
   updatedAt: string;
   emailVerified: boolean;
@@ -581,10 +581,80 @@ export type PlanSubscription = {
   id: string;
   userId: string;
   householdId?: string | null;
-  tier: "FREE" | "PREMIUM" | "PRO" | string;
+  provider?: BillingProvider | string;
+  providerCustomerId?: string | null;
+  providerSubscriptionId?: string | null;
+  planKey?: PlanKey | string;
+  tier: "FREE" | "PERSONAL" | "FAMILY" | "PREMIUM" | "PRO" | string;
   status: "ACTIVE" | "PAST_DUE" | "CANCELLED" | string;
   itemLimit: number;
   storageLimitMb: number;
+  currentPeriodStart?: string | null;
+  currentPeriodEnd?: string | null;
+  cancelAtPeriodEnd?: boolean | number;
+};
+
+export type BillingProvider = "paddle" | "lemon_squeezy" | "stripe";
+
+export type PlanKey = "free" | "personal" | "family";
+
+export type SubscriptionStatus = "free" | "active" | "trialing" | "past_due" | "paused" | "canceled" | "incomplete" | string;
+
+export type BillingPlan = {
+  key: PlanKey;
+  name: string;
+  priceLabel: string;
+  monthlyPriceEur: number;
+  recommended: boolean;
+  available: boolean;
+  checkoutEnabled: boolean;
+  cta: string;
+  note: string;
+  features: string[];
+  itemLimit: number;
+  storageLimitMb: number;
+};
+
+export type BillingSubscriptionState = {
+  id?: string;
+  provider?: BillingProvider | string;
+  planKey: PlanKey;
+  status: SubscriptionStatus;
+  currentPeriodStart?: string | null;
+  currentPeriodEnd?: string | null;
+  cancelAtPeriodEnd?: boolean;
+  itemLimit?: number;
+  storageLimitMb?: number;
+};
+
+export type BillingStatus = {
+  provider: BillingProvider;
+  providerConfigured: boolean;
+  familyCheckoutEnabled: boolean;
+  portalConfigured: boolean;
+  currentPlan: BillingPlan;
+  subscription: BillingSubscriptionState;
+  plans: BillingPlan[];
+  legalReviewRequired: boolean;
+  message: string;
+};
+
+export type CheckoutRequest = {
+  planKey: PlanKey;
+};
+
+export type BillingPortalRequest = {
+  returnUrl?: string | null;
+};
+
+export type WebhookEventRecord = {
+  provider: BillingProvider;
+  eventId: string;
+  eventType: string;
+  receivedAt: string;
+  processedAt?: string | null;
+  status: "RECEIVED" | "PROCESSED" | "IGNORED" | "FAILED" | string;
+  safeError?: string | null;
 };
 
 export type ProductStructure = {
@@ -685,6 +755,62 @@ export type NotificationsPayload = {
     thisWeek: number;
     later: number;
   };
+};
+
+export type PrivacyDataOverviewItem = {
+  id: string;
+  label: string;
+  value: number;
+  status: string;
+  note: string;
+};
+
+export type PrivacyConnectedSource = {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
+  lastSync?: string | null;
+  permissions: string[];
+  disconnectAvailable: boolean;
+  disconnectTodo?: string;
+};
+
+export type PrivacyPlan = {
+  state: string;
+  ready: boolean;
+  userVisibleMessage: string;
+  includedWhenImplemented?: string[];
+  requiredAreas?: string[];
+  knownTables?: string[];
+};
+
+export type PrivacySummary = {
+  generatedAt: string;
+  implementationState: string;
+  dataOverview: PrivacyDataOverviewItem[];
+  connectedSources: PrivacyConnectedSource[];
+  aiControls: {
+    receiptDocumentAnalysis: string;
+    vaultAutoAnalysis: boolean;
+    userCorrection: string;
+    note: string;
+  };
+  privateVault: {
+    status: string;
+    sensitiveCategories: string[];
+    requiresReauth: string;
+    strongerEncryption: string;
+  };
+  consentHistory: Array<{
+    id: string;
+    label: string;
+    createdAt: string;
+    status: string;
+  }>;
+  export: PrivacyPlan;
+  deletion: PrivacyPlan;
+  thirdPartyProviders: string[];
 };
 
 export type MobileBootstrap = {

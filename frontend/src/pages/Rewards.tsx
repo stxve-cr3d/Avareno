@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  AlertTriangle,
   ArrowLeft,
   Brain,
   CheckCircle2,
@@ -8,10 +9,11 @@ import {
   Copy,
   Database,
   Download,
+  FileLock2,
   History,
-  Link2Off,
   LockKeyhole,
   PauseCircle,
+  PlugZap,
   ShieldCheck,
   Sparkles,
   Trash2,
@@ -19,6 +21,7 @@ import {
   UserRound
 } from "lucide-react";
 import { Link, NavLink, useLocation, useParams } from "react-router-dom";
+import { api } from "../lib/api";
 import { useAuth } from "../lib/authProvider";
 import {
   buildCurrentUserProgress,
@@ -28,6 +31,7 @@ import {
   mockFriends
 } from "../lib/friendsData";
 import type { FriendProgress, MotivationPrivacyPreferences } from "../lib/friendsData";
+import type { PrivacyDataOverviewItem, PrivacySummary } from "../lib/types";
 
 const preferenceKey = "avareno-private-motivation-preferences";
 
@@ -50,9 +54,37 @@ export function Rewards() {
   const selectedFriend = friendId ? progressRows.find((friend) => friend.id === friendId) ?? null : null;
   const profileBasePath = location.pathname.startsWith("/app/ich")
     ? "/app/ich"
-    : location.pathname.startsWith("/app")
+    : location.pathname.startsWith("/app/profile")
       ? "/app/profile"
-      : "/rewards";
+      : location.pathname.startsWith("/app")
+        ? "/app/ich"
+        : "/rewards";
+  const [privacySummary, setPrivacySummary] = useState<PrivacySummary | null>(null);
+  const [privacyError, setPrivacyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (section !== "privacy") {
+      return;
+    }
+
+    let active = true;
+    setPrivacyError(null);
+    api<PrivacySummary>("/api/privacy/summary")
+      .then((summary) => {
+        if (active) {
+          setPrivacySummary(summary);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setPrivacyError("Backend-Zusammenfassung noch nicht erreichbar. Die sicheren Platzhalter bleiben sichtbar.");
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [section]);
 
   if (!profile || !currentUserProgress) return <div className="profile-loading">Profil wird geladen...</div>;
 
@@ -100,7 +132,7 @@ export function Rewards() {
         <ProfileStat icon={<PauseCircle size={18} />} label="Pausentage" value={String(profile.freezeDaysAvailable)} />
       </section>
 
-      <ProfileSectionNav basePath={profileBasePath} />
+      <ProfileSectionNav app={location.pathname.startsWith("/app")} basePath={profileBasePath} />
 
       {section === "overview" ? (
         <ProfileOverview
@@ -130,10 +162,10 @@ export function Rewards() {
       ) : null}
 
       {section === "privacy" ? (
-        <PrivacyPanel
+        <PrivacyCenterPanel
+          summary={privacySummary ?? buildPrivacyFallback(profile.displayName)}
+          loadError={privacyError}
           preferences={preferences}
-          profileEmail={profile.email}
-          profileName={profile.displayName}
           onChange={updatePreferences}
         />
       ) : null}
@@ -144,16 +176,16 @@ export function Rewards() {
 function getProfileSection(pathname: string) {
   if (pathname.includes("/friends/")) return "friendDetail";
   if (pathname.endsWith("/friends")) return "friends";
-  if (pathname.endsWith("/privacy")) return "privacy";
+  if (pathname.endsWith("/privacy") || pathname.endsWith("/datenschutz")) return "privacy";
   return "overview";
 }
 
-function ProfileSectionNav({ basePath }: { basePath: string }) {
+function ProfileSectionNav({ app, basePath }: { app: boolean; basePath: string }) {
   const items = [
     { to: basePath, label: "Übersicht", end: true },
     { to: `${basePath}/friends`, label: "Freunde" },
     { to: `${basePath}/privacy`, label: "Datenschutz" },
-    { to: `${basePath}/settings`, label: "Settings" }
+    { to: app ? `${basePath}/settings` : "/settings/account", label: "Konto" }
   ];
 
   return (
@@ -392,227 +424,221 @@ function FriendDetailPage({ basePath, friend }: { basePath: string; friend: Frie
   );
 }
 
-function PrivacyPanel({
+function PrivacyCenterPanel({
+  summary,
+  loadError,
   preferences,
-  profileEmail,
-  profileName,
   onChange
 }: {
+  summary: PrivacySummary;
+  loadError: string | null;
   preferences: MotivationPrivacyPreferences;
-  profileEmail: string;
-  profileName: string;
   onChange: (next: Partial<MotivationPrivacyPreferences>) => void;
 }) {
-  const [leaveState, setLeaveState] = useState<"idle" | "confirm" | "left">("idle");
-  const [deleteConfirmation, setDeleteConfirmation] = useState("");
-
-  function leaveCircle() {
-    if (leaveState === "idle") {
-      setLeaveState("confirm");
-      return;
-    }
-    onChange({
-      allowFriendInvites: false,
-      leaderboardEnabled: false,
-      motivationEnabled: false
-    });
-    setLeaveState("left");
-  }
-
-  const overviewRows = [
-    { label: "Account", value: profileEmail },
-    { label: "Profil", value: profileName },
-    { label: "Dinge & Dokumente", value: "Über Objekt- und Dokumentenspeicher verwaltet" },
-    { label: "AI Memory Build", value: "Foundation markiert, keine Garantie- oder Rechtsprüfung" }
-  ];
-  const connectedSources = [
-    { label: "Supabase Auth", status: "Aktive Anmeldung" },
-    { label: "Cloudflare Turnstile", status: "Bot-Schutz bei Login/Signup" },
-    { label: "Avareno Connect", status: "Noch keine produktive Verbindung" }
-  ];
-  const consentRows = [
-    { label: "Login-Session", status: "Technisch notwendig" },
-    { label: "AI-Verarbeitung", status: "Explizite Kontrolle noch offen" },
-    { label: "Marketing/Analytics", status: "Nicht aktiv im aktuellen Frontend" }
-  ];
+  const [deleteState, setDeleteState] = useState<"idle" | "confirm">("idle");
 
   return (
     <section className="profile-panel privacy-panel privacy-center-panel">
       <div className="profile-panel-head">
         <div>
-          <span>Datenschutz & Kontrolle</span>
-          <h2>Was Avareno über dich vorbereitet.</h2>
-          <p>Diese Seite ist die ehrliche Foundation: Sichtbarkeit ist steuerbar, Export und Löschung sind markiert, aber noch nicht als vollständig erledigt dargestellt.</p>
+          <span>Privacy Center</span>
+          <h2>Datenschutz & Kontrolle</h2>
+          <p>Ein ruhiger Ort für Datenüberblick, Export, Löschung, verbundene Quellen, KI-Analyse und Private Vault.</p>
         </div>
-        <LockKeyhole size={18} />
+        <ShieldCheck size={18} />
       </div>
 
-      <div className="privacy-center-grid" aria-label="Datenschutz Kontrollzentrum">
-        <article className="privacy-center-card">
-          <span><Database size={16} /></span>
-          <div>
-            <h3>Data Overview</h3>
-            <p>Aktuelle Kategorien, ohne Rohdokumente oder sensible Inhalte in der UI auszulesen.</p>
-          </div>
-          <div className="privacy-control-list">
-            {overviewRows.map((row) => (
-              <div key={row.label}>
-                <strong>{row.label}</strong>
-                <small>{row.value}</small>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="privacy-center-card">
-          <span><Download size={16} /></span>
-          <div>
-            <h3>Daten exportieren</h3>
-            <p>Der Export-Plan existiert als Backend-Foundation. Der vollständige Download ist noch nicht produktiv freigeschaltet.</p>
-          </div>
-          <button className="profile-secondary-action is-muted" disabled type="button">Export vorbereiten</button>
-        </article>
-
-        <article className="privacy-center-card is-danger-zone">
-          <span><Trash2 size={16} /></span>
-          <div>
-            <h3>Account & Daten löschen</h3>
-            <p>Löschung braucht eine saubere Orchestrierung für Auth, Datenbank, Storage, lokale Uploads, Connectors und Backups.</p>
-          </div>
-          <label className="privacy-confirm-field">
-            <span>Zum späteren Bestätigen: DELETE eingeben</span>
-            <input
-              onChange={(event) => setDeleteConfirmation(event.target.value)}
-              placeholder="DELETE"
-              type="text"
-              value={deleteConfirmation}
-            />
-          </label>
-          <button className="profile-secondary-action is-muted" disabled type="button">
-            {deleteConfirmation === "DELETE" ? "Löschung noch nicht aktiv" : "Löschung gesperrt"}
-          </button>
-        </article>
-
-        <article className="privacy-center-card">
-          <span><Link2Off size={16} /></span>
-          <div>
-            <h3>Connected Sources</h3>
-            <p>Connect bleibt read-only und minimal, bis Token-Löschung, Scopes und SSRF-Schutz vollständig geprüft sind.</p>
-          </div>
-          <div className="privacy-control-list">
-            {connectedSources.map((source) => (
-              <div key={source.label}>
-                <strong>{source.label}</strong>
-                <small>{source.status}</small>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="privacy-center-card">
-          <span><Brain size={16} /></span>
-          <div>
-            <h3>AI Analysis Controls</h3>
-            <p>AI-Fakten müssen als AI-assisted erkennbar bleiben, korrigierbar sein und dürfen keine Garantie- oder Rechtsentscheidung versprechen.</p>
-          </div>
-          <div className="profile-preview-row">
-            <span>Prompt-Minimierung</span>
-            <span>Vault opt-in offen</span>
-            <span>Korrekturpflicht</span>
-          </div>
-        </article>
-
-        <article className="privacy-center-card">
-          <span><ShieldCheck size={16} /></span>
-          <div>
-            <h3>Private Vault Controls</h3>
-            <p>Sensible Dokumente bekommen eine eigene Schutzschicht. Re-Auth, PIN/Passkey und stärkere Verschlüsselung sind bewusst noch TODO.</p>
-          </div>
-          <div className="profile-preview-row">
-            <span>Keine Auto-Analyse</span>
-            <span>Explizite Bestätigung nötig</span>
-          </div>
-        </article>
-
-        <article className="privacy-center-card">
-          <span><History size={16} /></span>
-          <div>
-            <h3>Consent & Permissions History</h3>
-            <p>Eine echte Historie ist vorbereitet, aber erst sinnvoll, sobald produktive Consent-Events geschrieben werden.</p>
-          </div>
-          <div className="privacy-control-list">
-            {consentRows.map((row) => (
-              <div key={row.label}>
-                <strong>{row.label}</strong>
-                <small>{row.status}</small>
-              </div>
-            ))}
-          </div>
-        </article>
-      </div>
-
-      <div className="privacy-foundation-note">
-        <strong>Foundation-Status</strong>
-        <span>Export, Löschung, Connector-Disconnect, Vault-Analyse und Consent-History sind nicht als abgeschlossen freigeschaltet.</span>
-      </div>
-
-      <div className="privacy-toggle-list">
-        <PrivacyToggle
-          checked={preferences.motivationEnabled}
-          label="Motivation aktivieren"
-          note="Zeigt sanfte Fortschritte nur in deinem privaten Bereich."
-          onChange={(checked) => onChange({ motivationEnabled: checked })}
-        />
-        <PrivacyToggle
-          checked={preferences.leaderboardEnabled}
-          label="Freundeskreis-Fortschritt anzeigen"
-          note="Nur akzeptierte Freunde aus deinem Kreis werden angezeigt."
-          onChange={(checked) => onChange({ leaderboardEnabled: checked })}
-        />
-        <PrivacyToggle
-          checked={preferences.hideXpFromFriends}
-          label="Meine XP vor Freunden verbergen"
-          note="Freunde sehen dann nur, dass du privat bleibst."
-          onChange={(checked) => onChange({ hideXpFromFriends: checked })}
-        />
-        <PrivacyToggle
-          checked={preferences.hideStreakFromFriends}
-          label="Meinen Streak vor Freunden verbergen"
-          note="Aktiviert als Beispiel für eine private Standardeinstellung."
-          onChange={(checked) => onChange({ hideStreakFromFriends: checked })}
-        />
-        <PrivacyToggle
-          checked={preferences.allowFriendInvites}
-          label="Freundeseinladungen erlauben"
-          note="Du kannst neue Codes pausieren, ohne bestehende Freunde zu entfernen."
-          onChange={(checked) => onChange({ allowFriendInvites: checked })}
-        />
-      </div>
-
-      {leaveState === "left" ? (
-        <p className="leave-circle-note">Freundeskreis-Funktionen sind pausiert. Bestehende Mock-Freunde bleiben für die Demo sichtbar.</p>
+      {loadError ? (
+        <div className="privacy-status-note">
+          <AlertTriangle size={16} />
+          <span>{loadError}</span>
+        </div>
       ) : null}
-      <button className={leaveState === "confirm" ? "leave-circle-button is-danger" : "leave-circle-button"} onClick={leaveCircle} type="button">
-        {leaveState === "confirm" ? "Verlassen bestätigen" : "Freundeskreis verlassen"}
-      </button>
+
+      <div className="privacy-center-list">
+        <PrivacySection icon={<Database size={18} />} label="Datenüberblick" title="Was Avareno gerade kennt">
+          <div className="privacy-data-grid">
+            {summary.dataOverview.map((item) => (
+              <PrivacyDataRow item={item} key={item.id} />
+            ))}
+          </div>
+        </PrivacySection>
+
+        <PrivacySection icon={<Download size={18} />} label="Export" title="Kopie deiner Daten">
+          <p>Erhalte eine Kopie deiner gespeicherten Dinge, Dokument-Metadaten und Einstellungen.</p>
+          {/* TODO: Enable when /api/privacy/export/request returns a real export artifact. */}
+          <button className="profile-primary-action privacy-action-button" disabled type="button">
+            <Download size={16} />
+            Daten exportieren
+          </button>
+          <small>{summary.export.userVisibleMessage}</small>
+        </PrivacySection>
+
+        <PrivacySection icon={<PlugZap size={18} />} label="Connect" title="Verbundene Quellen">
+          {summary.connectedSources.length ? (
+            <div className="privacy-source-list">
+              {summary.connectedSources.map((source) => (
+                <div className="privacy-source-row" key={source.id}>
+                  <div>
+                    <strong>{source.name}</strong>
+                    <small>{source.type} · {source.status} · {source.permissions.join(", ")}</small>
+                  </div>
+                  <button disabled type="button">Trennen</button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="private-empty-state privacy-empty-state">
+              <PlugZap size={18} />
+              <p>Noch keine verbundenen Quellen. Connect bleibt leer, bis du bewusst etwas verknüpfst.</p>
+            </div>
+          )}
+        </PrivacySection>
+
+        <PrivacySection icon={<Brain size={18} />} label="KI-Analyse" title="Belege und Dokumente">
+          <div className="privacy-toggle-list">
+            <PrivacyToggle
+              checked={false}
+              disabled
+              label="KI-Analyse für Belege und Dokumente"
+              note="Einstellungsmodell ist vorbereitet. Extrahierte Daten müssen später sichtbar korrigierbar bleiben."
+              onChange={() => undefined}
+            />
+            <PrivacyToggle
+              checked={!summary.aiControls.vaultAutoAnalysis}
+              disabled
+              label="Private Vault nie automatisch analysieren"
+              note="Sensible Vault-Dokumente bleiben von automatischer Analyse getrennt."
+              onChange={() => undefined}
+            />
+          </div>
+        </PrivacySection>
+
+        <PrivacySection icon={<FileLock2 size={18} />} label="Private Vault" title="Extra Schutz für sensible Dokumente">
+          <p>Vault ist als geschützter Bereich für Identität, Versicherungen, Zahlung, Medizin, Arbeits-, Vertrags- und Rechtsdokumente geplant.</p>
+          <div className="privacy-chip-row">
+            {summary.privateVault.sensitiveCategories.slice(0, 7).map((category) => (
+              <span key={category}>{formatVaultCategory(category)}</span>
+            ))}
+          </div>
+          <div className="privacy-action-pair">
+            <button className="profile-secondary-action is-muted" disabled type="button">Vault verwalten</button>
+            <button className="profile-secondary-action is-muted" disabled type="button">Re-Auth / PIN TODO</button>
+          </div>
+        </PrivacySection>
+
+        <PrivacySection icon={<History size={18} />} label="Historie" title="Einwilligungen & Berechtigungen">
+          {summary.consentHistory.length ? (
+            <div className="privacy-source-list">
+              {summary.consentHistory.map((event) => (
+                <div className="privacy-source-row" key={event.id}>
+                  <div>
+                    <strong>{event.label}</strong>
+                    <small>{event.createdAt} · {event.status}</small>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="private-empty-state privacy-empty-state">
+              <History size={18} />
+              <p>Noch keine gespeicherte Consent-Historie. Speicherung und Widerruf werden als eigener Audit-Trail vorbereitet.</p>
+            </div>
+          )}
+        </PrivacySection>
+
+        <PrivacySection icon={<LockKeyhole size={18} />} label="Freigaben" title="Freundeskreis sichtbar halten">
+          <div className="privacy-toggle-list">
+            <PrivacyToggle
+              checked={preferences.hideXpFromFriends}
+              label="Meine XP vor Freunden verbergen"
+              note="Freunde sehen dann nur, dass du privat bleibst."
+              onChange={(checked) => onChange({ hideXpFromFriends: checked })}
+            />
+            <PrivacyToggle
+              checked={preferences.hideStreakFromFriends}
+              label="Meinen Streak vor Freunden verbergen"
+              note="Private Standardeinstellung für sensible Fortschrittsdaten."
+              onChange={(checked) => onChange({ hideStreakFromFriends: checked })}
+            />
+          </div>
+        </PrivacySection>
+
+        <PrivacySection danger icon={<Trash2 size={18} />} label="Kritischer Bereich" title="Account und Daten löschen">
+          <p>Eine Löschung muss Nutzerprofil, Auth-User, Dinge, Dokumente, extrahierte Metadaten, Erinnerungen, Care/Resolve-Daten, Connector-Tokens, Logs, Storage-Objekte und Backup-Regeln abdecken.</p>
+          {deleteState === "confirm" ? (
+            <div className="privacy-delete-confirm">
+              <strong>Noch nicht aktiv</strong>
+              <span>{summary.deletion.userVisibleMessage}</span>
+              {/* TODO: Enable only after backend deletion orchestration covers all known tables, storage objects and Supabase auth user deletion. */}
+              <button disabled type="button">Löschung verbindlich anfordern</button>
+            </div>
+          ) : null}
+          <button className="leave-circle-button is-danger" onClick={() => setDeleteState("confirm")} type="button">
+            <Trash2 size={16} />
+            Account löschen
+          </button>
+        </PrivacySection>
+      </div>
     </section>
+  );
+}
+
+function PrivacySection({
+  children,
+  danger = false,
+  icon,
+  label,
+  title
+}: {
+  children: ReactNode;
+  danger?: boolean;
+  icon: ReactNode;
+  label: string;
+  title: string;
+}) {
+  return (
+    <article className={danger ? "privacy-control-block is-danger" : "privacy-control-block"}>
+      <div className="privacy-control-head">
+        <span aria-hidden="true">{icon}</span>
+        <div>
+          <small>{label}</small>
+          <h3>{title}</h3>
+        </div>
+      </div>
+      {children}
+    </article>
+  );
+}
+
+function PrivacyDataRow({ item }: { item: PrivacyDataOverviewItem }) {
+  return (
+    <div className="privacy-data-row">
+      <div>
+        <strong>{item.label}</strong>
+        <small>{item.note}</small>
+      </div>
+      <span>{item.value}</span>
+    </div>
   );
 }
 
 function PrivacyToggle({
   checked,
+  disabled = false,
   label,
   note,
   onChange
 }: {
   checked: boolean;
+  disabled?: boolean;
   label: string;
   note: string;
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="privacy-toggle">
-      <input checked={checked} onChange={(event) => onChange(event.target.checked)} type="checkbox" />
+    <label className={disabled ? "privacy-toggle is-disabled" : "privacy-toggle"}>
+      <input checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} type="checkbox" />
       <span aria-hidden="true" />
       <div>
         <strong>{label}</strong>
@@ -639,4 +665,57 @@ function readMotivationPreferences(): MotivationPrivacyPreferences {
   } catch {
     return defaultMotivationPrivacy;
   }
+}
+
+function buildPrivacyFallback(displayName: string): PrivacySummary {
+  return {
+    generatedAt: new Date().toISOString(),
+    implementationState: "FOUNDATION_ONLY",
+    dataOverview: [
+      { id: "items", label: "Gespeicherte Dinge", value: 0, status: "TODO", note: `${displayName}s Ding-Speicher wird geladen, sobald das Backend erreichbar ist.` },
+      { id: "documents", label: "Dokumente / Belege", value: 0, status: "TODO", note: "Dokument-Metadaten und Upload-Speicher sind im Exportplan vorgesehen." },
+      { id: "sources", label: "Verbundene Quellen", value: 0, status: "TODO", note: "Connect-Quellen werden erst nach bewusster Verknuepfung angezeigt." },
+      { id: "ai-analysis", label: "KI-Analyse", value: 0, status: "TODO", note: "Analyse bleibt kontrolliert und korrigierbar." },
+      { id: "private-vault", label: "Private Vault", value: 0, status: "TODO", note: "Sensible Dokumente werden nicht automatisch analysiert." }
+    ],
+    connectedSources: [],
+    aiControls: {
+      receiptDocumentAnalysis: "TODO_MODEL",
+      vaultAutoAnalysis: false,
+      userCorrection: "TODO",
+      note: "Backend noch nicht erreichbar."
+    },
+    privateVault: {
+      status: "PLANNED",
+      sensitiveCategories: ["IDENTITY", "INSURANCE", "PAYMENT", "MEDICAL", "EMPLOYMENT", "CONTRACTS", "LEGAL"],
+      requiresReauth: "TODO",
+      strongerEncryption: "TODO"
+    },
+    consentHistory: [],
+    export: {
+      state: "FOUNDATION_ONLY",
+      ready: false,
+      userVisibleMessage: "Datenexport ist vorbereitet, aber noch nicht vollständig implementiert."
+    },
+    deletion: {
+      state: "FOUNDATION_ONLY",
+      ready: false,
+      userVisibleMessage: "Kontolöschung ist als Orchestrierung geplant, aber noch nicht aktiv."
+    },
+    thirdPartyProviders: []
+  };
+}
+
+function formatVaultCategory(category: string) {
+  const labels: Record<string, string> = {
+    IDENTITY: "Identität",
+    INSURANCE: "Versicherung",
+    PAYMENT: "Zahlung",
+    MEDICAL: "Medizin",
+    EMPLOYMENT: "Arbeit",
+    CONTRACTS: "Verträge",
+    LEGAL: "Recht",
+    HIGHLY_PERSONAL: "Sehr persönlich"
+  };
+  return labels[category] ?? category.toLowerCase().replace(/_/g, " ");
 }

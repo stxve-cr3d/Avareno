@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { ArrowRight, CheckCircle2, CircleX, Fingerprint, KeyRound, Link2, LogOut, Mail, ShieldCheck, Smartphone, Trash2, Upload, UserRound } from "lucide-react";
+import { ArrowRight, CheckCircle2, CircleX, CreditCard, Fingerprint, KeyRound, Link2, LogOut, Mail, ShieldCheck, Smartphone, Trash2, Upload, UserRound } from "lucide-react";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { safeAppRedirect, supabase } from "../lib/authClient";
 import type { SocialAuthProvider } from "../lib/authClient";
 import { useAuth } from "../lib/authProvider";
+import { useLanguage } from "../lib/language";
+import { api } from "../lib/api";
+import type { BillingStatus, CheckoutRequest, PlanKey } from "../lib/types";
 import { formatUiText } from "../lib/uiText";
 import { AppLoadingBar } from "../components/app/AppKit";
+import { LanguageSwitch } from "../components/LanguageSwitch";
 import { useNotifications } from "../components/app/Notifications";
 
 type AuthMode = "login" | "signup";
+type AuthLoginMethod = "email" | "phone";
 type TurnstileRenderOptions = {
   sitekey: string;
   callback: (token: string) => void;
@@ -34,6 +39,14 @@ const onboardingOptions = [
   "Garantien & Erinnerungen",
   "Hilfe Über Resolve",
   "3D-Druck / Ersatzteile später"
+];
+const phoneCountries = [
+  { code: "DE", dialCode: "+49", flag: "🇩🇪", label: "Deutschland" },
+  { code: "AT", dialCode: "+43", flag: "🇦🇹", label: "Österreich" },
+  { code: "CH", dialCode: "+41", flag: "🇨🇭", label: "Schweiz" },
+  { code: "NL", dialCode: "+31", flag: "🇳🇱", label: "Niederlande" },
+  { code: "BE", dialCode: "+32", flag: "🇧🇪", label: "Belgien" },
+  { code: "FR", dialCode: "+33", flag: "🇫🇷", label: "Frankreich" }
 ];
 const avatarBucket = "avatars";
 const maxAvatarSize = 2 * 1024 * 1024;
@@ -209,7 +222,7 @@ export function AuthCallbackPage() {
       <AuthIntro
         eyebrow="Provider"
         title="Login prüfen"
-        body="Der externe Login kommt hier sicher zurück und wird Über Supabase eingeloest."
+        body="Der externe Login kommt hier sicher zurück und wird über Supabase eingelöst."
       />
 
       <AuthMessage error={auth.error} success={handled && !auth.error ? "Callback abgeschlossen." : null} />
@@ -331,6 +344,7 @@ export function OnboardingPage() {
 export function AccountSettingsPage() {
   const auth = useAuth();
   const { notify } = useNotifications();
+  const { language, languageLabel } = useLanguage();
   const [displayName, setDisplayName] = useState(auth.profile?.displayName ?? "");
   const [email, setEmail] = useState(auth.profile?.email ?? "");
   const [avatarUrl, setAvatarUrl] = useState(auth.profile?.avatarUrl ?? "");
@@ -356,6 +370,10 @@ export function AccountSettingsPage() {
   const [emailVerificationMessage, setEmailVerificationMessage] = useState("");
   const [emailVerificationError, setEmailVerificationError] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [billing, setBilling] = useState<BillingStatus | null>(null);
+  const [billingError, setBillingError] = useState("");
+  const [billingMessage, setBillingMessage] = useState("");
+  const [billingBusy, setBillingBusy] = useState<"status" | "checkout" | "portal" | null>(null);
 
   useEffect(() => {
     if (!auth.profile) {
@@ -369,6 +387,13 @@ export function AccountSettingsPage() {
     setMotivationEnabled(auth.profile.motivationEnabled);
     setLeaderboardEnabled(auth.profile.leaderboardEnabled);
   }, [auth.profile]);
+
+  useEffect(() => {
+    if (auth.status !== "authenticated") {
+      return;
+    }
+    void loadBillingStatus();
+  }, [auth.status]);
 
   if (auth.status === "anonymous") {
     return <Navigate to="/login" replace />;
@@ -405,7 +430,7 @@ export function AccountSettingsPage() {
     setPasskeyMessageActive(false);
 
     if (!normalizedEmail.includes("@")) {
-      setEmailVerificationError("Bitte nutze eine gÃ¼ltige E-Mail-Adresse.");
+      setEmailVerificationError("Bitte nutze eine gültige E-Mail-Adresse.");
       return;
     }
 
@@ -417,11 +442,11 @@ export function AccountSettingsPage() {
       setIsSendingEmailVerification(false);
 
       if (result.ok) {
-        setEmailVerificationMessage("Wir haben eine BestÃ¤tigung an die neue Adresse gesendet.");
+        setEmailVerificationMessage("Wir haben eine Bestätigung an die neue Adresse gesendet.");
         return;
       }
 
-      setEmailVerificationError(auth.error ?? "Die BestÃ¤tigung konnte nicht gestartet werden.");
+      setEmailVerificationError(auth.error ?? "Die Bestätigung konnte nicht gestartet werden.");
       return;
     }
 
@@ -429,11 +454,11 @@ export function AccountSettingsPage() {
     setIsSendingEmailVerification(false);
 
     if (result.ok) {
-      setEmailVerificationMessage(auth.config.mode === "mock" ? "E-Mail wurde im Demo-Modus bestÃ¤tigt." : "BestÃ¤tigungs-Mail wurde erneut gesendet.");
+      setEmailVerificationMessage(auth.config.mode === "mock" ? "E-Mail wurde im Demo-Modus bestätigt." : "Bestätigungs-Mail wurde erneut gesendet.");
       return;
     }
 
-    setEmailVerificationError(auth.error ?? "BestÃ¤tigungs-Mail konnte nicht gesendet werden.");
+    setEmailVerificationError(auth.error ?? "Bestätigungs-Mail konnte nicht gesendet werden.");
   }
 
   async function uploadAvatar(file?: File | null) {
@@ -550,12 +575,64 @@ export function AccountSettingsPage() {
     }
   }
 
+  async function loadBillingStatus() {
+    setBillingBusy("status");
+    setBillingError("");
+    try {
+      const result = await api<BillingStatus>("/api/billing/status");
+      setBilling(result);
+    } catch (caught) {
+      setBillingError(caught instanceof Error ? caught.message : "Planstatus konnte nicht geladen werden.");
+    } finally {
+      setBillingBusy(null);
+    }
+  }
+
+  async function startCheckout(planKey: PlanKey) {
+    setBillingBusy("checkout");
+    setBillingError("");
+    setBillingMessage("");
+    try {
+      const result = await api<{ checkoutUrl: string; mode: "checkout" | "free"; provider?: string | null }>("/api/billing/checkout", {
+        method: "POST",
+        body: JSON.stringify({ planKey } satisfies CheckoutRequest)
+      });
+      if (result.checkoutUrl.startsWith("https://")) {
+        window.location.assign(result.checkoutUrl);
+        return;
+      }
+      setBillingMessage("Für diesen Plan ist kein Checkout nötig.");
+      await loadBillingStatus();
+    } catch (caught) {
+      setBillingError(caught instanceof Error ? caught.message : "Checkout ist noch nicht verfügbar.");
+    } finally {
+      setBillingBusy(null);
+    }
+  }
+
+  async function openBillingPortal() {
+    setBillingBusy("portal");
+    setBillingError("");
+    setBillingMessage("");
+    try {
+      const result = await api<{ portalUrl: string }>("/api/billing/portal", {
+        method: "POST",
+        body: JSON.stringify({ returnUrl: window.location.href })
+      });
+      window.location.assign(result.portalUrl);
+    } catch (caught) {
+      setBillingError(caught instanceof Error ? caught.message : "Abo-Verwaltung ist noch nicht konfiguriert.");
+    } finally {
+      setBillingBusy(null);
+    }
+  }
+
   const normalizedEmail = email.trim().toLowerCase();
   const profileEmail = auth.profile?.email.trim().toLowerCase() ?? "";
   const emailChanged = normalizedEmail !== profileEmail;
   const emailIsValid = normalizedEmail.includes("@");
   const emailIsVerified = Boolean(auth.profile?.emailVerified) && !emailChanged;
-  const emailStatusLabel = emailIsVerified ? "BestÃ¤tigt" : emailChanged ? "Noch nicht gespeichert" : "Nicht bestÃ¤tigt";
+  const emailStatusLabel = emailIsVerified ? "Bestätigt" : emailChanged ? "Noch nicht gespeichert" : "Nicht bestätigt";
   const profileBusy = isSavingProfile || uploadingAvatar || isSendingEmailVerification;
   const providerBusy = isChangingPassword || isRegisteringPasskey || Boolean(connectingProvider);
 
@@ -568,6 +645,77 @@ export function AccountSettingsPage() {
           <p>Basisdaten, Privatsphäre und verbundene Login-Methoden an einem ruhigen Ort.</p>
         </div>
       </header>
+
+      <section className="account-panel account-language-panel">
+        <div className="account-panel-head">
+          <div>
+            <span>Sprache</span>
+            <h2>Sprache & Darstellung</h2>
+            <p>Wähle, wie Avareno hier angezeigt wird. Die Auswahl bleibt lokal in diesem Browser.</p>
+          </div>
+        </div>
+        <div className="account-language-row">
+          <div>
+            <small>Aktuell</small>
+            <strong>{languageLabel}</strong>
+            <span>{language === "de" ? "Deutsch ist der Standard für Avareno." : "English is active in this browser."}</span>
+          </div>
+          <LanguageSwitch className="account-language-switch" />
+        </div>
+      </section>
+
+      <section className="account-panel account-billing-panel">
+        <div className="account-panel-head">
+          <div>
+            <span>Plan & Abrechnung</span>
+            <h2>Dein Avareno-Plan</h2>
+            <p>Billing ist als Paddle-Foundation vorbereitet. Zahlungsdaten bleiben beim Anbieter und werden hier nicht gespeichert.</p>
+          </div>
+          <CreditCard size={18} />
+        </div>
+        <AppLoadingBar active={billingBusy === "status"} label="Planstatus wird geladen..." />
+        <div className="account-billing-summary">
+          <div>
+            <small>Aktueller Plan</small>
+            <strong>{billing?.currentPlan.name ?? "Free"}</strong>
+            <span>{billingStatusLabel(billing?.subscription.status)}</span>
+          </div>
+          <div>
+            <small>Preis</small>
+            <strong>{billing?.currentPlan.priceLabel ?? "0 €"}<em>/Monat</em></strong>
+            <span>{billing?.subscription.currentPeriodEnd ? `Läuft bis ${formatBillingDate(billing.subscription.currentPeriodEnd)}` : "Keine Verlängerung hinterlegt"}</span>
+          </div>
+        </div>
+        <div className="account-billing-note">
+          {billing?.providerConfigured
+            ? "Personal-Checkout kann über Paddle gestartet werden. Rechtliche, steuerliche und Provider-Prüfung bleiben vor Launch offen."
+            : "Paddle ist noch nicht vollständig konfiguriert. Hinterlege API-Key, Webhook-Secret und Price-ID serverseitig, bevor Checkout live geht."}
+        </div>
+        <div className="account-action-row">
+          <button
+            className="profile-secondary-action"
+            disabled={!billing?.providerConfigured || billingBusy === "checkout" || billing?.subscription.planKey === "personal"}
+            onClick={() => void startCheckout("personal")}
+            type="button"
+          >
+            <ArrowRight size={16} />
+            {billingBusy === "checkout" ? "Checkout startet..." : "Auf Personal upgraden"}
+          </button>
+          <button
+            className="profile-secondary-action is-muted"
+            disabled={!billing?.portalConfigured || billingBusy === "portal"}
+            onClick={() => void openBillingPortal()}
+            type="button"
+          >
+            <CreditCard size={16} />
+            Abo verwalten
+          </button>
+          <button className="profile-secondary-action is-muted" disabled type="button">
+            Family bald verfügbar
+          </button>
+        </div>
+        <AuthMessage error={billingError} success={billingMessage || null} />
+      </section>
 
       <form className="account-panel" onSubmit={submit}>
         <div className="account-panel-head">
@@ -621,14 +769,14 @@ export function AccountSettingsPage() {
                 setEmailVerificationMessage("");
                 setEmailVerificationError("");
               }} type="email" />
-              <span className="account-email-status-icon" aria-label={emailIsVerified ? "E-Mail bestÃ¤tigt" : "E-Mail nicht bestÃ¤tigt"}>
+              <span className="account-email-status-icon" aria-label={emailIsVerified ? "E-Mail bestätigt" : "E-Mail nicht bestätigt"}>
                 {emailIsVerified ? <CheckCircle2 size={16} /> : <CircleX size={16} />}
               </span>
             </span>
             {!emailIsVerified ? (
               <button className="account-inline-action" disabled={!emailIsValid || isSendingEmailVerification} onClick={() => void requestEmailConfirmation()} type="button">
                 <Mail size={14} />
-                {isSendingEmailVerification ? "Sendet..." : emailChanged ? "Speichern & bestÃ¤tigen" : "BestÃ¤tigung senden"}
+                {isSendingEmailVerification ? "Sendet..." : emailChanged ? "Speichern & bestätigen" : "Bestätigung senden"}
               </button>
             ) : null}
           </label>
@@ -638,7 +786,7 @@ export function AccountSettingsPage() {
           <input checked={privateProfile} onChange={(event) => setPrivateProfile(event.target.checked)} type="checkbox" />
           <span>
             <strong>Privates Profil</strong>
-            <small>Dein Profil bleibt standardmäßig nicht Öffentlich.</small>
+            <small>Dein Profil bleibt standardmäßig nicht öffentlich.</small>
           </span>
         </label>
 
@@ -654,7 +802,7 @@ export function AccountSettingsPage() {
           <input checked={leaderboardEnabled} onChange={(event) => setLeaderboardEnabled(event.target.checked)} type="checkbox" />
           <span>
             <strong>Freunde-Sichtbarkeit</strong>
-            <small>Nur für private Freundeskreise, nie Öffentlich.</small>
+            <small>Nur für private Freundeskreise, nie öffentlich.</small>
           </span>
         </label>
 
@@ -713,7 +861,7 @@ export function AccountSettingsPage() {
           <ProviderStatus icon={<Smartphone size={16} />} label="SMS / Twilio" status={auth.config.phoneProvider.configured ? "Aktiviert" : "Vorbereitet"}>
             <button className="account-provider-action" disabled type="button">
               <ShieldCheck size={14} />
-              Setup
+              {auth.config.phoneProvider.configured ? "Login aktiv" : "Setup"}
             </button>
           </ProviderStatus>
           <ProviderStatus icon={<Fingerprint size={16} />} label="Passkey" status={auth.config.passkeyProvider.configured ? "Aktiviert" : "Vorbereitet"}>
@@ -753,15 +901,39 @@ function AuthForm({ mode }: { mode: AuthMode }) {
   const auth = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [authMethod, setAuthMethod] = useState<AuthLoginMethod>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [phoneCountryCode, setPhoneCountryCode] = useState("DE");
+  const [phone, setPhone] = useState("");
+  const [phoneCode, setPhoneCode] = useState("");
+  const [phoneCodeSent, setPhoneCodeSent] = useState(false);
+  const [phoneOtpSuccess, setPhoneOtpSuccess] = useState<string | null>(null);
+  const [emailMagicLinkSuccess, setEmailMagicLinkSuccess] = useState<string | null>(null);
+  const [magicLinkDialogOpen, setMagicLinkDialogOpen] = useState(false);
+  const [magicLinkEmail, setMagicLinkEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingProtectedPath, setPendingProtectedPath] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaError, setCaptchaError] = useState<string | null>(null);
   const [captchaResetNonce, setCaptchaResetNonce] = useState(0);
   const from = safeAppRedirect((location.state as { from?: string } | null)?.from);
+  const phoneAuthAvailable = auth.config.phoneProvider.configured || auth.config.mode === "mock";
+  const phoneCountry = phoneCountries.find((country) => country.code === phoneCountryCode) ?? phoneCountries[0];
+  const phoneForAuth = formatPhoneForAuth(phone, phoneCountry.dialCode);
+  const captchaRequired = auth.config.turnstileEnabled && (authMethod === "email" || !phoneCodeSent);
+  const primaryDisabled = !auth.config.ready
+    || isSubmitting
+    || Boolean(pendingProtectedPath)
+    || (captchaRequired && !captchaToken);
+
+  useEffect(() => {
+    if (!phoneAuthAvailable && authMethod === "phone") {
+      setAuthMethod("email");
+    }
+  }, [authMethod, phoneAuthAvailable]);
+
   const handleCaptchaToken = useCallback((token: string) => {
     setCaptchaToken(token);
     setCaptchaError(null);
@@ -778,13 +950,40 @@ function AuthForm({ mode }: { mode: AuthMode }) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (auth.config.turnstileEnabled && !captchaToken) {
-      setCaptchaError("Bitte bestaetige kurz, dass du kein automatisierter Zugriff bist.");
+    if (captchaRequired && !captchaToken) {
+      setCaptchaError("Bitte bestätige kurz, dass du kein automatisierter Zugriff bist.");
       return;
     }
 
     setIsSubmitting(true);
     setCaptchaError(null);
+    setPhoneOtpSuccess(null);
+    setEmailMagicLinkSuccess(null);
+
+    if (authMethod === "phone") {
+      const result = phoneCodeSent
+        ? await auth.verifyPhoneOtp({ phone: phoneForAuth, token: phoneCode })
+        : await auth.requestPhoneOtp({ phone: phoneForAuth, displayName, captchaToken, shouldCreateUser: mode === "signup" });
+
+      if (result.ok && !phoneCodeSent) {
+        setPhoneCodeSent(true);
+        setPhoneOtpSuccess("SMS-Code wurde gesendet. Gib ihn hier ein, um den Zugang abzuschließen.");
+      } else if (result.ok) {
+        const target = result.nextPath ?? (mode === "signup" ? "/onboarding" : from);
+
+        if (isAuthRedirectTarget(target)) {
+          navigate(target, { replace: true });
+        } else {
+          setPendingProtectedPath(target);
+        }
+      } else if (auth.config.turnstileEnabled && !phoneCodeSent) {
+        setCaptchaToken("");
+        setCaptchaResetNonce((value) => value + 1);
+      }
+
+      setIsSubmitting(false);
+      return;
+    }
 
     const result = mode === "login"
       ? await auth.login({ email, password, captchaToken })
@@ -806,32 +1005,160 @@ function AuthForm({ mode }: { mode: AuthMode }) {
     setIsSubmitting(false);
   }
 
+  function openMagicLinkDialog() {
+    setMagicLinkEmail(email);
+    setEmailMagicLinkSuccess(null);
+    setPhoneOtpSuccess(null);
+    auth.clearError();
+    setMagicLinkDialogOpen(true);
+  }
+
+  async function sendMagicLink(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+
+    if (captchaRequired && !captchaToken) {
+      setCaptchaError("Bitte bestätige kurz, dass du kein automatisierter Zugriff bist.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setCaptchaError(null);
+    setPhoneOtpSuccess(null);
+    setEmailMagicLinkSuccess(null);
+
+    const targetEmail = magicLinkEmail.trim().toLowerCase();
+    const result = await auth.requestMagicLink({
+      email: targetEmail,
+      displayName,
+      captchaToken,
+      shouldCreateUser: mode === "signup"
+    });
+
+    if (result.ok) {
+      setEmail(targetEmail);
+      setMagicLinkDialogOpen(false);
+      setEmailMagicLinkSuccess(`Magic Link wurde gesendet. Öffne den Link im selben Browser auf ${new URL(auth.config.redirectUrl).origin}.`);
+      setCaptchaToken("");
+      setCaptchaResetNonce((value) => value + 1);
+    } else if (auth.config.turnstileEnabled) {
+      setCaptchaToken("");
+      setCaptchaResetNonce((value) => value + 1);
+    }
+
+    setIsSubmitting(false);
+  }
+
   return (
     <AuthSurface label={mode === "login" ? "Einloggen" : "Account erstellen"}>
       <AuthIntro
         eyebrow="Privater Zugang"
         title={mode === "login" ? "Willkommen zurück" : "Account erstellen"}
-        body={mode === "login" ? `Dein privater Speicher für Dinge, Nachweise und offene Punkte. Fragen? ${auth.config.supportEmail}` : "Mit E-Mail registrieren. Avareno bleibt privat, ruhig und ohne Öffentliche Profile."}
+        body={mode === "login" ? `Dein privater Speicher für Dinge, Nachweise und offene Punkte. Fragen? ${auth.config.supportEmail}` : phoneAuthAvailable ? "Mit E-Mail oder Telefon registrieren. Avareno bleibt privat, ruhig und ohne öffentliche Profile." : "Mit E-Mail registrieren. Avareno bleibt privat, ruhig und ohne öffentliche Profile."}
       />
 
       {!auth.config.ready ? <AuthSetupNotice missing={auth.config.setupMissing} /> : null}
 
       <form className="auth-form" onSubmit={submit}>
+        {phoneAuthAvailable ? (
+          <div className="auth-method-tabs" role="tablist" aria-label="Login-Methode">
+            <button className={authMethod === "email" ? "is-active" : ""} onClick={() => {
+              setAuthMethod("email");
+              setPhoneOtpSuccess(null);
+              setEmailMagicLinkSuccess(null);
+              setMagicLinkDialogOpen(false);
+              auth.clearError();
+            }} type="button">
+              <Mail size={15} />
+              E-Mail
+            </button>
+            <button className={authMethod === "phone" ? "is-active" : ""} onClick={() => {
+              setAuthMethod("phone");
+              setPhoneOtpSuccess(null);
+              setEmailMagicLinkSuccess(null);
+              setMagicLinkDialogOpen(false);
+              auth.clearError();
+            }} type="button">
+              <Smartphone size={15} />
+              Telefon
+            </button>
+          </div>
+        ) : null}
+
         {mode === "signup" ? (
           <AuthField icon={<UserRound size={17} />} label="Name">
-            <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Stefan" type="text" />
+            <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Dein Name" type="text" />
           </AuthField>
         ) : null}
 
-        <AuthField icon={<Mail size={17} />} label="E-Mail">
-          <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="du@example.com" type="email" />
-        </AuthField>
+        {authMethod === "email" ? (
+          <>
+            <AuthField icon={<Mail size={17} />} label="E-Mail">
+              <input value={email} onChange={(event) => {
+                setEmail(event.target.value);
+                setEmailMagicLinkSuccess(null);
+                auth.clearError();
+              }} placeholder="du@example.com" type="email" />
+            </AuthField>
 
-        <AuthField icon={<KeyRound size={17} />} label="Passwort">
-          <input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mindestens 6 Zeichen" type="password" />
-        </AuthField>
+            <AuthField icon={<KeyRound size={17} />} label="Passwort">
+              <input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mindestens 6 Zeichen" type="password" />
+            </AuthField>
+          </>
+        ) : (
+          <>
+            <AuthField icon={<Smartphone size={17} />} label="Telefonnummer">
+              <div className="auth-phone-input">
+                <label className="auth-phone-country" aria-label="Landesvorwahl">
+                  <select value={phoneCountryCode} onChange={(event) => {
+                    setPhoneCountryCode(event.target.value);
+                    setPhoneCodeSent(false);
+                    setPhoneCode("");
+                    setPhoneOtpSuccess(null);
+                    auth.clearError();
+                  }}>
+                    {phoneCountries.map((country) => (
+                      <option key={country.code} value={country.code}>{country.flag} {country.dialCode} {country.label}</option>
+                    ))}
+                  </select>
+                  <span aria-hidden="true">{phoneCountry.flag} {phoneCountry.dialCode}</span>
+                </label>
+                <input value={phone} onChange={(event) => {
+                  setPhone(event.target.value);
+                  setPhoneCodeSent(false);
+                  setPhoneCode("");
+                  setPhoneOtpSuccess(null);
+                  auth.clearError();
+                }} placeholder="Nummer ohne Vorwahl" type="tel" />
+              </div>
+            </AuthField>
 
-        {auth.config.turnstileEnabled ? (
+            {phoneCodeSent ? (
+              <AuthField icon={<KeyRound size={17} />} label="SMS-Code">
+                <input autoComplete="one-time-code" inputMode="numeric" value={phoneCode} onChange={(event) => setPhoneCode(event.target.value)} placeholder="123456" type="text" />
+              </AuthField>
+            ) : null}
+
+            {phoneCodeSent ? (
+              <button
+                className="auth-text-action"
+                disabled={isSubmitting}
+                onClick={() => {
+                  setPhoneCodeSent(false);
+                  setPhoneCode("");
+                  setPhoneOtpSuccess(null);
+                  setCaptchaToken("");
+                  setCaptchaResetNonce((value) => value + 1);
+                  auth.clearError();
+                }}
+                type="button"
+              >
+                Neuen SMS-Code anfordern
+              </button>
+            ) : null}
+          </>
+        )}
+
+        {auth.config.turnstileEnabled && (authMethod === "email" || !phoneCodeSent) ? (
           <TurnstileBox
             resetNonce={captchaResetNonce}
             siteKey={auth.config.turnstileSiteKey}
@@ -841,18 +1168,65 @@ function AuthForm({ mode }: { mode: AuthMode }) {
         ) : null}
 
         <AuthMessage error={captchaError} success={null} />
-        <AuthMessage error={auth.error} success={null} />
+        <AuthMessage error={auth.error} success={phoneOtpSuccess || emailMagicLinkSuccess} />
 
         <AppLoadingBar
           active={isSubmitting || Boolean(pendingProtectedPath)}
           label={pendingProtectedPath ? "Privaten Bereich öffnen..." : "Zugang wird geprüft..."}
         />
 
-        <button className="auth-primary" disabled={!auth.config.ready || isSubmitting || Boolean(pendingProtectedPath) || (auth.config.turnstileEnabled && !captchaToken)} type="submit">
-          {pendingProtectedPath ? "Öffne Avareno..." : isSubmitting ? "Prüfe Zugang..." : mode === "login" ? "Einloggen" : "Account erstellen"}
+        <button className="auth-primary" disabled={primaryDisabled} type="submit">
+          {pendingProtectedPath ? "Öffne Avareno..." : isSubmitting ? "Prüfe Zugang..." : authMethod === "phone" && !phoneCodeSent ? "SMS-Code senden" : authMethod === "phone" ? "Code prüfen" : mode === "login" ? "Einloggen" : "Account erstellen"}
           <ArrowRight size={17} />
         </button>
+
+        {authMethod === "email" ? (
+          <button className="auth-secondary-submit" disabled={!auth.config.ready || isSubmitting || Boolean(pendingProtectedPath)} onClick={openMagicLinkDialog} type="button">
+            <Mail size={16} />
+            Magic Link senden
+          </button>
+        ) : null}
       </form>
+
+      {magicLinkDialogOpen ? (
+        <div className="auth-dialog-backdrop">
+          <section className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="magic-link-title">
+            <div className="auth-dialog-head">
+              <div>
+                <span>Magic Link</span>
+                <h2 id="magic-link-title">Link per E-Mail</h2>
+                <p>Wir senden dir einen einmaligen Login-Link. Öffne ihn im selben Browser.</p>
+              </div>
+              <button className="auth-dialog-close" onClick={() => setMagicLinkDialogOpen(false)} type="button" aria-label="Schließen">
+                <CircleX size={18} />
+              </button>
+            </div>
+
+            <form className="auth-dialog-form" onSubmit={(event) => void sendMagicLink(event)}>
+              <AuthField icon={<Mail size={17} />} label="E-Mail">
+                <input autoFocus value={magicLinkEmail} onChange={(event) => {
+                  setMagicLinkEmail(event.target.value);
+                  setEmailMagicLinkSuccess(null);
+                  auth.clearError();
+                }} placeholder="du@example.com" type="email" />
+              </AuthField>
+
+              {captchaRequired && !captchaToken ? <p className="auth-dialog-note">Sicherheitsprüfung wird vorbereitet...</p> : null}
+              <AuthMessage error={auth.error} success={null} />
+
+              <div className="auth-dialog-actions">
+                <button className="auth-dialog-secondary" onClick={() => setMagicLinkDialogOpen(false)} type="button">
+                  Abbrechen
+                </button>
+                <button className="auth-dialog-primary" disabled={!auth.config.ready || isSubmitting || Boolean(pendingProtectedPath) || (captchaRequired && !captchaToken) || !magicLinkEmail.trim()} type="submit">
+                  Link senden
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
 
       <div className="auth-provider-grid" aria-label="Weitere Login-Anbieter">
         <button disabled={!auth.config.providers.google.configured} type="button" onClick={() => void auth.signInWithProvider("google")}>
@@ -961,6 +1335,15 @@ function readFileAsDataUrl(file: File) {
   });
 }
 
+function formatPhoneForAuth(phone: string, dialCode: string) {
+  const compact = phone.trim().replace(/[^\d+]/g, "");
+  if (compact.startsWith("+")) {
+    return compact;
+  }
+
+  return `${dialCode}${compact.replace(/^0+/, "")}`;
+}
+
 function providerLinkErrorMessage(caught: unknown, providerLabel: string) {
   const message = caught instanceof Error ? caught.message : "";
   if (message.toLowerCase().includes("manual linking is disabled")) {
@@ -968,6 +1351,24 @@ function providerLinkErrorMessage(caught: unknown, providerLabel: string) {
   }
 
   return message || `${providerLabel} konnte nicht verbunden werden.`;
+}
+
+function billingStatusLabel(status?: string) {
+  const normalized = (status ?? "ACTIVE").toUpperCase();
+  const labels: Record<string, string> = {
+    ACTIVE: "Aktiv",
+    TRIALING: "Testphase",
+    PAST_DUE: "Zahlung offen",
+    PAUSED: "Pausiert",
+    CANCELED: "Gekündigt",
+    CANCELLED: "Gekündigt",
+    INCOMPLETE: "Nicht abgeschlossen"
+  };
+  return labels[normalized] ?? normalized;
+}
+
+function formatBillingDate(value: string) {
+  return new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(value));
 }
 
 function AuthSurface({ label, children }: { label: string; children: ReactNode }) {
@@ -1008,7 +1409,7 @@ function AuthIntro({ eyebrow, title, body }: { eyebrow: string; title: string; b
 
 function AuthField({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
   return (
-    <label>
+    <label className="auth-field">
       <span>{formatUiText(label)}</span>
       <div>
         {icon}

@@ -123,12 +123,12 @@ const smartFallbackPayload: SmartHomePayload = {
       signal: "45 Tage verbleiben",
       priority: "HIGH",
       actionType: "CREATE_PLAN",
-      cta: "Create plan",
+      cta: "Plan erstellen",
       status: "READY",
       automation: {
-        trigger: "Warranty window changes",
-        action: "Notify and attach the reminder to product memory",
-        outcome: "Important deadlines stop slipping away"
+        trigger: "Garantiefenster verändert sich",
+        action: "Benachrichtigen und Erinnerung am Produktgedächtnis speichern",
+        outcome: "Wichtige Fristen gehen nicht mehr unter"
       }
     },
     {
@@ -141,7 +141,7 @@ const smartFallbackPayload: SmartHomePayload = {
       signal: "18 Dokumente",
       priority: "MEDIUM",
       actionType: "CREATE_PLAN",
-      cta: "Plan stock check",
+      cta: "Check planen",
       status: "READY"
     },
     {
@@ -151,16 +151,16 @@ const smartFallbackPayload: SmartHomePayload = {
       itemId: null,
       title: "Reparaturhistorie anlegen",
       subtitle: "Notiere Service, Ersatzteile und Ansprechpartner beim Objekt.",
-      signal: "Care due",
+      signal: "Care fällig",
       priority: "LOW",
       actionType: "CREATE_PLAN",
-      cta: "Create loop",
+      cta: "Loop erstellen",
       status: "READY"
     }
   ],
   quickActions: [],
-  localDiscovery: { mode: "DEMO", enabled: false, note: "Demo fallback." },
-  wow: { label: "object-aware control", promise: "Connect devices to the real things they belong to." }
+  localDiscovery: { mode: "DEMO", enabled: false, note: "Demo-Fallback." },
+  wow: { label: "objektbewusste Steuerung", promise: "Verbinde Geräte mit den echten Dingen, zu denen sie gehören." }
 };
 
 const fallbackHomeMotivation: MotivationSummary = {

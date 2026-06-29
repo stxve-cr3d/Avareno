@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.auth import auth_middleware
 from app.db import PROJECT_ROOT
-from app.routers import assistant, capture, dashboard, documents, extract, items, loops, me, mobile, notifications, planner, reports, rewards, search, smart_home, structure
+from app.routers import assistant, billing, capture, dashboard, documents, extract, items, loops, me, mobile, notifications, planner, privacy, reports, rewards, search, smart_home, structure, webhooks
 
 app = FastAPI(title="Avareno API")
 
@@ -38,6 +38,8 @@ app.middleware("http")(auth_middleware)
 
 uploads = PROJECT_ROOT / "uploads"
 uploads.mkdir(parents=True, exist_ok=True)
+# Compliance TODO: local static uploads are MVP-only. Use authenticated
+# downloads/private object storage before storing real private documents.
 app.mount("/uploads", StaticFiles(directory=Path(uploads)), name="uploads")
 
 app.include_router(me.router, prefix="/api/me", tags=["me"])
@@ -50,12 +52,15 @@ app.include_router(capture.router, prefix="/api/capture", tags=["capture"])
 app.include_router(rewards.router, prefix="/api/rewards", tags=["rewards"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(planner.router, prefix="/api/planner", tags=["planner"])
+app.include_router(privacy.router, prefix="/api/privacy", tags=["privacy"])
 app.include_router(mobile.router, prefix="/api/mobile", tags=["mobile"])
 app.include_router(structure.router, prefix="/api/structure", tags=["structure"])
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(assistant.router, prefix="/api/assistant", tags=["assistant"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(smart_home.router, prefix="/api/smart-home", tags=["smart-home"])
+app.include_router(billing.router, prefix="/api/billing", tags=["billing"])
+app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
 
 
 @app.get("/api/health")

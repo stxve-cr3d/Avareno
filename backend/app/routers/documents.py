@@ -38,6 +38,8 @@ async def upload_document(
         safe_name = re.sub(r"[^a-zA-Z0-9._-]", "-", file.filename)
         stored_name = f"{make_id()}-{safe_name}"
         target = UPLOAD_ROOT / stored_name
+        # Compliance TODO: add size/MIME allowlist, scanning, private storage,
+        # and deletion/export orchestration before accepting real user files.
         target.write_bytes(await file.read())
 
         now = now_iso()

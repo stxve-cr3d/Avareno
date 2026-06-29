@@ -88,11 +88,15 @@ def invite_household_member(payload: HouseholdInviteCreate) -> dict:
 @router.patch("/plan")
 def update_plan(payload: PlanTierUpdate) -> dict:
     limits = {
-        "FREE": {"itemLimit": 25, "storageLimitMb": 100},
-        "PREMIUM": {"itemLimit": 1000, "storageLimitMb": 5000},
-        "PRO": {"itemLimit": 10000, "storageLimitMb": 25000},
+        "FREE": {"planKey": "free", "itemLimit": 10, "storageLimitMb": 100},
+        "PERSONAL": {"planKey": "personal", "itemLimit": 1000, "storageLimitMb": 5000},
+        "FAMILY": {"planKey": "family", "itemLimit": 2500, "storageLimitMb": 15000},
     }
     tier = payload.tier.upper()
+    if tier in {"HOME", "PREMIUM"}:
+        tier = "PERSONAL"
+    if tier == "PRO":
+        tier = "FAMILY"
     if tier not in limits:
         raise HTTPException(status_code=400, detail="Unknown plan tier")
 
@@ -106,18 +110,18 @@ def update_plan(payload: PlanTierUpdate) -> dict:
         if existing:
             conn.execute(
                 """UPDATE "PlanSubscription"
-                   SET tier = ?, status = ?, itemLimit = ?, storageLimitMb = ?, updatedAt = ?
+                   SET planKey = ?, tier = ?, status = ?, itemLimit = ?, storageLimitMb = ?, updatedAt = ?
                    WHERE id = ?""",
-                (tier, "ACTIVE", limits[tier]["itemLimit"], limits[tier]["storageLimitMb"], now, existing["id"]),
+                (limits[tier]["planKey"], tier, "ACTIVE", limits[tier]["itemLimit"], limits[tier]["storageLimitMb"], now, existing["id"]),
             )
             plan_id = existing["id"]
         else:
             plan_id = make_id()
             conn.execute(
                 """INSERT INTO "PlanSubscription"
-                   (id, userId, householdId, tier, status, itemLimit, storageLimitMb, createdAt, updatedAt)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (plan_id, user["id"], household["id"], tier, "ACTIVE", limits[tier]["itemLimit"], limits[tier]["storageLimitMb"], now, now),
+                   (id, userId, householdId, provider, planKey, tier, status, itemLimit, storageLimitMb, createdAt, updatedAt)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (plan_id, user["id"], household["id"], "paddle", limits[tier]["planKey"], tier, "ACTIVE", limits[tier]["itemLimit"], limits[tier]["storageLimitMb"], now, now),
             )
         return row_to_dict(conn.execute('SELECT * FROM "PlanSubscription" WHERE id = ?', (plan_id,)).fetchone()) or {}
 

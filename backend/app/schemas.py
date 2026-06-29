@@ -141,6 +141,14 @@ class PlanTierUpdate(BaseModel):
     tier: str
 
 
+class BillingCheckoutRequest(BaseModel):
+    planKey: str = Field(min_length=1)
+
+
+class BillingPortalRequest(BaseModel):
+    returnUrl: str | None = None
+
+
 class SmartHomeConnectRequest(BaseModel):
     provider: str = "HOME_ASSISTANT"
 

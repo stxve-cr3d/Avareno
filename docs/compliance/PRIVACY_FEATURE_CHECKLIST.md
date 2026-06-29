@@ -127,3 +127,111 @@ Update if affected:
 - Safe to implement now: yes / no
 - Needs lawyer/DSB review first: yes / no
 - Notes:
+
+## Completed Review: Supabase Phone/SMS OTP Auth
+
+- Feature name: Supabase Phone/SMS OTP Auth
+- Owner: Engineering/Product
+- Route/module: `frontend/src/lib/authProvider.tsx`, `frontend/src/pages/AuthPages.tsx`
+- Backend/API changes: none
+- Database/storage changes: none in app database; Supabase Auth stores phone auth identity/session metadata
+- Third-party providers: Supabase Auth, Twilio through Supabase Phone provider, optional Cloudflare Turnstile
+- Launch state: gated; visible only when `VITE_AUTH_PHONE_ENABLED=true`
+
+Required questions:
+
+1. Personal data: phone number, SMS OTP, Supabase auth id/session metadata, optional signup display name, optional Turnstile token.
+2. Purpose: authenticate users with a passwordless phone method.
+3. Avoid collection: yes; email/password remains available and phone is optional.
+4. Data minimization: no app backend persistence; only Supabase Auth receives phone auth data.
+5. Storage: Supabase Auth; Twilio/SMS provider metadata handling must be verified in provider records.
+6. Retention: Supabase/Twilio retention unknown; must be reviewed before production launch.
+7. Export: account export plan must include Supabase Auth phone identity metadata.
+8. Deletion: account deletion orchestrator must delete/revoke Supabase Auth user/session and consider provider retention.
+9. Third-party sharing: yes, Supabase and Twilio/SMS provider.
+10. AI: no.
+11. Consent/legal basis: needs lawyer/DSB review; likely contract/pre-contract for auth, with transparent disclosure.
+12. Connected accounts: no.
+13. Sensitive documents: no.
+14. Tokens/secrets/API credentials: Twilio credentials stay in Supabase dashboard only; no frontend/backend secrets added.
+15. Logs: implementation does not add app logs containing phone numbers or OTPs.
+16. Abuse/security risks: SMS enumeration, OTP brute force, SIM swap, SMS delivery abuse/cost spikes; require Supabase/Twilio rate limits and monitoring before production.
+
+Decision:
+
+- Privacy review complete: yes for gated implementation
+- Safe to implement now: yes as gated UI/code path
+- Needs lawyer/DSB review first: yes before production enablement
+- Notes: verify Supabase project region, Twilio DPA/AVV, SMS retention/deletion, and Datenschutzerklaerung disclosure before setting `VITE_AUTH_PHONE_ENABLED=true` in production.
+
+## Completed Review: Supabase Email Magic Link Auth
+
+- Feature name: Supabase Email Magic Link Auth
+- Owner: Engineering/Product
+- Route/module: `frontend/src/lib/authProvider.tsx`, `frontend/src/pages/AuthPages.tsx`
+- Backend/API changes: none
+- Database/storage changes: none in app database; Supabase Auth stores email identity/session metadata
+- Third-party providers: Supabase Auth, configured transactional email provider through Supabase, optional Cloudflare Turnstile
+- Launch state: active with Supabase Auth email provider; production sender/domain review still required
+
+Required questions:
+
+1. Personal data: email address, Supabase auth id/session metadata, optional signup display name, optional Turnstile token.
+2. Purpose: authenticate users with a passwordless email method.
+3. Avoid collection: email is required for email authentication; password login and phone login remain separate options.
+4. Data minimization: no app backend persistence added; only Supabase Auth receives Magic Link auth data.
+5. Storage: Supabase Auth and the configured auth email provider.
+6. Retention: Supabase/email-provider retention unknown; must be verified before production launch.
+7. Export: account export plan must include Supabase Auth email identity metadata.
+8. Deletion: account deletion orchestrator must delete/revoke Supabase Auth user/session and consider email provider retention.
+9. Third-party sharing: yes, Supabase and configured transactional email provider; Cloudflare if Turnstile is enabled.
+10. AI: no.
+11. Consent/legal basis: needs lawyer/DSB review; likely contract/pre-contract for auth, with transparent disclosure.
+12. Connected accounts: no.
+13. Sensitive documents: no.
+14. Tokens/secrets/API credentials: SMTP/provider secrets stay in Supabase dashboard only; no frontend/backend secrets added.
+15. Logs: implementation does not add app logs containing email bodies, magic links, or tokens.
+16. Abuse/security risks: email enumeration, link forwarding, account takeover if mailbox compromised, email abuse/rate limits; require Supabase rate limits, redirect allowlist, Turnstile, and sender-domain controls.
+
+Decision:
+
+- Privacy review complete: yes for implementation
+- Safe to implement now: yes
+- Needs lawyer/DSB review first: yes before public production launch
+- Notes: verify Supabase project region, auth email provider, sender domain, SPF/DKIM/DMARC, DPA/AVV, retention/deletion, and Datenschutzerklaerung disclosure.
+
+## Completed Review: Billing And Subscription Foundation
+
+- Feature name: Billing and subscription foundation
+- Owner: Engineering/Product
+- Route/module: `backend/app/services/billing.py`, `backend/app/routers/billing.py`, `backend/app/routers/webhooks.py`, `frontend/src/pages/Home.tsx`, `frontend/src/pages/MarketingPages.tsx`, `frontend/src/pages/AuthPages.tsx`
+- Backend/API changes: billing status, checkout, portal placeholder and Paddle webhook endpoint
+- Database/storage changes: `PlanSubscription` billing columns, `BillingEvent` safe event table
+- Third-party providers: Paddle preferred first Merchant-of-Record direction; Lemon Squeezy/Stripe future alternatives only
+- Launch state: foundation; paid checkout requires server-side Paddle env configuration; Family disabled by default
+
+Required questions:
+
+1. Personal data: Avareno user id, plan key, subscription status, provider customer id, provider subscription id, period dates, cancellation flag, safe webhook event id/type/status. Paddle may process email, payment, invoice and tax/VAT metadata.
+2. Purpose: create and manage paid subscription state and provider webhook synchronization.
+3. Avoid collection: Free plan avoids provider checkout. Paid plans require provider-side billing data.
+4. Data minimization: client sends only `planKey`; prices and provider ids are server-side. Avareno stores no card/payment method details and no raw webhook payloads.
+5. Storage: local SQLite MVP now; future production database with RLS. Paddle stores provider-side billing/payment records.
+6. Retention: local/provider retention is not final and must be defined before paid launch.
+7. Export: export flow must include local subscription state.
+8. Deletion: account deletion must include local subscription state and provider-side cancellation/deletion process notes.
+9. Third-party sharing: yes, Paddle when checkout is configured and used.
+10. AI: no.
+11. Consent/legal basis: needs lawyer/DSB/tax review; paid subscription processing likely contract necessity, but public policy/terms must be reviewed.
+12. Connected accounts: no.
+13. Sensitive documents: no direct document processing, but billing links to an account that may store sensitive documents.
+14. Tokens/secrets/API credentials: `PADDLE_API_KEY` and `PADDLE_WEBHOOK_SECRET` are server-side only.
+15. Logs: no raw webhook payloads, card data, payment method details, invoice records or secrets should be logged.
+16. Abuse/security risks: forged webhooks, duplicate events, client-side price tampering, disabled Family purchase bypass. Foundation mitigates with signature verification, idempotent event ids, server-side price ids and disabled Family checkout.
+
+Decision:
+
+- Privacy review complete: yes for foundation
+- Safe to implement now: yes as non-production foundation with safe failure when Paddle is not configured
+- Needs lawyer/DSB review first: yes before accepting production payments
+- Notes: verify Paddle MoR scope, VAT/tax handling, invoice handling, DPA/AVV, subprocessors, region/transfers, retention/deletion, customer portal/cancellation and public legal copy before paid launch.

@@ -1,6 +1,7 @@
 PRAGMA foreign_keys = ON;
 
 DROP TABLE IF EXISTS "AffiliateClick";
+DROP TABLE IF EXISTS "BillingEvent";
 DROP TABLE IF EXISTS "ItemActivity";
 DROP TABLE IF EXISTS "SmartHomeCommand";
 DROP TABLE IF EXISTS "SmartHomeDevice";
@@ -81,14 +82,33 @@ CREATE TABLE "PlanSubscription" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "userId" TEXT NOT NULL,
   "householdId" TEXT,
+  "provider" TEXT NOT NULL DEFAULT 'paddle',
+  "providerCustomerId" TEXT,
+  "providerSubscriptionId" TEXT,
+  "planKey" TEXT NOT NULL DEFAULT 'free',
   "tier" TEXT NOT NULL DEFAULT 'FREE',
   "status" TEXT NOT NULL DEFAULT 'ACTIVE',
-  "itemLimit" INTEGER NOT NULL DEFAULT 25,
+  "itemLimit" INTEGER NOT NULL DEFAULT 10,
   "storageLimitMb" INTEGER NOT NULL DEFAULT 100,
+  "currentPeriodStart" TEXT,
+  "currentPeriodEnd" TEXT,
+  "cancelAtPeriodEnd" INTEGER NOT NULL DEFAULT 0,
   "createdAt" TEXT NOT NULL,
   "updatedAt" TEXT NOT NULL,
   FOREIGN KEY ("userId") REFERENCES "User" ("id"),
   FOREIGN KEY ("householdId") REFERENCES "Household" ("id") ON DELETE SET NULL
+);
+
+CREATE TABLE "BillingEvent" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "provider" TEXT NOT NULL,
+  "eventId" TEXT NOT NULL,
+  "eventType" TEXT NOT NULL,
+  "receivedAt" TEXT NOT NULL,
+  "processedAt" TEXT,
+  "status" TEXT NOT NULL DEFAULT 'RECEIVED',
+  "safeError" TEXT,
+  UNIQUE ("provider", "eventId")
 );
 
 CREATE TABLE "SmartHomeConnection" (

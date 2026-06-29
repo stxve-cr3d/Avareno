@@ -39,7 +39,12 @@ def current_auth_user_id() -> str | None:
 
 
 async def auth_middleware(request: Request, call_next):
-    if request.method == "OPTIONS" or not request.url.path.startswith("/api/") or request.url.path == "/api/health":
+    if (
+        request.method == "OPTIONS"
+        or not request.url.path.startswith("/api/")
+        or request.url.path == "/api/health"
+        or request.url.path.startswith("/api/webhooks/")
+    ):
         return await call_next(request)
 
     required = os.environ.get("AVARENO_REQUIRE_AUTH") == "1"

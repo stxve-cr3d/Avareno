@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import QRCode from "qrcode";
 import {
   ArrowLeft,
   BellRing,
@@ -23,6 +24,7 @@ import {
   Plus,
   Power,
   Printer,
+  QrCode,
   RadioTower,
   ReceiptText,
   Repeat2,
@@ -39,6 +41,7 @@ import {
   Wrench
 } from "lucide-react";
 import { api, isoDate } from "../lib/api";
+import { productQrUrl } from "../lib/productQr";
 import type { Item, Loop, RepairLog, SmartHomeDevice, SupportDraft } from "../lib/types";
 import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
@@ -745,6 +748,10 @@ export function ItemDetail() {
           </section>
 
           <section className="object-panel rounded-lg p-4">
+            <ProductQrPanel item={item} />
+          </section>
+
+          <section className="object-panel rounded-lg p-4">
             <SectionTitle eyebrow="Nachkauf" title="Links und Haushalt" icon={<Repeat2 size={19} />} />
             <div className="mt-5 grid gap-3">
               {shopUrl ? (
@@ -1095,6 +1102,144 @@ function ProductRecommendationCard({ recommendation }: { recommendation: Product
       </div>
     </article>
   );
+}
+
+function ProductQrPanel({ item }: { item: Item }) {
+  const [qrDataUrl, setQrDataUrl] = useState("");
+  const qrUrl = productQrUrl(item.id);
+
+  useEffect(() => {
+    let active = true;
+    QRCode.toDataURL(qrUrl, {
+      color: {
+        dark: "#101111",
+        light: "#ffffff"
+      },
+      errorCorrectionLevel: "M",
+      margin: 1,
+      scale: 8
+    })
+      .then((value) => {
+        if (active) setQrDataUrl(value);
+      })
+      .catch(() => {
+        if (active) setQrDataUrl("");
+      });
+    return () => {
+      active = false;
+    };
+  }, [qrUrl]);
+
+  function printQrLabel() {
+    if (!qrDataUrl) return;
+    const printWindow = window.open("", "_blank", "noopener,noreferrer,width=520,height=720");
+    if (!printWindow) return;
+    printWindow.document.write(buildQrPrintHtml(item, qrUrl, qrDataUrl));
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  }
+
+  return (
+    <div className="product-qr-card">
+      <SectionTitle eyebrow="Produkt-QR" title="Label zum Scannen" icon={<QrCode size={19} />} />
+      <div className="product-qr-body">
+        <div className="product-qr-code">
+          {qrDataUrl ? <img src={qrDataUrl} alt={`QR-Code für ${item.name}`} /> : <QrCode size={56} />}
+        </div>
+        <div className="product-qr-copy">
+          <p>Der Code öffnet diesen Produktpass in Avareno. Er enthält keine Seriennummer, keinen Preis und keine Dokumentdaten.</p>
+          <span>{qrUrl}</span>
+        </div>
+      </div>
+      <div className="product-qr-actions">
+        <Button onClick={printQrLabel} icon={<Printer size={18} />} disabled={!qrDataUrl} type="button">
+          QR drucken
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function buildQrPrintHtml(item: Item, qrUrl: string, qrDataUrl: string) {
+  const title = escapeHtml(item.name);
+  const subtitle = escapeHtml([item.manufacturer, item.model].filter(Boolean).join(" / ") || item.category || "Avareno Produkt");
+  const safeUrl = escapeHtml(qrUrl);
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${title} QR</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: #f4f7f7;
+        color: #101111;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      main {
+        width: min(100%, 420px);
+        margin: 24px auto;
+        border: 1px solid #d9dfdc;
+        border-radius: 18px;
+        background: #ffffff;
+        padding: 22px;
+      }
+      img {
+        display: block;
+        width: 220px;
+        height: 220px;
+        margin: 0 auto;
+      }
+      h1 {
+        margin: 18px 0 0;
+        font-size: 24px;
+        line-height: 1.1;
+      }
+      p {
+        margin: 8px 0 0;
+        color: #52605b;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.45;
+      }
+      small {
+        display: block;
+        margin-top: 16px;
+        overflow-wrap: anywhere;
+        color: #6f7a76;
+        font-size: 10px;
+        font-weight: 700;
+      }
+      @media print {
+        body { background: #ffffff; }
+        main { margin: 0; border-color: #111111; page-break-inside: avoid; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="${qrDataUrl}" alt="" />
+      <h1>${title}</h1>
+      <p>${subtitle}</p>
+      <small>${safeUrl}</small>
+    </main>
+  </body>
+</html>`;
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    };
+    return entities[character] ?? character;
+  });
 }
 
 function productRecommendationsFor(item: Item): ProductRecommendation[] {

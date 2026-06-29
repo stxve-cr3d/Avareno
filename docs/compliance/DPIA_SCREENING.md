@@ -61,6 +61,70 @@ Use the most conservative outcome that applies.
 - High risk: STOP. DSFA/DPIA likely needed before production.
 - Unknown risk: STOP and ask for legal/privacy review.
 
+## Screening: Supabase Phone/SMS OTP Auth
+
+- Feature name: Supabase Phone/SMS OTP Auth
+- Description: optional passwordless phone login/signup through Supabase Phone Auth and Twilio/SMS provider
+- Data categories: phone number, OTP, auth/session metadata, optional display name, optional Turnstile token
+- Users affected: signup and registered users who choose phone auth
+- Third parties: Supabase, Twilio/SMS provider, optional Cloudflare Turnstile
+- Launch state: gated by `VITE_AUTH_PHONE_ENABLED`
+
+High-risk trigger notes:
+
+- Sensitive/highly personal documents: no
+- Large-volume processing: no by feature design, but production scale and SMS abuse monitoring need review
+- Connected accounts/imports: no
+- AI analysis/profiling: no
+- Exposure to other users: no
+- Third-country transfer/new provider: unknown; Supabase/Twilio/Cloudflare region and DPA/AVV status must be verified
+- Breach harm: medium; phone numbers and account access are sensitive enough to require careful auth abuse controls
+
+Screening outcome: medium risk before production enablement because phone numbers and SMS provider transfer/retention details need legal/security review. Gated implementation may proceed for internal testing.
+
+## Screening: Supabase Email Magic Link Auth
+
+- Feature name: Supabase Email Magic Link Auth
+- Description: passwordless email login/signup through Supabase Auth Magic Links
+- Data categories: email address, auth/session metadata, optional display name, optional Turnstile token
+- Users affected: signup and registered users who choose Magic Link auth
+- Third parties: Supabase, configured auth email provider, optional Cloudflare Turnstile
+- Launch state: enabled in auth UI; production sender/provider review still required
+
+High-risk trigger notes:
+
+- Sensitive/highly personal documents: no
+- Large-volume processing: no by feature design, but email abuse/rate limiting needs review
+- Connected accounts/imports: no
+- AI analysis/profiling: no
+- Exposure to other users: no
+- Third-country transfer/new provider: unknown; Supabase/email-provider/Cloudflare region and DPA/AVV status must be verified
+- Breach harm: medium; mailbox compromise or forwarded Magic Links can grant account access
+
+Screening outcome: low-to-medium risk for implementation, medium before public production launch until provider, sender-domain, redirect, and retention details are verified.
+
+## Screening: Billing And Subscriptions
+
+- Feature name: Billing and subscription foundation
+- Description: Free/Personal/Family plan model, Paddle checkout foundation, Paddle webhook foundation, local subscription state
+- Data categories: Avareno user id, provider customer id, provider subscription id, plan key, subscription status, billing period dates, safe webhook event id/type/status; provider-side email, invoice, VAT/tax and payment data
+- Users affected: registered users choosing paid plans
+- Third parties: Paddle preferred first provider direction; Lemon Squeezy/Stripe future alternatives only
+- Launch state: foundation; checkout only works after server-side Paddle env configuration; Family disabled by default
+
+High-risk trigger notes:
+
+- Sensitive/highly personal documents: no direct document processing, but the account may belong to a user storing sensitive Avareno data.
+- Large-volume processing: no by feature design.
+- Connected accounts/imports: no.
+- AI analysis/profiling: no.
+- Exposure to other users: no.
+- Third-country transfer/new provider: unknown until Paddle contract/dashboard/DPA/AVV and subprocessors are verified.
+- Breach harm: medium/high because billing identifiers and subscription status can reveal account relationship and purchase state.
+- Legal/tax impact: high review need; Merchant-of-Record, VAT/tax, invoices, cancellation/refund and privacy policy wording must be reviewed.
+
+Screening outcome: medium risk for foundation; high review requirement before paid launch. Proceed only with no card data stored, no raw webhook payload logging, signature-verified webhooks and no public claims of legal/tax certainty.
+
 ## Required Follow-Ups
 
 - Update processing activities draft.

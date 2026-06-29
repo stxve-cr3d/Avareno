@@ -139,14 +139,53 @@ def _ensure_product_tables(conn: sqlite3.Connection) -> None:
           "id" TEXT NOT NULL PRIMARY KEY,
           "userId" TEXT NOT NULL,
           "householdId" TEXT,
+          "provider" TEXT NOT NULL DEFAULT 'paddle',
+          "providerCustomerId" TEXT,
+          "providerSubscriptionId" TEXT,
+          "planKey" TEXT NOT NULL DEFAULT 'free',
           "tier" TEXT NOT NULL DEFAULT 'FREE',
           "status" TEXT NOT NULL DEFAULT 'ACTIVE',
-          "itemLimit" INTEGER NOT NULL DEFAULT 25,
+          "itemLimit" INTEGER NOT NULL DEFAULT 10,
           "storageLimitMb" INTEGER NOT NULL DEFAULT 100,
+          "currentPeriodStart" TEXT,
+          "currentPeriodEnd" TEXT,
+          "cancelAtPeriodEnd" INTEGER NOT NULL DEFAULT 0,
           "createdAt" TEXT NOT NULL,
           "updatedAt" TEXT NOT NULL,
           FOREIGN KEY ("userId") REFERENCES "User" ("id"),
           FOREIGN KEY ("householdId") REFERENCES "Household" ("id") ON DELETE SET NULL
+        )"""
+    )
+    plan_columns = {row["name"] for row in conn.execute('PRAGMA table_info("PlanSubscription")').fetchall()}
+    plan_column_definitions = {
+        "provider": "TEXT NOT NULL DEFAULT 'paddle'",
+        "providerCustomerId": "TEXT",
+        "providerSubscriptionId": "TEXT",
+        "planKey": "TEXT NOT NULL DEFAULT 'free'",
+        "currentPeriodStart": "TEXT",
+        "currentPeriodEnd": "TEXT",
+        "cancelAtPeriodEnd": "INTEGER NOT NULL DEFAULT 0",
+    }
+    for name, definition in plan_column_definitions.items():
+        if name not in plan_columns:
+            conn.execute(f'ALTER TABLE "PlanSubscription" ADD COLUMN "{name}" {definition}')
+    conn.execute("""UPDATE "PlanSubscription" SET planKey = 'free' WHERE upper(tier) = 'FREE'""")
+    conn.execute("""UPDATE "PlanSubscription" SET planKey = 'personal', tier = 'PERSONAL' WHERE upper(tier) IN ('HOME', 'PREMIUM', 'PERSONAL')""")
+    conn.execute("""UPDATE "PlanSubscription" SET planKey = 'family', tier = 'FAMILY' WHERE upper(tier) IN ('PRO', 'FAMILY')""")
+    conn.execute("""UPDATE "PlanSubscription" SET itemLimit = 10 WHERE planKey = 'free' AND itemLimit > 10""")
+    conn.execute('CREATE INDEX IF NOT EXISTS "PlanSubscription_userId_idx" ON "PlanSubscription" ("userId")')
+    conn.execute('CREATE INDEX IF NOT EXISTS "PlanSubscription_providerSubscriptionId_idx" ON "PlanSubscription" ("provider", "providerSubscriptionId")')
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS "BillingEvent" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "provider" TEXT NOT NULL,
+          "eventId" TEXT NOT NULL,
+          "eventType" TEXT NOT NULL,
+          "receivedAt" TEXT NOT NULL,
+          "processedAt" TEXT,
+          "status" TEXT NOT NULL DEFAULT 'RECEIVED',
+          "safeError" TEXT,
+          UNIQUE ("provider", "eventId")
         )"""
     )
     conn.execute(
@@ -302,9 +341,9 @@ def _ensure_default_product_structure(conn: sqlite3.Connection) -> None:
         if not plan:
             conn.execute(
                 """INSERT INTO "PlanSubscription"
-                   (id, userId, householdId, tier, status, itemLimit, storageLimitMb, createdAt, updatedAt)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (make_id(), user["id"], household_id, "FREE", "ACTIVE", 25, 100, now, now),
+                   (id, userId, householdId, provider, planKey, tier, status, itemLimit, storageLimitMb, createdAt, updatedAt)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (make_id(), user["id"], household_id, "paddle", "free", "FREE", "ACTIVE", 10, 100, now, now),
             )
 
         root = conn.execute(

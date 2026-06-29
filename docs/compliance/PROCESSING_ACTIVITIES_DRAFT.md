@@ -78,6 +78,56 @@ Examples:
 
 ### Subprocessors
 
+## Supabase Phone/SMS OTP Authentication
+
+### Purpose
+
+Optional passwordless authentication by phone number and one-time SMS code.
+
+### Data Categories
+
+- phone number
+- SMS OTP submitted by the user
+- Supabase Auth user id and session/token metadata
+- optional signup display name
+- optional Turnstile token/security metadata when bot protection is enabled
+- SMS delivery metadata handled by Supabase/Twilio
+
+### User Categories
+
+- registered users
+- signup users choosing phone auth
+
+### Recipients
+
+- Supabase Auth
+- Twilio or the configured SMS provider through Supabase Phone Auth
+- Cloudflare Turnstile only when enabled
+
+### Legal Basis
+
+To be reviewed by lawyer/DSB before production enablement.
+
+### Retention
+
+Unknown until Supabase/Twilio dashboard, contract, and DPA/AVV details are verified. Account deletion must remove the Supabase Auth user and revoke sessions; provider-side SMS delivery retention must be documented.
+
+### Security Measures
+
+- feature gated by `VITE_AUTH_PHONE_ENABLED`
+- Twilio credentials stored only in Supabase provider settings
+- no phone numbers or OTPs logged by the app implementation
+- E.164-style phone input required
+- Supabase OTP verification creates the session
+- optional Turnstile captcha token can be sent to Supabase
+- production enablement requires rate limits, abuse monitoring, and user-facing disclosure
+
+### Subprocessors
+
+- Supabase
+- Twilio/SMS provider, exact account/region/DPA status TODO
+- Cloudflare if Turnstile is enabled
+
 Document provider, purpose, region, DPA/AVV status, EU/EEA transfer, retention/deletion, and user-facing disclosure.
 
 ## Draft Activities
@@ -86,11 +136,11 @@ Provider-specific draft entries live in `SUBPROCESSORS_DRAFT.md`. Implementation
 
 ### Account And Authentication
 
-- Purpose: create account, sign in, manage session, verify email, password reset, provider login.
-- Data categories: email, auth provider metadata, session/token metadata, profile metadata.
-- Recipients: Supabase Auth, OAuth providers if enabled.
+- Purpose: create account, sign in, manage session, verify email, send Magic Links, password reset, provider login.
+- Data categories: email, auth provider metadata, Magic Link/email metadata, session/token metadata, profile metadata.
+- Recipients: Supabase Auth, configured auth email provider, OAuth providers if enabled.
 - Retention: until account deletion plus provider/legal retention.
-- Security: Supabase Auth, redirect allowlist, no service-role key in frontend.
+- Security: Supabase Auth, redirect allowlist, Turnstile when enabled, no service-role key in frontend.
 - Open: DPA/AVV status, passkey provider status, account deletion flow.
 
 ### Profile And Settings
@@ -110,6 +160,15 @@ Provider-specific draft entries live in `SUBPROCESSORS_DRAFT.md`. Implementation
 - Retention: until user deletion/account deletion.
 - Security: user ownership/RLS.
 - Open: export format and deletion behavior.
+
+### Billing And Subscriptions
+
+- Purpose: sell and manage Free, Personal and Family subscription states.
+- Data categories: Avareno user id, provider customer id, provider subscription id, plan key, subscription status, current period dates, cancel-at-period-end flag, safe webhook event id/type/status/error. Paddle may process customer email, invoices, VAT/tax metadata and payment details in its own systems.
+- Recipients: Avareno backend/database for subscription state; Paddle as preferred first Merchant-of-Record billing provider direction after review.
+- Retention: local subscription state until account deletion or legally required billing retention is defined; provider retention/deletion behavior TODO.
+- Security: Paddle API key and webhook secret server-side only; webhook signature required; idempotent event ids; no card/payment method details stored by Avareno; no raw provider payload logging.
+- Open: MoR scope, VAT/tax handling, invoice handling, DPA/AVV, region/transfers, subprocessors, cancellation/customer portal, refund/support process, privacy policy and terms wording.
 
 ### Documents, Receipts And Files
 

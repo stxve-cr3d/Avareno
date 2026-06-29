@@ -8,6 +8,8 @@ def _add_years(value: datetime, years: int) -> datetime:
 
 
 def mock_extract_receipt(file_name: str | None = None, text: str | None = None) -> dict:
+    # Keep this mock narrow. Real AI/OCR must never receive secrets, unrelated
+    # user records, or Private Vault documents automatically.
     raw = f"{file_name or ''} {text or ''}".lower()
     today = datetime.now(timezone.utc).replace(hour=12, minute=0, second=0, microsecond=0)
 

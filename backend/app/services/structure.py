@@ -6,12 +6,12 @@ from app.db import row_to_dict, rows_to_dicts
 
 
 ITEM_TYPES = [
-    {"id": "THING", "label": "Alles", "description": "Default fuer Dinge, die nicht in eine enge Kategorie passen."},
-    {"id": "ELECTRONIC", "label": "Elektronik", "description": "TV, Smartphone, Laptop, Audio, Haushaltsgeraete."},
-    {"id": "FURNITURE", "label": "Moebel", "description": "Sofa, Bett, Tisch, Lampen, Einrichtung."},
-    {"id": "INFRASTRUCTURE", "label": "Gebaeude", "description": "Heizung, Fenster, Tueren, Boden, Kueche, Bad."},
+    {"id": "THING", "label": "Alles", "description": "Default für Dinge, die nicht in eine enge Kategorie passen."},
+    {"id": "ELECTRONIC", "label": "Elektronik", "description": "TV, Smartphone, Laptop, Audio, Haushaltsgeräte."},
+    {"id": "FURNITURE", "label": "Möbel", "description": "Sofa, Bett, Tisch, Lampen, Einrichtung."},
+    {"id": "INFRASTRUCTURE", "label": "Gebäude", "description": "Heizung, Fenster, Türen, Boden, Küche, Bad."},
     {"id": "VEHICLE", "label": "Fahrzeug", "description": "Auto, Fahrrad, E-Bike, Scooter."},
-    {"id": "COLLECTIBLE", "label": "Wertstueck", "description": "Sammlerstuecke, Schmuck, Kunst, besondere Dinge."},
+    {"id": "COLLECTIBLE", "label": "Wertstück", "description": "Sammlerstücke, Schmuck, Kunst, besondere Dinge."},
 ]
 
 
@@ -21,14 +21,14 @@ CAPTURE_METHODS = [
     {"id": "BARCODE", "label": "Barcode / QR", "status": "NEXT", "promise": "Produktdaten mit einem Scan finden."},
     {"id": "EMAIL", "label": "E-Mail Import", "status": "NEXT", "promise": "Online-Bestellungen automatisch einlesen."},
     {"id": "VOICE", "label": "Voice Note", "status": "LATER", "promise": "Schnell erfassen ohne Formular."},
-    {"id": "SMART_HOME", "label": "Smart Home", "status": "WOW", "promise": "Geraete aus Home Assistant, Matter und Co. importieren."},
+    {"id": "SMART_HOME", "label": "Smart Home", "status": "WOW", "promise": "Geräte aus Home Assistant, Matter und Co. importieren."},
 ]
 
 
 PREMIUM_FEATURES = [
-    {"id": "UNLIMITED_ITEMS", "label": "Unbegrenzte Dinge", "free": False, "premium": True},
+    {"id": "FAIR_USE_ITEMS", "label": "Großzügige Dinge mit Fair Use", "free": False, "premium": True},
     {"id": "FAMILY_SHARING", "label": "Familienfreigabe", "free": False, "premium": True},
-    {"id": "ADVANCED_SPACES", "label": "Gebaeude, Raeume, Zonen", "free": True, "premium": True},
+    {"id": "ADVANCED_SPACES", "label": "Gebäude, Räume, Zonen", "free": True, "premium": True},
     {"id": "AI_EXTRACTION", "label": "AI-Erkennung", "free": "limited", "premium": True},
     {"id": "SMART_HOME", "label": "Smart-Home-Anbindung", "free": False, "premium": True},
     {"id": "INSURANCE_REPORT", "label": "Versicherungsreport", "free": False, "premium": True},
@@ -44,7 +44,7 @@ WOW_FEATURES = [
     {
         "id": "EMERGENCY_BINDER",
         "label": "Emergency Home Binder",
-        "description": "Ein Tap erzeugt eine strukturierte Hausakte fuer Versicherung, Umzug oder Schaden.",
+        "description": "Ein Tap erzeugt eine strukturierte Hausakte für Versicherung, Umzug oder Schaden.",
     },
     {
         "id": "REORDER_INTELLIGENCE",
@@ -54,7 +54,7 @@ WOW_FEATURES = [
     {
         "id": "HOME_ASSISTANT_IMPORT",
         "label": "Smart Home Import",
-        "description": "Geraete koennen spaeter automatisch aus Smart-Home-Systemen entstehen.",
+        "description": "Geräte können später automatisch aus Smart-Home-Systemen entstehen.",
     },
 ]
 
@@ -109,7 +109,7 @@ def structure_payload(conn: sqlite3.Connection, user_id: str) -> dict:
         else []
     )
     item_count = conn.execute('SELECT COUNT(*) AS count FROM "Item" WHERE userId = ?', (user_id,)).fetchone()["count"]
-    free_limit = plan["itemLimit"] if plan else 25
+    free_limit = plan["itemLimit"] if plan else 10
 
     return {
         "household": household,
@@ -129,9 +129,9 @@ def structure_payload(conn: sqlite3.Connection, user_id: str) -> dict:
             "status": "FOUNDATION_READY",
             "partners": partners,
             "rules": [
-                "Shop-Links muessen hilfreich sein, nicht werblich.",
-                "Jeder Klick wird messbar, damit Revenue spaeter sauber zugeordnet werden kann.",
-                "Premium darf Affiliate nicht ersetzen, sondern ergaenzen.",
+                "Shop-Links müssen hilfreich sein, nicht werblich.",
+                "Jeder Klick wird messbar, damit Revenue später sauber zugeordnet werden kann.",
+                "Premium darf Affiliate nicht ersetzen, sondern ergänzen.",
             ],
         },
         "sharing": {

@@ -22,11 +22,22 @@ Privacy, security, and user control are product requirements, not add-ons.
 
 - name or display name
 - email address
+- phone number when SMS login is explicitly enabled
 - avatar URL or avatar image
 - auth provider metadata
 - privacy and motivation preferences
 - onboarding interests
 - passkey/provider status
+
+### Billing And Subscriptions
+
+- plan key and subscription status
+- provider customer id and provider subscription id
+- current billing period dates and cancellation flag
+- safe webhook event id/type/status
+- provider-side customer, invoice, VAT/tax and payment data handled by the billing provider
+
+Avareno must not store card numbers, payment method details, raw payment payloads, or full provider invoice/payment records.
 
 ### Object Memory
 
@@ -82,7 +93,7 @@ Logs must not contain raw document content, raw connector payloads, secrets, tok
 
 Current or planned storage areas include:
 
-- Supabase Auth for authentication and profile metadata
+- Supabase Auth for authentication, Magic Links, sessions, and profile metadata
 - Supabase Storage buckets:
   - `avatars`: public object URLs, no public listing
   - `object-images`: private user files
@@ -93,6 +104,7 @@ Current or planned storage areas include:
 - local `/uploads` directory in the MVP
 - future production Postgres with RLS
 - future encrypted connector token storage
+- billing subscription state and safe billing event records
 - future audit/sync logs
 
 Before public launch, production storage must have:
@@ -111,7 +123,9 @@ Avareno must provide or plan:
 - account settings
 - profile update
 - email verification
+- phone/SMS OTP login status where enabled
 - profile image removal
+- plan/subscription status and cancellation/customer portal access before paid launch
 - connector disconnect
 - data export
 - account deletion
@@ -136,6 +150,8 @@ Open implementation requirements:
 - disconnect connectors and delete stored tokens
 - define deletion behavior for backups
 - define deletion behavior for provider-side data
+- include local billing subscription state in export/deletion plans
+- define provider-side billing retention, cancellation and deletion process
 - define retention windows for logs and raw imports
 
 ## Third-Party Providers
@@ -148,6 +164,7 @@ Every provider must be documented before production use:
 - SMS provider such as Twilio if enabled
 - OAuth providers such as Google or Apple
 - AI/OCR providers
+- billing provider such as Paddle if paid subscriptions are enabled
 - analytics providers if any
 - newsletter provider if any
 - affiliate providers if any
@@ -193,5 +210,6 @@ Public claims must be accurate. Do not claim "100% secure", "legally verified", 
 - Does any data leave the EU/EEA?
 - Is a DSFA/DPIA required for AI extraction, connector imports, or Vault?
 - What consent UX is required for cookies, Turnstile, analytics, newsletter, affiliates, AI, and connector imports?
+- What legal/tax/Merchant-of-Record review is required before accepting paid subscriptions?
 - What exact account deletion and export obligations must be met before launch?
 - What support/community wording is required to prevent public sharing of sensitive documents?

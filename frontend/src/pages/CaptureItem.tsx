@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, BookOpen, Camera, LifeBuoy, PackagePlus, ReceiptText, ScanBarcode, ShieldCheck, Tag } from "lucide-react";
 import { api } from "../lib/api";
 import type { BarcodeLookup, Item } from "../lib/types";
+import { parseAvarenoProductQr } from "../lib/productQr";
 import { BarcodeScannerDialog } from "../components/BarcodeScannerDialog";
 import { Button } from "../components/Button";
 
@@ -30,7 +31,7 @@ type PassportForm = {
 
 const initialForm: PassportForm = {
   name: "",
-  category: "Other",
+  category: "Sonstiges",
   manufacturer: "",
   model: "",
   serialNumber: "",
@@ -72,7 +73,7 @@ export function CaptureItem() {
         method: "POST",
         body: JSON.stringify({
           name: form.name.trim(),
-          category: form.category.trim() || "Other",
+          category: form.category.trim() || "Sonstiges",
           manufacturer: nullable(form.manufacturer),
           model: nullable(form.model),
           serialNumber: nullable(form.serialNumber),
@@ -96,7 +97,7 @@ export function CaptureItem() {
       });
       navigate(`/items/${item.id}`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not create passport");
+      setError(caught instanceof Error ? caught.message : "Der Produktpass konnte nicht erstellt werden.");
     } finally {
       setBusy(false);
     }
@@ -130,7 +131,7 @@ export function CaptureItem() {
         setForm((current) => ({ ...current, barcode: result.barcode, barcodeFormat: result.barcodeFormat }));
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Barcode lookup failed");
+      setError(caught instanceof Error ? caught.message : "Die Barcode-Suche ist fehlgeschlagen.");
     } finally {
       setLookupBusy(false);
     }
@@ -139,10 +140,15 @@ export function CaptureItem() {
   const handleBarcodeDetected = useCallback(
     (value: string) => {
       setScannerOpen(false);
+      const productId = parseAvarenoProductQr(value);
+      if (productId) {
+        navigate(`/app/items/${productId}`);
+        return;
+      }
       setForm((current) => ({ ...current, barcode: value }));
       void lookupBarcode(value);
     },
-    [lookupBarcode]
+    [lookupBarcode, navigate]
   );
 
   return (
@@ -152,28 +158,28 @@ export function CaptureItem() {
       <section className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
         <div className="grid gap-5 bg-[#101111] p-5 text-white md:grid-cols-[minmax(0,1fr)_18rem] md:p-7">
           <div>
-            <p className="text-xs font-bold uppercase text-white/50">Product Passport</p>
-            <h1 className="mt-3 max-w-3xl text-[clamp(2.6rem,7vw,5.8rem)] font-semibold leading-[0.94]">Create a memory for a real thing</h1>
+            <p className="text-xs font-bold uppercase text-white/50">Produktpass</p>
+            <h1 className="mt-3 max-w-3xl text-[clamp(2.6rem,7vw,5.8rem)] font-semibold leading-[0.94]">Ein Ding sauber merken</h1>
             <p className="mt-5 max-w-xl text-base font-semibold leading-7 text-white/62">
-              Start with what you know now. Scan or paste a barcode, then complete anything missing later.
+              Fang mit dem an, was du gerade weißt. Barcode scannen oder einfügen, den Rest kannst du später in Ruhe ergänzen.
             </p>
           </div>
           <div className="grid content-end gap-3">
-            <PassportSignal icon={<Tag size={17} />} label="Identity" value={form.name || "Unnamed"} />
+            <PassportSignal icon={<Tag size={17} />} label="Identität" value={form.name || "Noch ohne Namen"} />
             <PassportSignal icon={<ScanBarcode size={17} />} label="Barcode" value={form.barcode || "Optional"} />
-            <PassportSignal icon={<ShieldCheck size={17} />} label="Warranty" value={form.warrantyUntil || "Later"} />
-            <PassportSignal icon={<LifeBuoy size={17} />} label="Support" value={form.supportContact || form.supportUrl || "Later"} />
+            <PassportSignal icon={<ShieldCheck size={17} />} label="Garantie" value={form.warrantyUntil || "Später"} />
+            <PassportSignal icon={<LifeBuoy size={17} />} label="Support" value={form.supportContact || form.supportUrl || "Später"} />
           </div>
         </div>
       </section>
 
       <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-5">
-          <PassportSection icon={<PackagePlus size={19} />} eyebrow="Step 1" title="Identity">
+          <PassportSection icon={<PackagePlus size={19} />} eyebrow="Schritt 1" title="Identität">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-                  <Field label="Barcode / GTIN" value={form.barcode} onChange={(value) => updateField("barcode", value)} placeholder="EAN, UPC or GTIN" inputMode="numeric" />
+                  <Field label="Barcode / GTIN" value={form.barcode} onChange={(value) => updateField("barcode", value)} placeholder="EAN, UPC oder GTIN" inputMode="numeric" />
                   <button
                     className="mt-7 inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 text-sm font-bold text-ink transition hover:border-leaf hover:text-leaf"
                     data-testid="barcode-scan-open"
@@ -181,7 +187,7 @@ export function CaptureItem() {
                     type="button"
                   >
                     <Camera size={17} />
-                    Scan
+                    Scannen
                   </button>
                   <button
                     className="mt-7 inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-ink px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
@@ -191,56 +197,56 @@ export function CaptureItem() {
                     type="button"
                   >
                     <ScanBarcode size={17} />
-                    {lookupBusy ? "Looking up..." : "Lookup"}
+                    {lookupBusy ? "Wird gesucht..." : "Suchen"}
                   </button>
                 </div>
                 {lookupResult ? (
                   <div className="mt-2 rounded-lg border border-line bg-[#f8faf9] p-3 text-sm font-semibold text-muted">
                     {lookupResult.item ? (
                       <span>
-                        Already saved as <strong className="text-ink">{lookupResult.item.name}</strong>.
+                        Schon gespeichert als <strong className="text-ink">{lookupResult.item.name}</strong>.
                         <button className="ml-2 font-black text-leaf" onClick={() => navigate(`/items/${lookupResult.item?.id}`)} type="button">
-                          Open
+                          Öffnen
                         </button>
                       </span>
                     ) : lookupResult.product ? (
                       <span>
-                        Found via <strong className="text-ink">{lookupResult.product.sourceName}</strong>. Fields were prefilled.
+                        Gefunden über <strong className="text-ink">{lookupResult.product.sourceName}</strong>. Die Felder wurden vorbereitet.
                       </span>
                     ) : (
-                      <span>No public product match yet. The barcode will still be saved locally.</span>
+                      <span>Noch kein öffentlicher Produkttreffer. Der Barcode wird trotzdem lokal am Ding gespeichert.</span>
                     )}
                   </div>
                 ) : null}
               </div>
               <Field label="Name" value={form.name} onChange={(value) => updateField("name", value)} placeholder="LG OLED C3 Wohnzimmer" required />
-              <Field label="Category" value={form.category} onChange={(value) => updateField("category", value)} placeholder="TV, Airfryer, Router" />
-              <Field label="Manufacturer" value={form.manufacturer} onChange={(value) => updateField("manufacturer", value)} placeholder="LG" />
-              <Field label="Model" value={form.model} onChange={(value) => updateField("model", value)} placeholder="OLED65C3" />
-              <Field label="Serial number" value={form.serialNumber} onChange={(value) => updateField("serialNumber", value)} placeholder="SN-..." />
-              <Field label="Location" value={form.location} onChange={(value) => updateField("location", value)} placeholder="Wohnzimmer, Keller, Buero" />
+              <Field label="Kategorie" value={form.category} onChange={(value) => updateField("category", value)} placeholder="TV, Airfryer, Router" />
+              <Field label="Hersteller" value={form.manufacturer} onChange={(value) => updateField("manufacturer", value)} placeholder="LG" />
+              <Field label="Modell" value={form.model} onChange={(value) => updateField("model", value)} placeholder="OLED65C3" />
+              <Field label="Seriennummer" value={form.serialNumber} onChange={(value) => updateField("serialNumber", value)} placeholder="SN-..." />
+              <Field label="Ort" value={form.location} onChange={(value) => updateField("location", value)} placeholder="Wohnzimmer, Keller, Büro" />
             </div>
           </PassportSection>
 
-          <PassportSection icon={<ReceiptText size={19} />} eyebrow="Step 2" title="Receipt and warranty">
+          <PassportSection icon={<ReceiptText size={19} />} eyebrow="Schritt 2" title="Kauf & Garantie">
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Merchant" value={form.merchant} onChange={(value) => updateField("merchant", value)} placeholder="MediaMarkt" />
-              <Field label="Price" value={form.price} onChange={(value) => updateField("price", value)} placeholder="1499" inputMode="decimal" />
-              <DateField label="Purchase date" value={form.purchaseDate} onChange={(value) => updateField("purchaseDate", value)} />
-              <DateField label="Warranty until" value={form.warrantyUntil} onChange={(value) => updateField("warrantyUntil", value)} />
+              <Field label="Händler" value={form.merchant} onChange={(value) => updateField("merchant", value)} placeholder="MediaMarkt" />
+              <Field label="Preis" value={form.price} onChange={(value) => updateField("price", value)} placeholder="1499" inputMode="decimal" />
+              <DateField label="Kaufdatum" value={form.purchaseDate} onChange={(value) => updateField("purchaseDate", value)} />
+              <DateField label="Garantie bis" value={form.warrantyUntil} onChange={(value) => updateField("warrantyUntil", value)} />
             </div>
           </PassportSection>
 
-          <PassportSection icon={<BookOpen size={19} />} eyebrow="Step 3" title="Manuals and support">
+          <PassportSection icon={<BookOpen size={19} />} eyebrow="Schritt 3" title="Handbuch & Support">
             <div className="grid gap-3">
-              <Field label="Manual URL" value={form.manualUrl} onChange={(value) => updateField("manualUrl", value)} placeholder="https://brand.com/manual" />
+              <Field label="Handbuch-URL" value={form.manualUrl} onChange={(value) => updateField("manualUrl", value)} placeholder="https://brand.com/manual" />
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Driver URL" value={form.driverUrl} onChange={(value) => updateField("driverUrl", value)} placeholder="https://brand.com/drivers" />
+                <Field label="Treiber-URL" value={form.driverUrl} onChange={(value) => updateField("driverUrl", value)} placeholder="https://brand.com/drivers" />
                 <Field label="Software URL" value={form.softwareUrl} onChange={(value) => updateField("softwareUrl", value)} placeholder="https://brand.com/software" />
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Support URL" value={form.supportUrl} onChange={(value) => updateField("supportUrl", value)} placeholder="https://brand.com/support" />
-                <Field label="Support contact" value={form.supportContact} onChange={(value) => updateField("supportContact", value)} placeholder="LG Support" />
+                <Field label="Support-URL" value={form.supportUrl} onChange={(value) => updateField("supportUrl", value)} placeholder="https://brand.com/support" />
+                <Field label="Support-Kontakt" value={form.supportContact} onChange={(value) => updateField("supportContact", value)} placeholder="LG Support" />
               </div>
             </div>
           </PassportSection>
@@ -250,24 +256,24 @@ export function CaptureItem() {
           <section className="rounded-lg border border-line bg-white p-4 shadow-soft">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-black uppercase text-muted">Ready to save</p>
-                <h2 className="mt-1 text-2xl font-black text-ink">{form.name || "New Product Passport"}</h2>
+                <p className="text-xs font-black uppercase text-muted">Bereit zum Speichern</p>
+                <h2 className="mt-1 text-2xl font-black text-ink">{form.name || "Neuer Produktpass"}</h2>
               </div>
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-leaf/10 text-leaf">
                 <ShieldCheck size={19} />
               </span>
             </div>
             <div className="mt-5 grid gap-2">
-              <PreviewLine label="Identity" ready={Boolean(form.name.trim())} />
+              <PreviewLine label="Identität" ready={Boolean(form.name.trim())} />
               <PreviewLine label="Barcode" ready={Boolean(form.barcode.trim())} />
-              <PreviewLine label="Warranty" ready={Boolean(form.warrantyUntil)} />
-              <PreviewLine label="Serial" ready={Boolean(form.serialNumber.trim())} />
-              <PreviewLine label="Manual" ready={Boolean(form.manualUrl.trim())} />
+              <PreviewLine label="Garantie" ready={Boolean(form.warrantyUntil)} />
+              <PreviewLine label="Seriennummer" ready={Boolean(form.serialNumber.trim())} />
+              <PreviewLine label="Handbuch" ready={Boolean(form.manualUrl.trim())} />
               <PreviewLine label="Support" ready={Boolean(form.supportUrl.trim() || form.supportContact.trim())} />
             </div>
             {error ? <p className="mt-4 rounded-lg bg-ember/10 p-3 text-sm font-black text-ember">{error}</p> : null}
             <Button className="mt-5 w-full" disabled={!form.name.trim() || busy} icon={<ArrowRight size={18} />} type="submit">
-              {busy ? "Creating..." : "Create Product Passport"}
+              {busy ? "Wird erstellt..." : "Produktpass erstellen"}
             </Button>
           </section>
         </aside>
@@ -358,7 +364,7 @@ function PreviewLine({ label, ready }: { label: string; ready: boolean }) {
     <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-[#f8faf9] px-3 py-2">
       <span className="text-sm font-black text-ink">{label}</span>
       <span className={`rounded-full px-2.5 py-1 text-xs font-black ${ready ? "bg-leaf/10 text-leaf" : "bg-amber/10 text-amber"}`}>
-        {ready ? "saved" : "later"}
+        {ready ? "gespeichert" : "später"}
       </span>
     </div>
   );

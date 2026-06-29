@@ -8,6 +8,7 @@ alter table public."HouseholdMember" enable row level security;
 alter table public."Space" enable row level security;
 alter table public."AffiliatePartner" enable row level security;
 alter table public."PlanSubscription" enable row level security;
+alter table public."BillingEvent" enable row level security;
 alter table public."SmartHomeConnection" enable row level security;
 alter table public."Item" enable row level security;
 alter table public."Document" enable row level security;
@@ -27,6 +28,7 @@ create index if not exists "HouseholdMember_userId_idx" on public."HouseholdMemb
 create index if not exists "HouseholdMember_householdId_idx" on public."HouseholdMember" ("householdId");
 create index if not exists "Space_householdId_idx" on public."Space" ("householdId");
 create index if not exists "PlanSubscription_userId_idx" on public."PlanSubscription" ("userId");
+create index if not exists "BillingEvent_provider_eventId_idx" on public."BillingEvent" ("provider", "eventId");
 create index if not exists "SmartHomeConnection_userId_idx" on public."SmartHomeConnection" ("userId");
 create index if not exists "Item_userId_idx" on public."Item" ("userId");
 create index if not exists "Document_userId_idx" on public."Document" ("userId");
@@ -45,7 +47,8 @@ grant select, insert, update, delete on public."Household" to authenticated;
 grant select, insert, update, delete on public."HouseholdMember" to authenticated;
 grant select, insert, update, delete on public."Space" to authenticated;
 grant select on public."AffiliatePartner" to authenticated;
-grant select, insert, update, delete on public."PlanSubscription" to authenticated;
+grant select on public."PlanSubscription" to authenticated;
+revoke all on public."BillingEvent" from anon, authenticated;
 grant select, insert, update, delete on public."SmartHomeConnection" to authenticated;
 grant select, insert, update, delete on public."Item" to authenticated;
 grant select, insert, update, delete on public."Document" to authenticated;
@@ -128,11 +131,14 @@ to authenticated
 using (true);
 
 drop policy if exists "Users can manage own plan subscriptions" on public."PlanSubscription";
-create policy "Users can manage own plan subscriptions"
-on public."PlanSubscription" for all
+drop policy if exists "Users can read own plan subscriptions" on public."PlanSubscription";
+create policy "Users can read own plan subscriptions"
+on public."PlanSubscription" for select
 to authenticated
-using ((select auth.uid())::text = "userId")
-with check ((select auth.uid())::text = "userId");
+using ((select auth.uid())::text = "userId");
+
+-- BillingEvent intentionally has no authenticated user policies.
+-- It is written only by server-side webhook processing with service-role privileges.
 
 drop policy if exists "Users can manage own smart home connections" on public."SmartHomeConnection";
 create policy "Users can manage own smart home connections"

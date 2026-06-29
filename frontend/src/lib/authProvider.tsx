@@ -13,6 +13,25 @@ type AuthCredentials = {
   captchaToken?: string;
 };
 
+type PhoneOtpRequest = {
+  phone: string;
+  captchaToken?: string;
+  displayName?: string;
+  shouldCreateUser?: boolean;
+};
+
+type PhoneOtpVerification = {
+  phone: string;
+  token: string;
+};
+
+type MagicLinkRequest = {
+  email: string;
+  captchaToken?: string;
+  displayName?: string;
+  shouldCreateUser?: boolean;
+};
+
 type OnboardingInput = {
   displayName: string;
   privateProfile: boolean;
@@ -33,8 +52,11 @@ type AuthContextValue = {
   config: typeof authRuntime;
   login: (input: AuthCredentials) => Promise<AuthActionResult>;
   signup: (input: AuthCredentials & { displayName?: string }) => Promise<AuthActionResult>;
+  requestMagicLink: (input: MagicLinkRequest) => Promise<AuthActionResult>;
   requestPasswordReset: (email: string) => Promise<AuthActionResult>;
   requestEmailVerification: (email?: string) => Promise<AuthActionResult>;
+  requestPhoneOtp: (input: PhoneOtpRequest) => Promise<AuthActionResult>;
+  verifyPhoneOtp: (input: PhoneOtpVerification) => Promise<AuthActionResult>;
   resetPassword: (input: { password: string }) => Promise<AuthActionResult>;
   verifyEmail: (token: string) => Promise<AuthActionResult>;
   completeAuthCallback: (input: { code?: string | null; errorDescription?: string | null }) => Promise<AuthActionResult>;
@@ -199,6 +221,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStatus("anonymous");
       return { ok: true, nextPath: `/auth/verify-email?pending=1&email=${encodeURIComponent(email)}` };
     },
+    async requestMagicLink(input) {
+      setError(null);
+
+      const email = input.email.trim().toLowerCase();
+      if (!email.includes("@")) {
+        setError("Bitte nutze eine gültige E-Mail-Adresse.");
+        return { ok: false };
+      }
+
+      if (authRuntime.mode === "mock") {
+        return { ok: true };
+      }
+
+      if (!supabase) {
+        return failWithSetupError(setError);
+      }
+
+      const shouldCreateUser = input.shouldCreateUser ?? false;
+      const { error: magicLinkError } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser,
+          emailRedirectTo: authRuntime.emailRedirectUrl,
+          captchaToken: input.captchaToken,
+          data: shouldCreateUser ? {
+            display_name: input.displayName?.trim() || displayNameFromEmail(email),
+            onboarding_completed: false,
+            motivation_enabled: true,
+            leaderboard_enabled: false,
+            private_profile: true
+          } : undefined
+        }
+      });
+
+      if (magicLinkError) {
+        setError(mapMagicLinkError(authErrorDetail(magicLinkError)));
+        return { ok: false };
+      }
+
+      return { ok: true };
+    },
     async requestPasswordReset(email) {
       setError(null);
 
@@ -230,7 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const targetEmail = email?.trim().toLowerCase() || profile?.email.trim().toLowerCase() || "";
       if (!targetEmail.includes("@")) {
-        setError("Bitte nutze eine gÃ¼ltige E-Mail-Adresse.");
+        setError("Bitte nutze eine gültige E-Mail-Adresse.");
         return { ok: false };
       }
 
@@ -261,6 +324,112 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       return { ok: true };
+    },
+    async requestPhoneOtp(input) {
+      setError(null);
+
+      const phone = normalizePhoneNumber(input.phone);
+      if (!isE164PhoneNumber(phone)) {
+        setError("Bitte nutze eine gültige Telefonnummer mit Landesvorwahl.");
+        return { ok: false };
+      }
+
+      if (!authRuntime.phoneProvider.configured && authRuntime.mode !== "mock") {
+        setError("Telefon-Login ist noch nicht konfiguriert.");
+        return { ok: false };
+      }
+
+      if (authRuntime.mode === "mock") {
+        return { ok: true };
+      }
+
+      if (!supabase) {
+        return failWithSetupError(setError);
+      }
+
+      const displayName = input.displayName?.trim() || displayNameFromPhone(phone);
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        phone,
+        options: {
+          channel: "sms",
+          shouldCreateUser: input.shouldCreateUser ?? true,
+          captchaToken: input.captchaToken,
+          data: {
+            display_name: displayName,
+            onboarding_completed: false,
+            motivation_enabled: true,
+            leaderboard_enabled: false,
+            private_profile: true
+          }
+        }
+      });
+
+      if (otpError) {
+        setError(mapPhoneOtpRequestError(authErrorDetail(otpError)));
+        return { ok: false };
+      }
+
+      return { ok: true };
+    },
+    async verifyPhoneOtp(input) {
+      setError(null);
+
+      const phone = normalizePhoneNumber(input.phone);
+      const token = input.token.replace(/\s+/g, "");
+
+      if (!isE164PhoneNumber(phone)) {
+        setError("Bitte nutze eine Telefonnummer im internationalen Format.");
+        return { ok: false };
+      }
+
+      if (token.length < 4) {
+        setError("Bitte gib den SMS-Code vollständig ein.");
+        return { ok: false };
+      }
+
+      if (authRuntime.mode === "mock") {
+        const now = new Date().toISOString();
+        const authUserId = `dev_phone_${Date.now()}`;
+        const nextProfile = withUpdatedAt({
+          ...defaultDevProfile,
+          id: authUserId,
+          authUserId,
+          displayName: displayNameFromPhone(phone),
+          email: "",
+          authProvider: "phone",
+          createdAt: now,
+          updatedAt: now,
+          emailVerified: false,
+          onboardingCompleted: false,
+          weeklyXp: 0,
+          totalXp: 0,
+          currentStreakDays: 0,
+          longestStreakDays: 0,
+          freezeDaysAvailable: 0
+        });
+        storeDevProfile(nextProfile);
+        setProfile(nextProfile);
+        setStatus("authenticated");
+        return { ok: true, nextPath: "/onboarding" };
+      }
+
+      if (!supabase) {
+        return failWithSetupError(setError);
+      }
+
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        phone,
+        token,
+        type: "sms"
+      });
+
+      if (verifyError || !data.session) {
+        setError(mapPhoneOtpError(verifyError ? authErrorDetail(verifyError) : { message: "Phone OTP verification failed" }));
+        return { ok: false };
+      }
+
+      applySession(data.session, setProfile, setStatus);
+      return { ok: true, nextPath: data.user?.user_metadata?.onboarding_completed ? "/app" : "/onboarding" };
     },
     async resetPassword(input) {
       setError(null);
@@ -592,11 +761,12 @@ function profileFromSupabaseUser(user: SupabaseUser): UserProfile {
   const metadata = user.user_metadata ?? {};
   const provider = normalizeProvider(user.app_metadata?.provider);
   const createdAt = user.created_at ?? new Date().toISOString();
+  const phone = stringMeta(user.phone);
 
   return {
     id: user.id,
     authUserId: user.id,
-    displayName: stringMeta(metadata.display_name) || stringMeta(metadata.full_name) || stringMeta(metadata.name) || displayNameFromEmail(user.email ?? "avareno@example.com"),
+    displayName: stringMeta(metadata.display_name) || stringMeta(metadata.full_name) || stringMeta(metadata.name) || (user.email ? displayNameFromEmail(user.email) : displayNameFromPhone(phone)),
     email: user.email ?? "",
     avatarUrl: stringMeta(metadata.avatar_url) || stringMeta(metadata.picture) || null,
     authProvider: provider,
@@ -705,6 +875,7 @@ function withUpdatedAt(profile: UserProfile): UserProfile {
 }
 
 function normalizeProvider(provider: unknown): UserProfile["authProvider"] {
+  if (provider === "phone") return "phone";
   if (provider === "google" || provider === "apple") return provider;
   return "email";
 }
@@ -718,8 +889,51 @@ function displayNameFromEmail(email: string) {
   return name.slice(0, 1).toUpperCase() + name.slice(1);
 }
 
-function mapAuthError(message: string) {
-  const normalized = message.toLowerCase();
+function displayNameFromPhone(phone: string) {
+  const lastDigits = phone.replace(/\D/g, "").slice(-4);
+  return lastDigits ? `Telefon ${lastDigits}` : "Avareno";
+}
+
+function normalizePhoneNumber(phone: string) {
+  return phone.trim().replace(/[\s().-]/g, "");
+}
+
+function isE164PhoneNumber(phone: string) {
+  return /^\+[1-9]\d{7,14}$/.test(phone);
+}
+
+type AuthErrorDetail = {
+  code?: string;
+  message: string;
+};
+
+function authErrorDetail(error: { code?: string; message?: string }): AuthErrorDetail {
+  return {
+    code: error.code,
+    message: error.message ?? "Auth action failed"
+  };
+}
+
+function normalizedAuthDetail(detail: string | AuthErrorDetail) {
+  const message = typeof detail === "string" ? detail : detail.message;
+  const code = typeof detail === "string" ? "" : detail.code ?? "";
+  return {
+    code,
+    message,
+    normalized: `${code} ${message}`.toLowerCase()
+  };
+}
+
+function mapAuthError(detail: string | AuthErrorDetail) {
+  const { message, normalized } = normalizedAuthDetail(detail);
+
+  if (normalized.includes("captcha") || normalized.includes("captcha_token")) {
+    return "Captcha-Schutz ist in Supabase aktiv. Bitte richte Turnstile lokal ein oder deaktiviere Captcha Protection nur für den lokalen Test.";
+  }
+
+  if (normalized.includes("too many") || normalized.includes("rate limit") || normalized.includes("over request rate limit")) {
+    return "Zu viele Versuche. Warte kurz und versuche es dann erneut.";
+  }
 
   if (normalized.includes("invalid login") || normalized.includes("invalid credentials")) {
     return "Login fehlgeschlagen. Bitte prüfe deine Eingaben.";
@@ -731,6 +945,10 @@ function mapAuthError(message: string) {
 
   if (normalized.includes("email not confirmed") || normalized.includes("not confirmed")) {
     return "Bitte bestätige zuerst deine E-Mail.";
+  }
+
+  if (normalized.includes("phone") || normalized.includes("sms") || normalized.includes("otp")) {
+    return "Telefon-Login konnte nicht abgeschlossen werden. Prüfe die Nummer, fordere einen frischen SMS-Code an und gib ihn ohne Leerzeichen ein.";
   }
 
   if (normalized.includes("expired") || normalized.includes("invalid token")) {
@@ -754,4 +972,58 @@ function mapAuthError(message: string) {
   }
 
   return `${message || "Diese Aktion konnte nicht abgeschlossen werden."} Brauchst du Hilfe? Schreib uns an ${authRuntime.supportEmail}.`;
+}
+
+function mapPhoneOtpError(detail: string | AuthErrorDetail) {
+  const { normalized } = normalizedAuthDetail(detail);
+
+  if (normalized.includes("expired") || normalized.includes("invalid token") || normalized.includes("otp expired") || (normalized.includes("token") && normalized.includes("invalid"))) {
+    return "Der SMS-Code ist ungültig oder abgelaufen. Fordere bitte einen neuen Code an.";
+  }
+
+  if (normalized.includes("too many") || normalized.includes("rate limit") || normalized.includes("over request rate limit")) {
+    return "Zu viele Versuche. Warte kurz und fordere dann einen neuen SMS-Code an.";
+  }
+
+  if (normalized.includes("captcha") || normalized.includes("captcha_token")) {
+    return "Captcha-Schutz ist in Supabase aktiv. Bitte löse Turnstile erneut und fordere dann einen neuen SMS-Code an.";
+  }
+
+  return mapAuthError(detail);
+}
+
+function mapPhoneOtpRequestError(detail: string | AuthErrorDetail) {
+  const { normalized } = normalizedAuthDetail(detail);
+
+  if (normalized.includes("captcha") || normalized.includes("captcha_token")) {
+    return "Captcha-Schutz ist in Supabase aktiv. Bitte löse Turnstile erneut und fordere dann den SMS-Code an.";
+  }
+
+  if (normalized.includes("provider") || normalized.includes("twilio") || normalized.includes("sms") || normalized.includes("messagebird") || normalized.includes("vonage")) {
+    return "Supabase konnte die SMS nicht versenden. Prüfe in Supabase/Twilio den SMS-Provider, Sender, Guthaben/Trial-Freigabe und die Auth-Logs.";
+  }
+
+  if (normalized.includes("phone")) {
+    return "Diese Telefonnummer wurde von Supabase nicht akzeptiert. Prüfe die Landesvorwahl und nutze eine erreichbare Mobilnummer.";
+  }
+
+  return mapAuthError(detail);
+}
+
+function mapMagicLinkError(detail: string | AuthErrorDetail) {
+  const { normalized } = normalizedAuthDetail(detail);
+
+  if (normalized.includes("captcha") || normalized.includes("captcha_token")) {
+    return "Captcha-Schutz ist in Supabase aktiv. Bitte löse Turnstile erneut und sende dann den Magic Link.";
+  }
+
+  if (normalized.includes("signup") || normalized.includes("user not found") || normalized.includes("not found")) {
+    return "Für diese E-Mail existiert noch kein Account. Erstelle zuerst einen Account oder nutze den Signup-Magic-Link.";
+  }
+
+  if (normalized.includes("redirect") || normalized.includes("not allowed")) {
+    return "Magic Link konnte nicht gesendet werden. Prüfe in Supabase die Redirect URL für /auth/callback.";
+  }
+
+  return mapAuthError(detail);
 }

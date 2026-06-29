@@ -7,46 +7,62 @@ import { Reveal, RevealGroup } from "../components/MarketingReveal";
 
 const lastUpdated = "24. Juni 2026";
 
+type BillingPeriod = "monthly" | "yearly";
+
 const pricingPlans = [
   {
     name: "Free",
-    price: "0 EUR",
-    note: "Zum Ausprobieren und fuer die ersten Dinge.",
-    features: ["20 Dinge", "Basis-Dokumente", "Manuelle Erinnerungen", "Lokale Demo-Nutzung"],
+    monthlyPrice: "0 €",
+    yearlyPrice: "0 €",
+    note: "Für die ersten Dinge und zum Ausprobieren.",
+    features: ["Bis zu 10 Dinge", "Begrenzte Belege und Dokumente", "Manuelle Erinnerungen", "Basis-Objektgedächtnis"],
     cta: "Kostenlos starten",
+    href: "/signup",
     highlighted: false
   },
   {
-    name: "Home",
-    price: "6 EUR",
-    note: "Fuer Haushalte, Belege, Garantien und gemeinsame Verantwortung.",
-    features: ["Unbegrenzte Dinge", "Garantie- und Care-Loops", "Haushaltsmitglieder", "Export fuer Support-Faelle"],
-    cta: "Home waehlen",
+    name: "Personal",
+    monthlyPrice: "9 €",
+    yearlyPrice: "90 €",
+    yearlyNote: "2 Monate sparen",
+    note: "Für deinen privaten Speicher im Alltag.",
+    features: ["Großzügige Dinge mit Fair Use", "Belege, Garantien und Handbücher", "Care-Loops und Erinnerungen", "Basis-KI-Extraktion mit Fair Use", "Datenexport und Private Vault Basic"],
+    cta: "Personal wählen",
+    href: "/signup?plan=personal",
     badge: "Empfohlen",
     highlighted: true
   },
   {
     name: "Family",
-    price: "12 EUR",
-    note: "Fuer Familien, mehrere Orte und spaetere Rollen/Rechte.",
-    features: ["Mehrere Haushalte", "Rollen und Freigaben", "Priorisierte Erinnerungen", "Erweiterte Objekt-Historie"],
+    monthlyPrice: "19 €",
+    yearlyPrice: "190 €",
+    yearlyNote: "2 Monate sparen",
+    note: "Für Haushalte, Familie und gemeinsame Verantwortung.",
+    features: ["Alles aus Personal", "Mehrere Haushaltsmitglieder", "Geteilte Dinge und Erinnerungen", "Mehr Speicher und KI-Fair-Use", "Erweiterter Private Vault"],
     cta: "Family vormerken",
+    badge: "Bald verfügbar",
+    href: "/pricing",
+    disabled: true,
     highlighted: false
   }
 ];
 
 const pricingFaq = [
   {
-    title: "Ist das Pricing schon final?",
-    text: "Nein. Die Seite ist als Produkt- und Website-Struktur vorbereitet. Preise und Limits koennen spaeter an das echte Geschaeftsmodell angepasst werden."
+    title: "Sind die Preise schon final?",
+    text: "Die Struktur Free, Personal und Family ist als Premium-Setup vorbereitet. Vor echter Abrechnung müssen Zahlungsanbieter, Steuern, Rechnungen, Widerruf, Kündigung, Datenverarbeitung und Auftragsverarbeitung final geprüft werden."
   },
   {
-    title: "Gibt es eine mobile App?",
-    text: "Das Layout ist mobile-first vorbereitet. Die Web-App bleibt aktuell die Produktbasis, kann aber spaeter als mobile App oder PWA weitergefuehrt werden."
+    title: "Warum gibt es kein sehr großes Gratis-Kontingent?",
+    text: "Avareno speichert private Dokumente und soll langfristig zuverlässig betrieben werden. Ein begrenztes Free-Kontingent hält die Kosten transparent und vermeidet ein Modell, das auf Tracking oder Datenverwertung angewiesen ist."
   },
   {
     title: "Kann ich meine Daten exportieren?",
-    text: "Der Produktgedanke sieht Exporte für Support, Garantie und eigene Sicherungen vor. Die technische Umsetzung sollte vor Launch final definiert werden."
+    text: "Export ist Teil der Produktausrichtung und vor Launch relevant für Vertrauen und DSGVO/GDPR. Die konkrete Umsetzung muss fertig sein, bevor Avareno produktiv wichtige Nutzerdaten verarbeitet."
+  },
+  {
+    title: "Ist Billing schon aktiv?",
+    text: "Die technische Grundlage ist für Paddle als bevorzugte Merchant-of-Record-Richtung vorbereitet. Ohne konfigurierte Paddle-Keys und Price-IDs startet Avareno keinen Checkout und zeigt keinen Zahlungserfolg."
   }
 ];
 
@@ -54,22 +70,22 @@ const privacySections = [
   {
     icon: <ShieldCheck size={19} />,
     title: "Verantwortlicher",
-    text: "Verantwortlich fuer diese Website und App ist der unten im Impressum genannte Anbieter. Bitte Namen, Anschrift und Kontaktadresse vor einem echten Launch ergaenzen."
+    text: "Verantwortlich für diese Website und App ist der unten im Impressum genannte Anbieter. Bitte Namen, Anschrift und Kontaktadresse vor einem echten Launch ergänzen."
   },
   {
     icon: <Server size={19} />,
     title: "Hosting und Server-Logs",
-    text: "Beim Aufruf der Website koennen technisch notwendige Server-Logdaten verarbeitet werden, etwa IP-Adresse, Zeitpunkt, angefragte URL, Browserinformationen und Statuscodes."
+    text: "Beim Aufruf der Website können technisch notwendige Server-Logdaten verarbeitet werden, etwa IP-Adresse, Zeitpunkt, angefragte URL, Browserinformationen und Statuscodes."
   },
   {
     icon: <FileText size={19} />,
     title: "App-Inhalte",
-    text: "Avareno kann Dinge, Dokumente, Garantien, Erinnerungen, Raeume und Notizen speichern. Vor Produktivbetrieb muss festgelegt werden, wo diese Daten liegen und wie lange sie gespeichert bleiben."
+    text: "Avareno kann Dinge, Dokumente, Garantien, Erinnerungen, Räume und Notizen speichern. Vor Produktivbetrieb muss festgelegt werden, wo diese Daten liegen und wie lange sie gespeichert bleiben."
   },
   {
     icon: <LockKeyhole size={19} />,
     title: "Rechte der Nutzer",
-    text: "Nutzer koennen je nach Rechtslage Auskunft, Berichtigung, Loeschung, Einschraenkung, Datenuebertragbarkeit und Widerspruch verlangen. Kontaktweg und Identitaetspruefung muessen final definiert werden."
+    text: "Nutzer können je nach Rechtslage Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und Widerspruch verlangen. Kontaktweg und Identitätsprüfung müssen final definiert werden."
   }
 ];
 
@@ -88,6 +104,11 @@ const cookieRows = [
     name: "Cloudflare Turnstile",
     purpose: "Bot-Schutz für Login und Registrierung. Das Challenge-Token wird an Supabase Auth weitergegeben.",
     status: "Aktiv, Sicherheit"
+  },
+  {
+    name: "Spracheinstellung",
+    purpose: "Merkt lokal, ob die Oberfläche auf Deutsch oder Englisch angezeigt werden soll.",
+    status: "Aktiv, Komfort"
   },
   {
     name: "Analyse",
@@ -135,10 +156,23 @@ function DraftNotice() {
     <aside className="avareno-draft-notice">
       <Scale size={20} />
       <div>
-        <strong>Entwurf fuer den Launch</strong>
-        <p>Die Inhalte sind strukturiert vorbereitet, aber keine Rechtsberatung. Vor Veroeffentlichung bitte echte Anbieter-, Hosting- und Verarbeitungsdaten eintragen und rechtlich pruefen lassen.</p>
+        <strong>Entwurf für den Launch</strong>
+        <p>Die Inhalte sind strukturiert vorbereitet, aber keine Rechtsberatung. Vor Veröffentlichung bitte echte Anbieter-, Hosting- und Verarbeitungsdaten eintragen und rechtlich prüfen lassen.</p>
       </div>
     </aside>
+  );
+}
+
+function BillingPeriodSwitch({ value, onChange }: { value: BillingPeriod; onChange: (value: BillingPeriod) => void }) {
+  return (
+    <div className="avareno-billing-switch" aria-label="Abrechnungszeitraum">
+      <button aria-pressed={value === "monthly"} className={value === "monthly" ? "is-active" : ""} onClick={() => onChange("monthly")} type="button">
+        Monatlich
+      </button>
+      <button aria-pressed={value === "yearly"} className={value === "yearly" ? "is-active" : ""} onClick={() => onChange("yearly")} type="button">
+        Jährlich <span>2 Monate sparen</span>
+      </button>
+    </div>
   );
 }
 
@@ -159,31 +193,38 @@ function PricingFaqItem({ item, open = false }: { item: { title: string; text: s
 }
 
 export function PricingPage() {
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
   usePageTitle("Preise");
+  const periodLabel = billingPeriod === "yearly" ? "/Jahr" : "/Monat";
 
   return (
     <MarketingPageFrame>
       <Reveal>
         <StandardHero
-          eyebrow="Pricing"
-          title="Ein klares Modell fuer dein Zuhause."
-          text="Avareno startet einfach und kann spaeter mit Haushalten, Rollen, Familien und mehr Orten wachsen."
+          eyebrow="Preise"
+          title="Wähle den Speicher, der zu deinem Alltag passt"
+          text="Starte kostenlos und erweitere Avareno, wenn dein privater Speicher für Dinge, Belege, Garantien und offene Punkte wächst."
         >
           <div className="avareno-price-signal">
-            <span>Beta</span>
-            <strong>Preise als MVP-Entwurf</strong>
+            <span>MoR geplant</span>
+            <strong>Paddle als bevorzugte Billing-Richtung</strong>
           </div>
         </StandardHero>
       </Reveal>
 
-      <RevealGroup as="section" className="avareno-pricing-grid" aria-label="Avareno Preisplaene" stagger={90}>
+      <Reveal>
+        <BillingPeriodSwitch value={billingPeriod} onChange={setBillingPeriod} />
+      </Reveal>
+
+      <RevealGroup as="section" className="avareno-pricing-grid" aria-label="Avareno Preispläne" stagger={90}>
         {pricingPlans.map((plan) => (
           <article className={plan.highlighted ? "avareno-pricing-card is-highlighted" : "avareno-pricing-card"} key={plan.name}>
             <div className="avareno-pricing-card-head">
               <p>{plan.name}</p>
               {"badge" in plan ? <span>{plan.badge}</span> : null}
             </div>
-            <h2>{plan.price}<span>/Monat</span></h2>
+            <h2>{billingPeriod === "yearly" ? plan.yearlyPrice : plan.monthlyPrice}<span>{periodLabel}</span></h2>
+            {billingPeriod === "yearly" && "yearlyNote" in plan ? <p className="avareno-pricing-saving">{plan.yearlyNote}</p> : null}
             <small>{plan.note}</small>
             <ul>
               {plan.features.map((feature) => (
@@ -193,9 +234,15 @@ export function PricingPage() {
                 </li>
               ))}
             </ul>
-            <Link className={plan.highlighted ? "avareno-primary-cta" : "avareno-secondary-cta"} to="/signup">
-              {plan.cta} <ArrowRight size={16} />
-            </Link>
+            {"disabled" in plan && plan.disabled ? (
+              <button className="avareno-secondary-cta" disabled type="button">
+                {plan.cta}
+              </button>
+            ) : (
+              <Link className={plan.highlighted ? "avareno-primary-cta" : "avareno-secondary-cta"} to={"href" in plan ? plan.href : "/signup"}>
+                {plan.cta} <ArrowRight size={16} />
+              </Link>
+            )}
           </article>
         ))}
       </RevealGroup>
@@ -223,7 +270,7 @@ export function ImpressumPage() {
       <StandardHero
         eyebrow="Impressum"
         title="Anbieterkennzeichnung."
-        text="Diese Seite ist als saubere Struktur vorbereitet. Die konkreten Angaben muessen vor dem oeffentlichen Launch ergaenzt werden."
+        text="Diese Seite ist als saubere Struktur vorbereitet. Die konkreten Angaben müssen vor dem öffentlichen Launch ergänzt werden."
       >
         <DraftNotice />
       </StandardHero>
@@ -231,11 +278,11 @@ export function ImpressumPage() {
       <section className="avareno-legal-grid">
         <article className="avareno-legal-card">
           <MapPin size={21} />
-          <h2>Angaben gemaess Anbieterkennzeichnung</h2>
+          <h2>Angaben gemäß Anbieterkennzeichnung</h2>
           <dl>
             <div>
               <dt>Anbieter</dt>
-              <dd>Avareno / [Name oder Firma ergaenzen]</dd>
+              <dd>Avareno / [Name oder Firma ergänzen]</dd>
             </div>
             <div>
               <dt>Anschrift</dt>
@@ -243,7 +290,7 @@ export function ImpressumPage() {
             </div>
             <div>
               <dt>Vertreten durch</dt>
-              <dd>[Vertretungsberechtigte Person ergaenzen]</dd>
+              <dd>[Vertretungsberechtigte Person ergänzen]</dd>
             </div>
           </dl>
         </article>
@@ -258,23 +305,23 @@ export function ImpressumPage() {
             </div>
             <div>
               <dt>Telefon</dt>
-              <dd>[optional ergaenzen]</dd>
+              <dd>[optional ergänzen]</dd>
             </div>
             <div>
               <dt>Register / USt-ID</dt>
-              <dd>[falls vorhanden ergaenzen]</dd>
+              <dd>[falls vorhanden ergänzen]</dd>
             </div>
           </dl>
         </article>
 
         <article className="avareno-legal-card avareno-legal-card-wide">
           <Scale size={21} />
-          <h2>Verantwortung fuer Inhalte</h2>
+          <h2>Verantwortung für Inhalte</h2>
           <p>
-            Die Inhalte dieser Website werden mit Sorgfalt erstellt. Fuer Vollstaendigkeit, Richtigkeit und Aktualitaet kann in diesem Entwurfsstand keine Gewaehr uebernommen werden.
+            Die Inhalte dieser Website werden mit Sorgfalt erstellt. Für Vollständigkeit, Richtigkeit und Aktualität kann in diesem Entwurfsstand keine Gewähr übernommen werden.
           </p>
           <p>
-            Sobald Avareno oeffentlich betrieben wird, sollten Haftung, Streitbeilegung, redaktionelle Verantwortung und externe Links passend zur Betreiberstruktur final formuliert werden.
+            Sobald Avareno öffentlich betrieben wird, sollten Haftung, Streitbeilegung, redaktionelle Verantwortung und externe Links passend zur Betreiberstruktur final formuliert werden.
           </p>
         </article>
       </section>
@@ -290,7 +337,7 @@ export function DatenschutzPage() {
       <StandardHero
         eyebrow="Datenschutz"
         title="Datenschutz transparent vorbereiten."
-        text="Avareno arbeitet mit Dingen, Dokumenten und Erinnerungen. Genau deshalb muss die Datenschutzerklaerung vor dem Launch konkret und verstaendlich sein."
+        text="Avareno arbeitet mit Dingen, Dokumenten und Erinnerungen. Genau deshalb muss die Datenschutzerklärung vor dem Launch konkret und verständlich sein."
       >
         <DraftNotice />
       </StandardHero>
@@ -317,25 +364,25 @@ export function DatenschutzPage() {
         <article className="avareno-legal-card">
           <h2>Rechtsgrundlagen</h2>
           <p>
-            Je nach Funktion kommen Vertragserfuellung, berechtigte Interessen, Einwilligung oder gesetzliche Pflichten als Rechtsgrundlage in Betracht. Die konkrete Zuordnung muss mit der finalen Produktarchitektur abgeglichen werden.
+            Je nach Funktion kommen Vertragserfüllung, berechtigte Interessen, Einwilligung oder gesetzliche Pflichten als Rechtsgrundlage in Betracht. Die konkrete Zuordnung muss mit der finalen Produktarchitektur abgeglichen werden.
           </p>
         </article>
         <article className="avareno-legal-card">
-          <h2>Empfaenger und Dienste</h2>
+          <h2>Empfänger und Dienste</h2>
           <p>
-            Aktuell sind Supabase Auth fuer Login-Sessions und Cloudflare Turnstile fuer Bot-Schutz eingebunden. Analyse-, Marketing-, KI- oder weitere Speicheranbieter muessen vor Launch konkret benannt werden.
+            Aktuell sind Supabase Auth für Login-Sessions und Cloudflare Turnstile für Bot-Schutz eingebunden. Analyse-, Marketing-, KI- oder weitere Speicheranbieter müssen vor Launch konkret benannt werden.
           </p>
         </article>
         <article className="avareno-legal-card">
           <h2>Speicherdauer</h2>
           <p>
-            Daten sollten nur so lange gespeichert werden, wie sie fuer Konto, Produktgedaechtnis, Garantie, Support oder gesetzliche Pflichten notwendig sind. Loesch- und Exportflows sollten technisch vorgesehen werden.
+            Daten sollten nur so lange gespeichert werden, wie sie für Konto, Produktgedächtnis, Garantie, Support oder gesetzliche Pflichten notwendig sind. Lösch- und Exportflows sollten technisch vorgesehen werden.
           </p>
         </article>
         <article className="avareno-legal-card">
-          <h2>Kontakt fuer Datenschutz</h2>
+          <h2>Kontakt für Datenschutz</h2>
           <p>
-            Datenschutzanfragen koennen spaeter ueber eine dedizierte Adresse wie privacy@avareno.app laufen. Die Adresse muss erreichbar und organisatorisch betreut sein.
+            Datenschutzanfragen können später über eine dedizierte Adresse wie privacy@avareno.app laufen. Die Adresse muss erreichbar und organisatorisch betreut sein.
           </p>
         </article>
       </section>
@@ -373,13 +420,13 @@ export function CookiesPage() {
 
       <section className="avareno-standard-panel">
         <div className="avareno-standard-copy">
-          <p>Consent</p>
+          <p>Einwilligung</p>
           <h2>Cookie-Banner erst einbauen, wenn er wirklich gebraucht wird.</h2>
         </div>
         <div className="avareno-cookie-settings">
           <Settings size={24} />
           <p>
-            Technisch notwendige Speicherung fuer Login und Sicherheit braucht keinen Marketing-Consent, muss aber transparent erklaert werden. Sobald Analyse, Marketing, externe Medien oder aehnliche Dienste hinzukommen, sollte ein Consent-Flow mit echten Kategorien und Widerruf eingebaut werden.
+            Technisch notwendige Speicherung für Login und Sicherheit braucht keinen Marketing-Consent, muss aber transparent erklärt werden. Sobald Analyse, Marketing, externe Medien oder ähnliche Dienste hinzukommen, sollte ein Consent-Flow mit echten Kategorien und Widerruf eingebaut werden.
           </p>
         </div>
       </section>

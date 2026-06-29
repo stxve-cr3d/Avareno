@@ -50,9 +50,9 @@ export const authRuntime: AuthRuntimeConfig = {
   ready: (mode === "supabase" || mode === "mock") && !(mode === "supabase" && turnstileRequested && !turnstileSiteKey),
   turnstileEnabled: mode === "supabase" && turnstileRequested && Boolean(turnstileSiteKey),
   turnstileSiteKey,
-  redirectUrl: import.meta.env.VITE_AUTH_REDIRECT_URL ?? `${origin}/auth/callback`,
-  emailRedirectUrl: import.meta.env.VITE_AUTH_EMAIL_REDIRECT_URL ?? `${origin}/auth/callback`,
-  resetPasswordUrl: import.meta.env.VITE_AUTH_PASSWORD_RESET_URL ?? `${origin}/reset-password`,
+  redirectUrl: resolveAuthUrl(import.meta.env.VITE_AUTH_REDIRECT_URL, "/auth/callback"),
+  emailRedirectUrl: resolveAuthUrl(import.meta.env.VITE_AUTH_EMAIL_REDIRECT_URL, "/auth/callback"),
+  resetPasswordUrl: resolveAuthUrl(import.meta.env.VITE_AUTH_PASSWORD_RESET_URL, "/reset-password"),
   supportEmail: import.meta.env.VITE_AUTH_SUPPORT_EMAIL ?? "info@avareno.de",
   emailFrom: import.meta.env.VITE_AUTH_EMAIL_FROM ?? "noreply@avareno.de",
   emailFromName: import.meta.env.VITE_AUTH_EMAIL_FROM_NAME ?? "Avareno",
@@ -106,6 +106,23 @@ export const supabase = mode === "supabase"
     }
   })
   : null;
+
+function resolveAuthUrl(configured: string | undefined, path: string) {
+  const value = configured?.trim();
+  if (!value) return `${origin}${path}`;
+
+  try {
+    const url = new URL(value);
+    const isLocalApp = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    if (isLocalApp && url.origin !== origin) {
+      return `${origin}${url.pathname}${url.search}${url.hash}`;
+    }
+  } catch {
+    return `${origin}${path}`;
+  }
+
+  return value;
+}
 
 export async function getAuthAccessToken() {
   if (!supabase) {

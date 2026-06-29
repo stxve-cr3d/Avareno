@@ -13,8 +13,8 @@ This document is a working list only. It is not a final GDPR/DSGVO subprocessor 
 ### Supabase
 
 - Status: planned/active for Auth and storage/database foundation.
-- Purpose: authentication, sessions, user profile data, application database, storage buckets.
-- Data categories: email, auth metadata, profile data, object memory, document metadata, uploaded files if stored in Supabase Storage.
+- Purpose: authentication, sessions, Magic Links, optional phone OTP auth, user profile data, application database, storage buckets.
+- Data categories: email, Magic Link/email metadata, phone number where enabled, auth metadata, profile data, object memory, document metadata, uploaded files if stored in Supabase Storage.
 - Region: TODO confirm project region.
 - DPA/AVV: TODO confirm executed agreement.
 - EU/EEA transfer: TODO review Supabase subprocessors and selected region.
@@ -66,9 +66,9 @@ This document is a working list only. It is not a final GDPR/DSGVO subprocessor 
 
 ### SMS / Twilio
 
-- Status: not production-enabled unless explicitly configured.
-- Purpose: possible SMS login or notification flow.
-- Data categories: phone number, SMS metadata, message content.
+- Status: gated by Supabase Phone Auth and `VITE_AUTH_PHONE_ENABLED`; not production-enabled until provider/legal review is complete.
+- Purpose: SMS OTP login/signup through Supabase Phone Auth.
+- Data categories: phone number, OTP/SMS metadata, message content.
 - Region: TODO.
 - DPA/AVV: TODO.
 - Retention/deletion: TODO.
@@ -101,4 +101,3 @@ This document is a working list only. It is not a final GDPR/DSGVO subprocessor 
 - Region: TODO.
 - DPA/AVV: TODO.
 - Consent/disclosure: TODO legal review.
-

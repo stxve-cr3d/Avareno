@@ -17,7 +17,7 @@ export function CaptureMessage() {
       method: "POST",
       body: JSON.stringify({ text, contactName })
     });
-    setPreview(`Created: ${result.parsed.title}`);
+    setPreview(`Erstellt: ${result.parsed.title}`);
     setTimeout(() => navigate(`/app/care/${result.loop.id}`), 600);
   }
 
@@ -29,15 +29,15 @@ export function CaptureMessage() {
             <MessageSquareText size={22} />
           </div>
           <div>
-            <p className="text-sm font-black text-leaf">Safe message memory</p>
-            <h1 className="mt-1 text-3xl font-black text-ink">Message reminder</h1>
-            <p className="mt-2 text-sm font-semibold leading-6 text-muted">Capture a promise without sending or scraping messages.</p>
+            <p className="text-sm font-black text-leaf">Sichere Nachrichten-Erinnerung</p>
+            <h1 className="mt-1 text-3xl font-black text-ink">Absprache merken</h1>
+            <p className="mt-2 text-sm font-semibold leading-6 text-muted">Halte eine Zusage fest, ohne Nachrichten zu senden oder Chats auszulesen.</p>
           </div>
         </div>
       </div>
       <Card>
         <label className="text-sm font-bold text-ink">
-          Contact
+          Kontakt
           <input
             value={contactName}
             onChange={(event) => setContactName(event.target.value)}
@@ -45,7 +45,7 @@ export function CaptureMessage() {
           />
         </label>
         <label className="mt-4 block text-sm font-bold text-ink">
-          Pasted message
+          Eingefügte Nachricht
           <textarea
             value={text}
             onChange={(event) => setText(event.target.value)}
@@ -54,10 +54,10 @@ export function CaptureMessage() {
         </label>
         <div className="mt-4 flex items-start gap-3 rounded-2xl bg-leaf/10 p-3 text-sm font-semibold leading-6 text-moss">
           <ShieldCheck className="mt-0.5 shrink-0" size={18} />
-          Later this can open the WhatsApp chat, but the MVP only creates a safe reminder.
+          Später kann daraus ein WhatsApp-Absprung werden. Im MVP erstellt Avareno nur eine sichere Erinnerung.
         </div>
         <Button className="mt-4 w-full" onClick={createReminder} icon={<MessageSquareText size={18} />}>
-          Create reminder
+          Erinnerung erstellen
         </Button>
         {preview ? <p className="mt-3 rounded-2xl bg-leaf/10 p-3 text-sm font-black text-moss">{preview}</p> : null}
       </Card>

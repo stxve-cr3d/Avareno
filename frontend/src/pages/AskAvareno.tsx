@@ -37,7 +37,7 @@ export function AskAvareno() {
     <div className="ask-page mx-auto max-w-7xl space-y-5">
       <section className="ask-hero rounded-lg">
         <div>
-          <p className="text-xs font-black uppercase text-leaf">Ask Avareno</p>
+          <p className="text-xs font-black uppercase text-leaf">Avareno fragen</p>
           <h1 className="mt-3 max-w-4xl text-[clamp(3rem,7vw,7rem)] font-black leading-[0.9] text-white">
             frag deine dinge
           </h1>
@@ -47,15 +47,15 @@ export function AskAvareno() {
         </div>
         <div className="ask-signal">
           <Bot size={28} />
-          <p>Object assistant</p>
-          <strong>{answer ? `${Math.round(answer.confidence * 100)}% confidence` : "ready"}</strong>
+          <p>Objekt-Assistent</p>
+          <strong>{answer ? `${Math.round(answer.confidence * 100)}% sicher` : "bereit"}</strong>
         </div>
       </section>
 
       <section className="ask-panel rounded-lg">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-black uppercase text-muted">Question</p>
+            <p className="text-xs font-black uppercase text-muted">Frage</p>
             <h2 className="mt-1 text-3xl font-black text-ink">Was willst du wissen?</h2>
           </div>
           <span className="grid h-11 w-11 place-items-center rounded-full bg-ink text-white">
@@ -66,7 +66,7 @@ export function AskAvareno() {
         <div className="ask-input-row">
           <input value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Frag nach Rechnung, Garantie, Raum, Wert..." />
           <button onClick={() => ask()} disabled={busy} type="button">
-            {busy ? "..." : "Ask"} <ArrowRight size={16} />
+            {busy ? "..." : "Fragen"} <ArrowRight size={16} />
           </button>
         </div>
 
@@ -104,8 +104,10 @@ export function AskAvareno() {
           <div className="ask-panel rounded-lg">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-black uppercase text-muted">Matches</p>
-                <h2 className="text-3xl font-black text-ink">{answer.cards.length} results</h2>
+                <p className="text-xs font-black uppercase text-muted">Treffer</p>
+                <h2 className="text-3xl font-black text-ink">
+                  {answer.cards.length} {answer.cards.length === 1 ? "Ergebnis" : "Ergebnisse"}
+                </h2>
               </div>
               <Search className="text-leaf" size={22} />
             </div>

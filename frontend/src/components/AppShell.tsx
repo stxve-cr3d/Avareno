@@ -1,7 +1,7 @@
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Archive, ChevronDown, FileText, Home, LifeBuoy, LogOut, MessageSquareText, Package, PenLine, Plus, ReceiptText, ShieldCheck, UserRound, UsersRound, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import avarenoMark from "../assets/avareno-mark.svg";
+import avarenoMark from "../assets/avareno-test-logo.png";
 import { useAuth } from "../lib/authProvider";
 
 const nav = [

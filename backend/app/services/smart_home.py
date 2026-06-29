@@ -1069,8 +1069,7 @@ def _smartthings_request(path: str, method: str = "GET", body: dict | None = Non
             raw = response.read().decode("utf-8")
             return json.loads(raw) if raw else {}
     except urllib.error.HTTPError as exc:
-        message = exc.read().decode("utf-8", errors="ignore")
-        raise RuntimeError(f"SmartThings API error {exc.code}: {message}") from exc
+        raise RuntimeError(f"SmartThings API error {exc.code}: provider request failed") from exc
 
 
 def _upsert_device(

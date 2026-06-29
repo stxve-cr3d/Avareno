@@ -20,6 +20,7 @@ import { Care } from "./pages/Care";
 import { CookiesPage, DatenschutzPage, ImpressumPage, PricingPage } from "./pages/MarketingPages";
 import { AccountSettingsPage, AuthCallbackPage, EmailVerifyPage, ForgotPasswordPage, LoginPage, OnboardingPage, ResetPasswordPage, SignupPage } from "./pages/AuthPages";
 import { AuthProvider } from "./lib/authProvider";
+import { LanguageProvider } from "./lib/language";
 import "./styles.css";
 
 const router = createBrowserRouter([
@@ -63,6 +64,11 @@ const router = createBrowserRouter([
       { path: "rewards/friends", element: <FriendsListPage /> },
       { path: "rewards/friends/:friendId", element: <FriendProfilePage /> },
       { path: "rewards/privacy", element: <Rewards /> },
+      { path: "rewards/datenschutz", element: <Rewards /> },
+      { path: "ich", element: <Rewards /> },
+      { path: "ich/friends", element: <Rewards /> },
+      { path: "ich/friends/:friendId", element: <Rewards /> },
+      { path: "ich/datenschutz", element: <Rewards /> },
       { path: "app", element: <SmartHome /> },
       { path: "app/capture", element: <UniversalCapture /> },
       { path: "app/capture/receipt", element: <CaptureReceipt /> },
@@ -92,13 +98,16 @@ const router = createBrowserRouter([
       { path: "app/ich/friends", element: <Rewards /> },
       { path: "app/ich/friends/:friendId", element: <Rewards /> },
       { path: "app/ich/privacy", element: <Rewards /> },
+      { path: "app/ich/datenschutz", element: <Rewards /> },
       { path: "app/ich/settings", element: <AccountSettingsPage /> },
-      { path: "app/rewards", element: <Rewards /> },
-      { path: "app/friends", element: <FriendsListPage /> },
+      { path: "app/rewards", element: <Navigate to="/app/ich" replace /> },
+      { path: "app/rewards/privacy", element: <Navigate to="/app/ich/privacy" replace /> },
+      { path: "app/rewards/datenschutz", element: <Navigate to="/app/ich/privacy" replace /> },
+      { path: "app/rewards/friends", element: <Navigate to="/app/ich/friends" replace /> },
+      { path: "app/rewards/friends/:friendId", element: <Rewards /> },
+      { path: "app/friends", element: <Navigate to="/app/ich/friends" replace /> },
       { path: "app/friends/:friendId", element: <FriendProfilePage /> },
-      { path: "app/rewards/friends", element: <FriendsListPage /> },
-      { path: "app/rewards/friends/:friendId", element: <FriendProfilePage /> },
-      { path: "app/rewards/privacy", element: <Rewards /> },
+      { path: "app/settings", element: <AccountSettingsPage /> },
       { path: "app/settings/account", element: <AccountSettingsPage /> }
     ]
   }
@@ -111,8 +120,10 @@ function LoopCareRedirect({ app = false }: { app?: boolean }) {
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </LanguageProvider>
   </React.StrictMode>
 );

@@ -7,6 +7,7 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
+from app.services.connectors.security import ConnectorSecurityError, validate_connector_url
 from app.utils import now_iso
 
 CompatibilityLevel = str
@@ -158,7 +159,11 @@ def _sandbox_headers(env_name: str) -> dict[str, str]:
 
 
 def _get_json(url: str, headers: dict[str, str]) -> Any:
-    request = urllib.request.Request(url, headers=headers)
+    try:
+        safe_url = validate_connector_url(url)
+    except ConnectorSecurityError:
+        return {}
+    request = urllib.request.Request(safe_url, headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=5) as response:
             return json.loads(response.read().decode("utf-8"))

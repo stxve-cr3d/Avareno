@@ -50,18 +50,18 @@ export function UniversalCapture() {
     <div className="capture-studio mx-auto max-w-7xl space-y-5">
       <section className="capture-studio-hero rounded-lg">
         <div>
-          <p className="text-xs font-black uppercase text-leaf">Universal capture</p>
+          <p className="text-xs font-black uppercase text-leaf">Smart erfassen</p>
           <h1 className="mt-3 max-w-4xl text-[clamp(3rem,7vw,7rem)] font-black leading-[0.9] text-white">
             ein Eingang für alles
           </h1>
           <p className="mt-5 max-w-2xl text-base font-semibold leading-7 text-white/62">
-            Schreib, fotografiere oder scanne. Avareno macht daraus ein Objektprofil, ohne dass User Datenbank-Felder denken müssen.
+            Schreib, fotografiere oder scanne. Avareno macht daraus ein Objektprofil, ohne dass du in Datenbankfeldern denken musst.
           </p>
         </div>
         <div className="capture-mode-grid">
           <ModeButton active={inputType === "TEXT"} icon={<FileText size={17} />} label="Text" onClick={() => setInputType("TEXT")} />
-          <ModeButton active={inputType === "PHOTO"} icon={<Camera size={17} />} label="Photo" onClick={() => setInputType("PHOTO")} />
-          <ModeButton active={inputType === "RECEIPT"} icon={<ScanLine size={17} />} label="Receipt" onClick={() => setInputType("RECEIPT")} />
+          <ModeButton active={inputType === "PHOTO"} icon={<Camera size={17} />} label="Foto" onClick={() => setInputType("PHOTO")} />
+          <ModeButton active={inputType === "RECEIPT"} icon={<ScanLine size={17} />} label="Beleg" onClick={() => setInputType("RECEIPT")} />
         </div>
       </section>
 
@@ -69,7 +69,7 @@ export function UniversalCapture() {
         <div className="capture-panel rounded-lg">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-black uppercase text-muted">Input</p>
+              <p className="text-xs font-black uppercase text-muted">Eingabe</p>
               <h2 className="mt-1 text-3xl font-black text-ink">Sag Avareno was da ist.</h2>
             </div>
             <span className="grid h-11 w-11 place-items-center rounded-full bg-ink text-white">
@@ -80,7 +80,7 @@ export function UniversalCapture() {
           <textarea className="capture-textarea" value={text} onChange={(event) => setText(event.target.value)} />
 
           <select className="capture-select" value={spaceId} onChange={(event) => setSpaceId(event.target.value)}>
-            <option value="">Auto room</option>
+            <option value="">Raum automatisch erkennen</option>
             {(structure?.spaces ?? [])
               .filter((space) => space.type !== "HOME")
               .map((space) => (
@@ -99,7 +99,7 @@ export function UniversalCapture() {
           </div>
 
           <button className="capture-primary" disabled={!text || busy} onClick={generateDraft} type="button">
-            {busy ? "Thinking..." : "Create draft"}
+            {busy ? "Avareno denkt..." : "Entwurf erstellen"}
             <ArrowRight size={16} />
           </button>
         </div>
@@ -107,7 +107,7 @@ export function UniversalCapture() {
         <div className="capture-panel rounded-lg">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-black uppercase text-muted">Draft</p>
+              <p className="text-xs font-black uppercase text-muted">Entwurf</p>
               <h2 className="mt-1 text-3xl font-black text-ink">{draft?.draftItem.name ?? "Noch kein Vorschlag"}</h2>
             </div>
             <span className="grid h-11 w-11 place-items-center rounded-full bg-leaf/10 text-leaf">
@@ -120,7 +120,7 @@ export function UniversalCapture() {
               <div className="capture-draft-card">
                 {draft.draftItem.imageUrl ? <img src={draft.draftItem.imageUrl} alt="" /> : <PackagePlus size={42} />}
                 <div>
-                  <p className="text-xs font-black uppercase text-muted">Confidence {Math.round(draft.confidence * 100)}%</p>
+                  <p className="text-xs font-black uppercase text-muted">Sicherheit {Math.round(draft.confidence * 100)}%</p>
                   <p className="mt-1 text-xl font-black text-ink">{draft.draftItem.category}</p>
                   <p className="text-sm font-semibold text-muted">
                     {[draft.draftItem.manufacturer, draft.draftItem.model, draft.draftItem.location].filter(Boolean).join(" / ") || draft.draftItem.itemType}
@@ -137,15 +137,15 @@ export function UniversalCapture() {
                 ))}
               </div>
 
-              <p className="text-sm font-semibold text-muted">Missing next: {draft.missing.join(", ")}</p>
+              <p className="text-sm font-semibold text-muted">Fehlt als Nächstes: {draft.missing.join(", ")}</p>
 
               <button className="capture-primary" onClick={createItem} type="button">
-                Create item profile <ArrowRight size={16} />
+                Objektprofil erstellen <ArrowRight size={16} />
               </button>
             </div>
           ) : (
             <div className="mt-5 rounded-lg border border-dashed border-line bg-white/70 p-6 text-sm font-bold text-muted">
-              The draft appears here after Avareno reads your input.
+              Der Entwurf erscheint hier, sobald Avareno deine Eingabe gelesen hat.
             </div>
           )}
         </div>

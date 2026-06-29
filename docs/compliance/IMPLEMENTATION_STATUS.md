@@ -61,3 +61,13 @@ This status file prevents incomplete privacy, deletion, export, connector, AI, a
 - Add tests for connector URL validation and deletion/export planning.
 - Add user-facing status once actual export/deletion requests are queued and tracked.
 
+## Current Audit Artifacts
+
+- `docs/compliance/PROVIDER_INVENTORY.md`
+- `docs/compliance/DATA_PROCESSING_MAP.md`
+- `docs/compliance/GERMANY_LAUNCH_CHECKLIST.md`
+- `docs/compliance/RISK_REGISTER.md`
+- `docs/compliance/COMPLIANCE_IMPLEMENTATION_PLAN.md`
+- `docs/compliance/COOKIE_TRACKING_AUDIT.md`
+- `docs/compliance/GERMANY_SAFE_RULES.md`
+- `docs/security/SUPABASE_SECURITY_REVIEW.md`
