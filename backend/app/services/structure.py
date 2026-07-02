@@ -6,12 +6,12 @@ from app.db import row_to_dict, rows_to_dicts
 
 
 ITEM_TYPES = [
-    {"id": "THING", "label": "Alles", "description": "Default für Dinge, die nicht in eine enge Kategorie passen."},
+    {"id": "THING", "label": "Alles", "description": "Default für Objekte, die nicht in eine enge Kategorie passen."},
     {"id": "ELECTRONIC", "label": "Elektronik", "description": "TV, Smartphone, Laptop, Audio, Haushaltsgeräte."},
     {"id": "FURNITURE", "label": "Möbel", "description": "Sofa, Bett, Tisch, Lampen, Einrichtung."},
     {"id": "INFRASTRUCTURE", "label": "Gebäude", "description": "Heizung, Fenster, Türen, Boden, Küche, Bad."},
     {"id": "VEHICLE", "label": "Fahrzeug", "description": "Auto, Fahrrad, E-Bike, Scooter."},
-    {"id": "COLLECTIBLE", "label": "Wertstück", "description": "Sammlerstücke, Schmuck, Kunst, besondere Dinge."},
+    {"id": "COLLECTIBLE", "label": "Wertstück", "description": "Sammlerstücke, Schmuck, Kunst, besondere Objekte."},
 ]
 
 
@@ -26,7 +26,7 @@ CAPTURE_METHODS = [
 
 
 PREMIUM_FEATURES = [
-    {"id": "FAIR_USE_ITEMS", "label": "Großzügige Dinge mit Fair Use", "free": False, "premium": True},
+    {"id": "FAIR_USE_ITEMS", "label": "Großzügige Objekte mit Fair Use", "free": False, "premium": True},
     {"id": "FAMILY_SHARING", "label": "Familienfreigabe", "free": False, "premium": True},
     {"id": "ADVANCED_SPACES", "label": "Gebäude, Räume, Zonen", "free": True, "premium": True},
     {"id": "AI_EXTRACTION", "label": "AI-Erkennung", "free": "limited", "premium": True},
@@ -39,7 +39,7 @@ WOW_FEATURES = [
     {
         "id": "OBJECT_TIMELINE",
         "label": "Object Memory Timeline",
-        "description": "Jedes Ding bekommt eine Historie aus Kauf, Reparatur, Raumwechsel, Garantie und Notizen.",
+        "description": "Jedes Objekt bekommt eine Historie aus Kauf, Reparatur, Raumwechsel, Garantie und Notizen.",
     },
     {
         "id": "EMERGENCY_BINDER",
@@ -109,7 +109,7 @@ def structure_payload(conn: sqlite3.Connection, user_id: str) -> dict:
         else []
     )
     item_count = conn.execute('SELECT COUNT(*) AS count FROM "Item" WHERE userId = ?', (user_id,)).fetchone()["count"]
-    free_limit = plan["itemLimit"] if plan else 10
+    free_limit = plan["itemLimit"] if plan else 30
 
     return {
         "household": household,

@@ -8,11 +8,12 @@ import type { Loop } from "../lib/types";
 
 export function CaptureMessage() {
   const navigate = useNavigate();
-  const [text, setText] = useState("du kimmst am freida oda?");
-  const [contactName, setContactName] = useState("Miesa");
+  const [text, setText] = useState("");
+  const [contactName, setContactName] = useState("");
   const [preview, setPreview] = useState("");
 
   async function createReminder() {
+    if (!text.trim()) return;
     const result = await api<{ loop: Loop; parsed: { title: string; reminderAt: string } }>("/api/capture/message", {
       method: "POST",
       body: JSON.stringify({ text, contactName })
@@ -42,6 +43,7 @@ export function CaptureMessage() {
             value={contactName}
             onChange={(event) => setContactName(event.target.value)}
             className="mt-1 w-full rounded-2xl border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
+            placeholder="z. B. Mama, Vermieter, Werkstatt"
           />
         </label>
         <label className="mt-4 block text-sm font-bold text-ink">
@@ -50,13 +52,14 @@ export function CaptureMessage() {
             value={text}
             onChange={(event) => setText(event.target.value)}
             className="mt-1 min-h-40 w-full rounded-2xl border border-line p-4 text-sm font-semibold leading-6 outline-none focus:border-leaf"
+            placeholder="Füge die Absprache ein, z. B. „Komm bitte am Freitag vorbei“"
           />
         </label>
         <div className="mt-4 flex items-start gap-3 rounded-2xl bg-leaf/10 p-3 text-sm font-semibold leading-6 text-moss">
           <ShieldCheck className="mt-0.5 shrink-0" size={18} />
-          Später kann daraus ein WhatsApp-Absprung werden. Im MVP erstellt Avareno nur eine sichere Erinnerung.
+          Avareno liest keine Chats aus und sendet keine Nachrichten. Es erstellt nur eine private Erinnerung aus dem, was du hier einfügst.
         </div>
-        <Button className="mt-4 w-full" onClick={createReminder} icon={<MessageSquareText size={18} />}>
+        <Button className="mt-4 w-full" disabled={!text.trim()} onClick={createReminder} icon={<MessageSquareText size={18} />}>
           Erinnerung erstellen
         </Button>
         {preview ? <p className="mt-3 rounded-2xl bg-leaf/10 p-3 text-sm font-black text-moss">{preview}</p> : null}

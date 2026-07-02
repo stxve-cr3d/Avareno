@@ -71,9 +71,9 @@ Status: technical/product readiness plan, 2026-06-28. Not legal advice. Must be 
 ## Must Fix Before Paid Launch
 
 - Billing provider review
-  - Paddle is the preferred first Merchant-of-Record direction, but this is not a legal/tax conclusion.
-  - Verify Paddle account setup, MoR scope, VAT/tax handling, invoice handling, DPA/AVV, subprocessors, region/transfers, retention/deletion and customer portal/cancellation behavior.
-  - Keep Lemon Squeezy and Stripe as future alternatives only; do not run multiple billing providers in parallel before a documented decision.
+  - Stripe is the planned subscription billing direction, but this is not a legal/tax conclusion.
+  - Verify Stripe account setup, Stripe Tax/VAT handling, invoice handling, DPA/AVV, subprocessors, region/transfers, retention/deletion and customer portal/cancellation behavior.
+  - Keep Lemon Squeezy and Paddle as alternatives/legacy only; do not run multiple billing providers in parallel before a documented decision.
   - Do not store card/payment method data in Avareno. Store only user id, provider customer/subscription ids, plan/status, period dates and safe webhook event ids/status.
 - Retention policy config
   - Define retention windows for uploads, extracted text, logs, AI prompts/outputs, affiliate clicks, support requests, deleted accounts and backups.
@@ -95,7 +95,7 @@ Status: technical/product readiness plan, 2026-06-28. Not legal advice. Must be 
   - Mark affiliate links clearly.
   - Do not include sensitive product/document context in partner redirects unless reviewed.
 - Payment provider review
-  - Paddle has been added to the provider inventory as preferred billing direction; complete provider/legal/tax review before accepting production payments.
+  - Stripe has been added to the provider inventory as planned billing direction; complete provider/legal/tax review before accepting production payments.
 
 ## Nice To Have Later
 

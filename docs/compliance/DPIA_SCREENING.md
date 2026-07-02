@@ -106,11 +106,11 @@ Screening outcome: low-to-medium risk for implementation, medium before public p
 ## Screening: Billing And Subscriptions
 
 - Feature name: Billing and subscription foundation
-- Description: Free/Personal/Family plan model, Paddle checkout foundation, Paddle webhook foundation, local subscription state
+- Description: Free/Personal/Pro/Family plan model, server-side Stripe Checkout, billing portal, Stripe webhook foundation and local subscription state
 - Data categories: Avareno user id, provider customer id, provider subscription id, plan key, subscription status, billing period dates, safe webhook event id/type/status; provider-side email, invoice, VAT/tax and payment data
 - Users affected: registered users choosing paid plans
-- Third parties: Paddle preferred first provider direction; Lemon Squeezy/Stripe future alternatives only
-- Launch state: foundation; checkout only works after server-side Paddle env configuration; Family disabled by default
+- Third parties: Stripe planned for subscription billing
+- Launch state: foundation; paid checkout is implemented server-side but production launch still requires Stripe Tax, invoice, retention, cancellation and legal/tax review
 
 High-risk trigger notes:
 
@@ -119,11 +119,11 @@ High-risk trigger notes:
 - Connected accounts/imports: no.
 - AI analysis/profiling: no.
 - Exposure to other users: no.
-- Third-country transfer/new provider: unknown until Paddle contract/dashboard/DPA/AVV and subprocessors are verified.
+- Third-country transfer/new provider: unknown until Stripe contract/dashboard/DPA/AVV and subprocessors are verified.
 - Breach harm: medium/high because billing identifiers and subscription status can reveal account relationship and purchase state.
-- Legal/tax impact: high review need; Merchant-of-Record, VAT/tax, invoices, cancellation/refund and privacy policy wording must be reviewed.
+- Legal/tax impact: high review need; Stripe Tax/VAT, invoices, cancellation/refund and privacy policy wording must be reviewed.
 
-Screening outcome: medium risk for foundation; high review requirement before paid launch. Proceed only with no card data stored, no raw webhook payload logging, signature-verified webhooks and no public claims of legal/tax certainty.
+Screening outcome: medium risk for foundation; high review requirement before paid launch. Proceed only with no card data stored, no raw webhook payload logging, signature-verified Stripe webhooks and no public claims of legal/tax certainty.
 
 ## Screening: MVP Privacy Controls Foundation
 

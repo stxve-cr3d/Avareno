@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { Bell, Box, FileText, ListChecks, Search as SearchIcon } from "lucide-react";
 import { api } from "../lib/api";
 import type { SearchPayload, SearchResult } from "../lib/types";
@@ -9,78 +9,150 @@ const icons = {
   LOOP: ListChecks,
   DOCUMENT: FileText,
   REMINDER: Bell
+} as const;
+
+const typeLabels: Record<SearchResult["type"], string> = {
+  ITEM: "Objekt",
+  LOOP: "Loop",
+  DOCUMENT: "Dokument",
+  REMINDER: "Erinnerung"
 };
 
+type SearchStatus = "idle" | "loading" | "ready" | "error";
+
 export function Search() {
-  const [params] = useSearchParams();
-  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const location = useLocation();
+  const inApp = location.pathname.startsWith("/app");
   const [query, setQuery] = useState(params.get("q") ?? "");
   const [payload, setPayload] = useState<SearchPayload>({ query: "", results: [] });
+  const [status, setStatus] = useState<SearchStatus>("idle");
 
+  // Keep the input in sync with external navigation (deep links, back/forward)
+  // without clobbering what the user is actively typing.
   useEffect(() => {
     const q = params.get("q") ?? "";
-    setQuery(q);
-    if (!q.trim()) {
-      setPayload({ query: "", results: [] });
-      return;
-    }
-    api<SearchPayload>(`/api/search?q=${encodeURIComponent(q)}`).then(setPayload).catch(console.error);
+    setQuery((prev) => (prev.trim() === q ? prev : q));
   }, [params]);
 
+  // Live typeahead: debounce the query, fetch results, and mirror it into the URL
+  // (replace, so we don't spam history) for shareable / deep-linkable search.
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setPayload({ query: "", results: [] });
+      setStatus("idle");
+      if (params.get("q")) setParams({}, { replace: true });
+      return;
+    }
+    setStatus("loading");
+    let active = true;
+    const handle = window.setTimeout(() => {
+      api<SearchPayload>(`/api/search?q=${encodeURIComponent(q)}`)
+        .then((data) => {
+          if (!active) return;
+          setPayload(data);
+          setStatus("ready");
+        })
+        .catch(() => {
+          if (active) setStatus("error");
+        });
+      if (params.get("q") !== q) setParams({ q }, { replace: true });
+    }, 220);
+    return () => {
+      active = false;
+      window.clearTimeout(handle);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
+  // Results update live as you type; Enter just keeps focus / prevents reload.
   function submit(event: FormEvent) {
     event.preventDefault();
-    navigate(`/search?q=${encodeURIComponent(query)}`);
   }
 
+  // Backend returns legacy routes (/items/:id, /loops/:id); keep the user in the app shell.
+  const toAppRoute = (route: string) => (inApp && !route.startsWith("/app") ? `/app${route}` : route);
+
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-10">
-      <form onSubmit={submit} className="rounded-[1.75rem] bg-white p-4 shadow-soft md:p-5">
-        <label className="flex min-h-14 items-center gap-3 rounded-2xl border border-line bg-paper px-4">
-          <SearchIcon size={21} className="text-ink/45" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className="min-w-0 flex-1 bg-transparent text-lg font-black outline-none placeholder:text-ink/28"
-            placeholder="Wonach suchst du?"
-            autoFocus
-          />
-        </label>
-      </form>
-
-      <div className="mt-6">
-        <h1 className="text-3xl font-black">Suche</h1>
-        <p className="mt-2 text-sm font-bold text-ink/52">
-          {payload.results.length ? `${payload.results.length} Treffer für "${payload.query}"` : "Dinge, Loops, Dokumente und Erinnerungen an einem Ort."}
-        </p>
-      </div>
-
-      <div className="mt-5 grid gap-3">
-        {payload.results.map((result) => (
-          <ResultRow key={`${result.type}-${result.id}`} result={result} />
-        ))}
-        {query && !payload.results.length ? (
-          <div className="rounded-[1.5rem] border border-dashed border-line bg-white p-8 text-center">
-            <p className="text-lg font-black">Nichts gefunden</p>
-            <p className="mt-2 text-sm font-bold text-ink/50">Probier einen anderen Namen, Kontakt oder Garantie-Hinweis.</p>
+    <main className="av-console av-search-page">
+      <section className="av-console-top">
+        <div className="av-dashboard-header">
+          <span className="av-console-kicker">Suche</span>
+          <div className="av-dashboard-title-row">
+            <div>
+              <h1>Alles finden</h1>
+              <p>Objekte, Loops, Dokumente und Erinnerungen an einem Ort.</p>
+            </div>
           </div>
-        ) : null}
-      </div>
-    </div>
+          <form className="av-search" onSubmit={submit}>
+            <SearchIcon size={16} />
+            <input
+              autoFocus
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Wonach suchst du? Name, Beleg, Raum, Garantie…"
+              type="search"
+              value={query}
+            />
+          </form>
+        </div>
+      </section>
+
+      <article className="av-console-section">
+        <div className="av-console-section-head">
+          <div>
+            <span>Ergebnisse</span>
+            <h2>
+              {status === "ready" && payload.results.length
+                ? `${payload.results.length} Treffer für „${payload.query}“`
+                : "Deine Objektsuche"}
+            </h2>
+          </div>
+        </div>
+
+        {status === "loading" ? (
+          <div className="av-empty">
+            <p className="av-empty-title">Wird gesucht…</p>
+          </div>
+        ) : status === "error" ? (
+          <div className="av-empty">
+            <p className="av-empty-title">Suche gerade nicht erreichbar</p>
+            <div className="av-empty-body">Versuch es gleich noch einmal.</div>
+          </div>
+        ) : payload.results.length ? (
+          <div className="av-search-results">
+            {payload.results.map((result) => (
+              <ResultRow key={`${result.type}-${result.id}`} result={result} to={toAppRoute(result.route)} />
+            ))}
+          </div>
+        ) : query.trim() ? (
+          <div className="av-empty">
+            <p className="av-empty-title">Nichts gefunden</p>
+            <div className="av-empty-body">Probier einen anderen Namen, Kontakt oder Garantie-Hinweis.</div>
+          </div>
+        ) : (
+          <div className="av-empty">
+            <p className="av-empty-title">Tippe, um zu suchen</p>
+            <div className="av-empty-body">Avareno durchsucht deine Objekte, Belege, Dokumente und Erinnerungen.</div>
+          </div>
+        )}
+      </article>
+    </main>
   );
 }
 
-function ResultRow({ result }: { result: SearchResult }) {
+function ResultRow({ result, to }: { result: SearchResult; to: string }) {
   const Icon = icons[result.type];
   return (
-    <Link to={result.route} className="flex items-center gap-4 rounded-[1.4rem] bg-white p-4 shadow-soft transition hover:-translate-y-0.5 hover:shadow-lift">
-      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-mint text-moss">
-        <Icon size={21} />
+    <Link className="av-search-row" to={to}>
+      <span className="av-search-row-icon">
+        <Icon size={18} />
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-lg font-black">{result.title}</span>
-        <span className="mt-1 block truncate text-sm font-bold text-ink/50">{result.subtitle}</span>
+      <span className="av-search-row-copy">
+        <strong>{result.title}</strong>
+        <small>{result.subtitle}</small>
       </span>
-      <span className="hidden rounded-full bg-paper px-3 py-1 text-xs font-black text-ink/48 sm:block">{result.type}</span>
+      <span className="av-search-row-type">{typeLabels[result.type]}</span>
     </Link>
   );
 }

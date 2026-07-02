@@ -2,13 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { ArrowRight, CheckCircle2, CircleX, CreditCard, Fingerprint, KeyRound, Link2, LogOut, Mail, ShieldCheck, Smartphone, Trash2, Upload, UserRound } from "lucide-react";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { safeAppRedirect, supabase } from "../lib/authClient";
+import { getAuthAccessToken, safeAppRedirect, supabase } from "../lib/authClient";
 import type { SocialAuthProvider } from "../lib/authClient";
 import { useAuth } from "../lib/authProvider";
 import { useLanguage } from "../lib/language";
 import { api } from "../lib/api";
-import { formatPrice as formatPlanPrice, getPlanById } from "../lib/pricing";
-import type { BillingStatus, CheckoutRequest, PlanKey } from "../lib/types";
+import { formatPrice as formatPlanPrice, getPaidPlans, getPlanById } from "../lib/pricing";
+import type { BillingInvoice, BillingStatus } from "../lib/types";
 import { formatUiText } from "../lib/uiText";
 import { AppLoadingBar } from "../components/app/AppKit";
 import { LanguageSwitch } from "../components/LanguageSwitch";
@@ -349,6 +349,7 @@ export function AccountSettingsPage() {
   const { notify } = useNotifications();
   const { language, languageLabel } = useLanguage();
   const { actualTheme, themeLabel } = useTheme();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [displayName, setDisplayName] = useState(auth.profile?.displayName ?? "");
   const [email, setEmail] = useState(auth.profile?.email ?? "");
   const [avatarUrl, setAvatarUrl] = useState(auth.profile?.avatarUrl ?? "");
@@ -375,9 +376,11 @@ export function AccountSettingsPage() {
   const [emailVerificationError, setEmailVerificationError] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [billing, setBilling] = useState<BillingStatus | null>(null);
+  const [billingInvoices, setBillingInvoices] = useState<BillingInvoice[]>([]);
   const [billingError, setBillingError] = useState("");
+  const [billingInvoiceError, setBillingInvoiceError] = useState("");
   const [billingMessage, setBillingMessage] = useState("");
-  const [billingBusy, setBillingBusy] = useState<"status" | "checkout" | "portal" | null>(null);
+  const [billingBusy, setBillingBusy] = useState<"status" | "portal" | null>(null);
 
   useEffect(() => {
     if (!auth.profile) {
@@ -398,6 +401,34 @@ export function AccountSettingsPage() {
     }
     void loadBillingStatus();
   }, [auth.status]);
+
+  useEffect(() => {
+    if (auth.status !== "authenticated") {
+      return;
+    }
+
+    const billingReturnState = searchParams.get("billing");
+    if (!billingReturnState) {
+      return;
+    }
+
+    if (billingReturnState === "success") {
+      setBillingError("");
+      setBillingMessage("Stripe Checkout wurde abgeschlossen. Wir aktualisieren deinen Planstatus; falls der Webhook noch verarbeitet wird, kann der neue Plan kurz verzoegert erscheinen.");
+      void loadBillingStatus();
+    } else if (billingReturnState === "portal") {
+      setBillingError("");
+      setBillingMessage("Zurueck aus der Abo-Verwaltung. Dein Planstatus wurde aktualisiert.");
+      void loadBillingStatus();
+    } else if (billingReturnState === "cancelled" || billingReturnState === "canceled") {
+      setBillingError("");
+      setBillingMessage("Checkout wurde abgebrochen. Dein Plan wurde nicht geaendert.");
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("billing");
+    setSearchParams(nextParams, { replace: true });
+  }, [auth.status, searchParams, setSearchParams]);
 
   if (auth.status === "anonymous") {
     return <Navigate to="/login" replace />;
@@ -582,46 +613,54 @@ export function AccountSettingsPage() {
   async function loadBillingStatus() {
     setBillingBusy("status");
     setBillingError("");
+    setBillingInvoiceError("");
     try {
-      const result = await api<BillingStatus>("/api/billing/status");
-      setBilling(result);
-    } catch (caught) {
-      setBillingError(caught instanceof Error ? caught.message : "Planstatus konnte nicht geladen werden.");
-    } finally {
-      setBillingBusy(null);
-    }
-  }
-
-  async function startCheckout(planKey: PlanKey) {
-    setBillingBusy("checkout");
-    setBillingError("");
-    setBillingMessage("");
-    try {
-      const result = await api<{ checkoutUrl: string; mode: "checkout" | "free"; provider?: string | null }>("/api/billing/checkout", {
-        method: "POST",
-        body: JSON.stringify({ planKey } satisfies CheckoutRequest)
-      });
-      if (result.checkoutUrl.startsWith("https://")) {
-        window.location.assign(result.checkoutUrl);
+      const token = await getAuthAccessToken();
+      if (!token) {
+        setBilling(null);
+        setBillingInvoices([]);
+        setBillingError("Planstatus braucht eine echte Supabase-Session. Melde dich erneut an, bevor du Checkout testest.");
         return;
       }
-      setBillingMessage("Für diesen Plan ist kein Checkout nötig.");
-      await loadBillingStatus();
+
+      const result = await api<BillingStatus>("/api/billing/status");
+      setBilling(result);
+      try {
+        const invoices = await api<BillingInvoice[]>("/api/billing/invoices");
+        setBillingInvoices(invoices);
+      } catch (caughtInvoices) {
+        setBillingInvoices([]);
+        setBillingInvoiceError(caughtInvoices instanceof Error ? caughtInvoices.message : "Rechnungen konnten nicht geladen werden.");
+      }
     } catch (caught) {
-      setBillingError(caught instanceof Error ? caught.message : "Checkout ist noch nicht verfügbar.");
+      const message = caught instanceof Error ? caught.message : "";
+      setBillingError(
+        message.toLowerCase().includes("authentication required")
+          ? "Planstatus braucht eine echte Supabase-Session. Melde dich erneut an, bevor du Checkout testest."
+          : message || "Planstatus konnte nicht geladen werden."
+      );
     } finally {
       setBillingBusy(null);
     }
   }
 
   async function openBillingPortal() {
-    setBillingBusy("portal");
     setBillingError("");
     setBillingMessage("");
+
+    const token = await getAuthAccessToken();
+    if (!token) {
+      setBillingError("Die Abo-Verwaltung braucht eine echte Login-Session. Melde dich bitte erneut ueber Supabase an.");
+      return;
+    }
+
+    setBillingBusy("portal");
     try {
+      const returnUrl = new URL(window.location.href);
+      returnUrl.searchParams.set("billing", "portal");
       const result = await api<{ portalUrl: string }>("/api/billing/portal", {
         method: "POST",
-        body: JSON.stringify({ returnUrl: window.location.href })
+        body: JSON.stringify({ returnUrl: returnUrl.toString() })
       });
       window.location.assign(result.portalUrl);
     } catch (caught) {
@@ -640,8 +679,12 @@ export function AccountSettingsPage() {
   const profileBusy = isSavingProfile || uploadingAvatar || isSendingEmailVerification;
   const providerBusy = isChangingPassword || isRegisteringPasskey || Boolean(connectingProvider);
   const freePlan = getPlanById("free");
-  const personalPlan = getPlanById("personal");
-  const familyPlan = getPlanById("family");
+  const paidPlans = getPaidPlans();
+  const billingProviderNote = billing
+    ? billing.providerConfigured
+      ? "Stripe Checkout ist serverseitig vorbereitet. Rechtliche, steuerliche und Provider-Pruefung bleiben vor Launch offen."
+      : "Stripe-Konfiguration wurde vom laufenden Backend noch nicht erkannt. Falls die env.local gerade aktualisiert wurde, starte den Backend-Server neu."
+    : "Planstatus ist noch nicht geladen. Fuer Stripe Checkout brauchst du eine echte Supabase-Session; die Stripe-Keys liegen nur serverseitig.";
 
   return (
     <section className="account-page">
@@ -684,7 +727,7 @@ export function AccountSettingsPage() {
           <div>
             <span>Plan & Abrechnung</span>
             <h2>Dein Avareno-Plan</h2>
-            <p>Billing ist als Paddle-Foundation vorbereitet. Zahlungsdaten bleiben beim Anbieter und werden hier nicht gespeichert.</p>
+            <p>Billing ist als Stripe-Subscription-Foundation vorbereitet. Zahlungsdaten bleiben beim Anbieter und werden hier nicht gespeichert.</p>
           </div>
           <CreditCard size={18} />
         </div>
@@ -697,25 +740,35 @@ export function AccountSettingsPage() {
           </div>
           <div>
             <small>Preis</small>
-            <strong>{billing?.currentPlan.priceLabel ?? formatPlanPrice(freePlan, "monthly", "de-DE")}<em>/Monat</em></strong>
+            <strong>{billing?.currentPlan.priceLabel ?? formatPlanPrice(freePlan.prices.monthly.amount, freePlan.currency, "de-DE")}<em>/Monat</em></strong>
             <span>{billing?.subscription.currentPeriodEnd ? `Läuft bis ${formatBillingDate(billing.subscription.currentPeriodEnd)}` : "Keine Verlängerung hinterlegt"}</span>
           </div>
         </div>
         <div className="account-billing-note">
-          {billing?.providerConfigured
-            ? "Personal-Checkout kann über Paddle gestartet werden. Rechtliche, steuerliche und Provider-Prüfung bleiben vor Launch offen."
-            : "Paddle ist noch nicht vollständig konfiguriert. Hinterlege API-Key, Webhook-Secret und Price-ID serverseitig, bevor Checkout live geht."}
+          {billingProviderNote}
         </div>
         <div className="account-action-row">
-          <button
-            className="profile-secondary-action"
-            disabled={!billing?.providerConfigured || billingBusy === "checkout" || billing?.subscription.planKey === "personal"}
-            onClick={() => void startCheckout("personal")}
-            type="button"
-          >
-            <ArrowRight size={16} />
-            {billingBusy === "checkout" ? "Checkout startet..." : personalPlan.ctaLabel.de}
-          </button>
+          {paidPlans.map((plan) => {
+            const isCurrentPlan = billing?.subscription.planKey === plan.id;
+            if (isCurrentPlan || billingBusy === "status") {
+              return (
+                <button className={plan.isPopular ? "profile-secondary-action" : "profile-secondary-action is-muted"} disabled key={plan.id} type="button">
+                  <ArrowRight size={16} />
+                  {plan.ctaLabel.de}
+                </button>
+              );
+            }
+            return (
+              <Link
+                className={plan.isPopular ? "profile-secondary-action" : "profile-secondary-action is-muted"}
+                key={plan.id}
+                to={`/checkout/${plan.id}?interval=${billing?.subscription.billingInterval === "yearly" ? "yearly" : "monthly"}`}
+              >
+                <ArrowRight size={16} />
+                {plan.ctaLabel.de}
+              </Link>
+            );
+          })}
           <button
             className="profile-secondary-action is-muted"
             disabled={!billing?.portalConfigured || billingBusy === "portal"}
@@ -725,11 +778,38 @@ export function AccountSettingsPage() {
             <CreditCard size={16} />
             Abo verwalten
           </button>
-          <button className="profile-secondary-action is-muted" disabled type="button">
-            {familyPlan.ctaLabel.de}
-          </button>
         </div>
         <AuthMessage error={billingError} success={billingMessage || null} />
+        <div className="account-invoice-list">
+          <div className="account-invoice-head">
+            <div>
+              <small>Rechnungen</small>
+              <strong>Stripe-Rechnungshistorie</strong>
+            </div>
+            <span>{billingInvoices.length ? `${billingInvoices.length} Eintraege` : "Noch keine Rechnung"}</span>
+          </div>
+          {billingInvoiceError ? <p className="account-invoice-note is-error">{billingInvoiceError}</p> : null}
+          {billingInvoices.length === 0 && !billingInvoiceError ? (
+            <p className="account-invoice-note">Nach der ersten erfolgreichen Stripe-Zahlung erscheinen Rechnungen hier. PDF und Zahlungsdetails bleiben bei Stripe.</p>
+          ) : (
+            billingInvoices.map((invoice) => (
+              <div className="account-invoice-row" key={invoice.id}>
+                <div>
+                  <strong>{invoice.invoiceNumber || invoice.providerInvoiceId}</strong>
+                  <span>{invoiceStatusLabel(invoice.status)} - {formatBillingDate(invoice.invoiceCreatedAt)}</span>
+                </div>
+                <div>
+                  <strong>{formatBillingAmount(invoice.amountPaid || invoice.amountDue, invoice.currency)}</strong>
+                  {invoice.hostedInvoiceUrl ? (
+                    <a href={invoice.hostedInvoiceUrl} target="_blank" rel="noreferrer">
+                      Bei Stripe oeffnen
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </section>
 
       <form className="account-panel" onSubmit={submit}>
@@ -985,7 +1065,7 @@ function AuthForm({ mode }: { mode: AuthMode }) {
         setPhoneCodeSent(true);
         setPhoneOtpSuccess("SMS-Code wurde gesendet. Gib ihn hier ein, um den Zugang abzuschließen.");
       } else if (result.ok) {
-        const target = result.nextPath ?? (mode === "signup" ? "/onboarding" : from);
+        const target = resolvePostAuthTarget(mode, result.nextPath, from);
 
         if (isAuthRedirectTarget(target)) {
           navigate(target, { replace: true });
@@ -1006,7 +1086,7 @@ function AuthForm({ mode }: { mode: AuthMode }) {
       : await auth.signup({ email, password, displayName, captchaToken });
 
     if (result.ok) {
-      const target = result.nextPath ?? (mode === "signup" ? "/onboarding" : from);
+      const target = resolvePostAuthTarget(mode, result.nextPath, from);
 
       if (isAuthRedirectTarget(target)) {
         navigate(target, { replace: true });
@@ -1069,7 +1149,7 @@ function AuthForm({ mode }: { mode: AuthMode }) {
       <AuthIntro
         eyebrow="Privater Zugang"
         title={mode === "login" ? "Willkommen zurück" : "Account erstellen"}
-        body={mode === "login" ? `Dein privater Speicher für Dinge, Nachweise und offene Punkte. Fragen? ${auth.config.supportEmail}` : phoneAuthAvailable ? "Mit E-Mail oder Telefon registrieren. Avareno bleibt privat, ruhig und ohne öffentliche Profile." : "Mit E-Mail registrieren. Avareno bleibt privat, ruhig und ohne öffentliche Profile."}
+        body={mode === "login" ? `Dein privater Speicher für Objekte, Nachweise und offene Punkte. Fragen? ${auth.config.supportEmail}` : phoneAuthAvailable ? "Mit E-Mail oder Telefon registrieren. Avareno bleibt privat, ruhig und ohne öffentliche Profile." : "Mit E-Mail registrieren. Avareno bleibt privat, ruhig und ohne öffentliche Profile."}
       />
 
       {!auth.config.ready ? <AuthSetupNotice missing={auth.config.setupMissing} /> : null}
@@ -1384,8 +1464,31 @@ function billingStatusLabel(status?: string) {
   return labels[normalized] ?? normalized;
 }
 
-function formatBillingDate(value: string) {
-  return new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(value));
+function invoiceStatusLabel(status?: string) {
+  const normalized = (status ?? "").toUpperCase();
+  const labels: Record<string, string> = {
+    DRAFT: "Entwurf",
+    OPEN: "Offen",
+    PAID: "Bezahlt",
+    VOID: "Storniert",
+    VOIDED: "Storniert",
+    UNCOLLECTIBLE: "Uneinbringlich"
+  };
+  return labels[normalized] ?? (normalized || "Unbekannt");
+}
+
+function formatBillingDate(value?: string | null) {
+  if (!value) return "Kein Datum";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Kein Datum";
+  return new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+}
+
+function formatBillingAmount(amount: number, currency: string) {
+  return new Intl.NumberFormat("de-DE", {
+    style: "currency",
+    currency: (currency || "eur").toUpperCase()
+  }).format((amount || 0) / 100);
 }
 
 function AuthSurface({ label, children }: { label: string; children: ReactNode }) {
@@ -1409,6 +1512,22 @@ function isAuthRedirectTarget(path: string) {
     || path === "/forgot-password"
     || path === "/reset-password"
     || path.startsWith("/auth/");
+}
+
+function resolvePostAuthTarget(mode: AuthMode, nextPath: string | undefined, from: string) {
+  if (mode === "signup") {
+    return nextPath ?? "/onboarding";
+  }
+
+  if (nextPath === "/onboarding") {
+    return "/onboarding";
+  }
+
+  if (from !== "/app") {
+    return from;
+  }
+
+  return nextPath ?? "/app";
 }
 
 function AuthIntro({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) {

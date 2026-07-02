@@ -15,7 +15,7 @@ from typing import Any
 from app.db import PROJECT_ROOT
 
 
-UPLOAD_ROOT = PROJECT_ROOT / "uploads"
+UPLOAD_ROOT = Path(os.environ.get("AVARENO_UPLOAD_ROOT", str(PROJECT_ROOT / "uploads"))).expanduser()
 DEFAULT_SIGNED_DOWNLOAD_TTL_SECONDS = 5 * 60
 MAX_SIGNED_DOWNLOAD_TTL_SECONDS = 15 * 60
 
@@ -90,7 +90,7 @@ def safe_local_upload_path(file_path: str | None) -> Path | None:
         return None
 
     root = UPLOAD_ROOT.resolve()
-    target = (PROJECT_ROOT / file_path.lstrip("/")).resolve()
+    target = (root / file_path.removeprefix("/uploads/")).resolve()
     try:
         target.relative_to(root)
     except ValueError as exc:

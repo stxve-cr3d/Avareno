@@ -1,10 +1,11 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import type { ReactNode } from "react";
-import { Github, Instagram, Menu, X } from "lucide-react";
+import { Github, Instagram, Menu, UserRound, X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import avarenoMark from "../assets/avareno-test-logo.png";
 import { LanguageSwitch } from "./LanguageSwitch";
 import { useLanguage } from "../lib/language";
+import { useAuth } from "../lib/authProvider";
 
 type FooterInternalLink = {
   label: string;
@@ -25,6 +26,7 @@ type FooterColumn = {
 const marketingCopy = {
   de: {
     app: "App",
+    account: "Account",
     brandAria: "Avareno Startseite",
     closeNav: "Website-Navigation schließen",
     cta: "Starten",
@@ -37,7 +39,7 @@ const marketingCopy = {
     navLinks: [
       { to: "/#product", label: "Produkt" },
       { to: "/#memory-gallery", label: "Beispiele" },
-      { to: "/#dinge", label: "Dinge" },
+      { to: "/#dinge", label: "Objekte" },
       { to: "/#how-it-works", label: "Ablauf" },
       { to: "/datenschutz", label: "Sicherheit" },
       { to: "/#pricing", label: "Preise" }
@@ -46,7 +48,7 @@ const marketingCopy = {
       {
         title: "Produkt",
         links: [
-          { to: "/#dinge", label: "Dinge" },
+          { to: "/#dinge", label: "Objekte" },
           { to: "/#dinge", label: "Resolve" },
           { to: "/#dinge", label: "Care" },
           { to: "/datenschutz", label: "Privater Vault" }
@@ -83,6 +85,7 @@ const marketingCopy = {
   },
   en: {
     app: "App",
+    account: "Account",
     brandAria: "Avareno homepage",
     closeNav: "Close website navigation",
     cta: "Get started",
@@ -95,7 +98,7 @@ const marketingCopy = {
     navLinks: [
       { to: "/#product", label: "Product" },
       { to: "/#memory-gallery", label: "Memory" },
-      { to: "/#dinge", label: "Dinge" },
+      { to: "/#dinge", label: "Objekte" },
       { to: "/#how-it-works", label: "How it works" },
       { to: "/datenschutz", label: "Security" },
       { to: "/#pricing", label: "Pricing" }
@@ -104,7 +107,7 @@ const marketingCopy = {
       {
         title: "Product",
         links: [
-          { to: "/#dinge", label: "Dinge" },
+          { to: "/#dinge", label: "Objekte" },
           { to: "/#dinge", label: "Resolve" },
           { to: "/#dinge", label: "Care" },
           { to: "/datenschutz", label: "Private Vault" }
@@ -188,9 +191,11 @@ function useMarketingHashNavigation(onNavigate?: () => void) {
 export function MarketingHeader() {
   const location = useLocation();
   const { language } = useLanguage();
+  const auth = useAuth();
   const copy = marketingCopy[language];
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const handleNavClick = useMarketingHashNavigation(() => setIsMenuOpen(false));
+  const isSignedIn = auth.status === "authenticated";
 
   useEffect(() => {
     setIsMenuOpen(false);
@@ -226,11 +231,12 @@ export function MarketingHeader() {
 
       <div className="site-nav-actions">
         <LanguageSwitch className="site-language-switch" onSwitch={() => setIsMenuOpen(false)} />
-        <Link className="site-nav-login" to="/login" onClick={() => setIsMenuOpen(false)}>
+        <Link className="site-nav-login" to={isSignedIn ? "/app" : "/login"} onClick={() => setIsMenuOpen(false)}>
           {copy.app}
         </Link>
-        <Link className="site-nav-cta" to="/signup" onClick={() => setIsMenuOpen(false)}>
-          {copy.cta}
+        <Link className="site-nav-cta" to={isSignedIn ? "/app/ich/settings" : "/signup"} onClick={() => setIsMenuOpen(false)}>
+          {isSignedIn ? <UserRound size={15} aria-hidden="true" /> : null}
+          {isSignedIn ? copy.account : copy.cta}
         </Link>
       </div>
     </header>

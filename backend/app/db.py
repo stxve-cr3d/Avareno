@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
@@ -10,7 +11,7 @@ from app.utils import make_id, now_iso
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = BACKEND_ROOT.parent
-DB_PATH = BACKEND_ROOT / "second_memory.db"
+DB_PATH = Path(os.environ.get("AVARENO_DB_PATH", str(BACKEND_ROOT / "second_memory.db"))).expanduser()
 SCHEMA_PATH = BACKEND_ROOT / "schema.sql"
 _SCHEMA_LOCK = Lock()
 
@@ -78,6 +79,7 @@ def ensure_runtime_schema(conn: sqlite3.Connection) -> None:
     _ensure_privacy_tables(conn)
     _ensure_product_tables(conn)
     _ensure_smart_home_tables(conn)
+    _ensure_social_tables(conn)
     _ensure_default_product_structure(conn)
     _ensure_default_smart_home_devices(conn)
 
@@ -172,13 +174,15 @@ def _ensure_product_tables(conn: sqlite3.Connection) -> None:
           "id" TEXT NOT NULL PRIMARY KEY,
           "userId" TEXT NOT NULL,
           "householdId" TEXT,
-          "provider" TEXT NOT NULL DEFAULT 'paddle',
+          "provider" TEXT NOT NULL DEFAULT 'internal',
           "providerCustomerId" TEXT,
           "providerSubscriptionId" TEXT,
+          "stripePriceId" TEXT,
+          "billingInterval" TEXT,
           "planKey" TEXT NOT NULL DEFAULT 'free',
           "tier" TEXT NOT NULL DEFAULT 'FREE',
           "status" TEXT NOT NULL DEFAULT 'ACTIVE',
-          "itemLimit" INTEGER NOT NULL DEFAULT 10,
+          "itemLimit" INTEGER NOT NULL DEFAULT 30,
           "storageLimitMb" INTEGER NOT NULL DEFAULT 100,
           "currentPeriodStart" TEXT,
           "currentPeriodEnd" TEXT,
@@ -191,9 +195,11 @@ def _ensure_product_tables(conn: sqlite3.Connection) -> None:
     )
     plan_columns = {row["name"] for row in conn.execute('PRAGMA table_info("PlanSubscription")').fetchall()}
     plan_column_definitions = {
-        "provider": "TEXT NOT NULL DEFAULT 'paddle'",
+        "provider": "TEXT NOT NULL DEFAULT 'internal'",
         "providerCustomerId": "TEXT",
         "providerSubscriptionId": "TEXT",
+        "stripePriceId": "TEXT",
+        "billingInterval": "TEXT",
         "planKey": "TEXT NOT NULL DEFAULT 'free'",
         "currentPeriodStart": "TEXT",
         "currentPeriodEnd": "TEXT",
@@ -204,8 +210,13 @@ def _ensure_product_tables(conn: sqlite3.Connection) -> None:
             conn.execute(f'ALTER TABLE "PlanSubscription" ADD COLUMN "{name}" {definition}')
     conn.execute("""UPDATE "PlanSubscription" SET planKey = 'free' WHERE upper(tier) = 'FREE'""")
     conn.execute("""UPDATE "PlanSubscription" SET planKey = 'personal', tier = 'PERSONAL' WHERE upper(tier) IN ('HOME', 'PREMIUM', 'PERSONAL')""")
-    conn.execute("""UPDATE "PlanSubscription" SET planKey = 'family', tier = 'FAMILY' WHERE upper(tier) IN ('PRO', 'FAMILY')""")
-    conn.execute("""UPDATE "PlanSubscription" SET itemLimit = 10 WHERE planKey = 'free' AND itemLimit > 10""")
+    conn.execute("""UPDATE "PlanSubscription" SET planKey = 'pro', tier = 'PRO' WHERE upper(tier) = 'PRO'""")
+    conn.execute("""UPDATE "PlanSubscription" SET planKey = 'family', tier = 'FAMILY' WHERE upper(tier) = 'FAMILY'""")
+    conn.execute("""UPDATE "PlanSubscription" SET provider = 'internal' WHERE planKey = 'free' AND provider IN ('paddle', 'stripe', 'lemon_squeezy') AND providerCustomerId IS NULL AND providerSubscriptionId IS NULL""")
+    conn.execute("""UPDATE "PlanSubscription" SET itemLimit = 30, storageLimitMb = 100 WHERE planKey = 'free'""")
+    conn.execute("""UPDATE "PlanSubscription" SET itemLimit = 300, storageLimitMb = 2048 WHERE planKey = 'personal'""")
+    conn.execute("""UPDATE "PlanSubscription" SET itemLimit = 2000, storageLimitMb = 20480 WHERE planKey = 'pro'""")
+    conn.execute("""UPDATE "PlanSubscription" SET itemLimit = 5000, storageLimitMb = 51200 WHERE planKey = 'family'""")
     conn.execute('CREATE INDEX IF NOT EXISTS "PlanSubscription_userId_idx" ON "PlanSubscription" ("userId")')
     conn.execute('CREATE INDEX IF NOT EXISTS "PlanSubscription_providerSubscriptionId_idx" ON "PlanSubscription" ("provider", "providerSubscriptionId")')
     conn.execute(
@@ -221,6 +232,35 @@ def _ensure_product_tables(conn: sqlite3.Connection) -> None:
           UNIQUE ("provider", "eventId")
         )"""
     )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS "BillingInvoice" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "userId" TEXT NOT NULL,
+          "provider" TEXT NOT NULL DEFAULT 'stripe',
+          "providerInvoiceId" TEXT NOT NULL,
+          "providerCustomerId" TEXT,
+          "providerSubscriptionId" TEXT,
+          "invoiceNumber" TEXT,
+          "status" TEXT NOT NULL,
+          "currency" TEXT NOT NULL DEFAULT 'eur',
+          "amountDue" INTEGER NOT NULL DEFAULT 0,
+          "amountPaid" INTEGER NOT NULL DEFAULT 0,
+          "amountRemaining" INTEGER NOT NULL DEFAULT 0,
+          "periodStart" TEXT,
+          "periodEnd" TEXT,
+          "hostedInvoiceUrl" TEXT,
+          "invoicePdfUrl" TEXT,
+          "invoiceCreatedAt" TEXT,
+          "finalizedAt" TEXT,
+          "paidAt" TEXT,
+          "createdAt" TEXT NOT NULL,
+          "updatedAt" TEXT NOT NULL,
+          UNIQUE ("provider", "providerInvoiceId"),
+          FOREIGN KEY ("userId") REFERENCES "User" ("id")
+        )"""
+    )
+    conn.execute('CREATE INDEX IF NOT EXISTS "BillingInvoice_userId_createdAt_idx" ON "BillingInvoice" ("userId", "invoiceCreatedAt")')
+    conn.execute('CREATE INDEX IF NOT EXISTS "BillingInvoice_providerInvoiceId_idx" ON "BillingInvoice" ("provider", "providerInvoiceId")')
     conn.execute(
         """CREATE TABLE IF NOT EXISTS "SmartHomeConnection" (
           "id" TEXT NOT NULL PRIMARY KEY,
@@ -320,6 +360,74 @@ def _ensure_smart_home_tables(conn: sqlite3.Connection) -> None:
     )
 
 
+def _ensure_social_tables(conn: sqlite3.Connection) -> None:
+    # Friendships are stored symmetrically (one row per direction) so that a
+    # user's friends are a simple "WHERE userId = ?" lookup. Both rows share the
+    # same status and are created/removed together.
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS "Friendship" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "userId" TEXT NOT NULL,
+          "friendUserId" TEXT NOT NULL,
+          "status" TEXT NOT NULL DEFAULT 'ACCEPTED',
+          "createdAt" TEXT NOT NULL,
+          "updatedAt" TEXT NOT NULL,
+          UNIQUE ("userId", "friendUserId"),
+          FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE,
+          FOREIGN KEY ("friendUserId") REFERENCES "User" ("id") ON DELETE CASCADE
+        )"""
+    )
+    # Each user has a single reusable, human-friendly invite code. Entering
+    # someone else's active code connects the two accounts as friends.
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS "FriendInviteCode" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "userId" TEXT NOT NULL,
+          "code" TEXT NOT NULL UNIQUE,
+          "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+          "createdAt" TEXT NOT NULL,
+          "expiresAt" TEXT,
+          FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE
+        )"""
+    )
+    # Per-user motivation-privacy preferences. These decide what (if anything) a
+    # friend may see of this user's progress. Enforced server-side.
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS "MotivationPrivacy" (
+          "userId" TEXT NOT NULL PRIMARY KEY,
+          "motivationEnabled" INTEGER NOT NULL DEFAULT 1,
+          "leaderboardEnabled" INTEGER NOT NULL DEFAULT 1,
+          "hideXpFromFriends" INTEGER NOT NULL DEFAULT 0,
+          "hideStreakFromFriends" INTEGER NOT NULL DEFAULT 1,
+          "allowFriendInvites" INTEGER NOT NULL DEFAULT 1,
+          "updatedAt" TEXT NOT NULL,
+          FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE
+        )"""
+    )
+    # Private named groups of a user's friends (owner-only, for their own view).
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS "FriendCircle" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "userId" TEXT NOT NULL,
+          "name" TEXT NOT NULL,
+          "createdAt" TEXT NOT NULL,
+          "updatedAt" TEXT NOT NULL,
+          FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS "FriendCircleMember" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "circleId" TEXT NOT NULL,
+          "friendUserId" TEXT NOT NULL,
+          "createdAt" TEXT NOT NULL,
+          UNIQUE ("circleId", "friendUserId"),
+          FOREIGN KEY ("circleId") REFERENCES "FriendCircle" ("id") ON DELETE CASCADE,
+          FOREIGN KEY ("friendUserId") REFERENCES "User" ("id") ON DELETE CASCADE
+        )"""
+    )
+
+
 def _ensure_default_product_structure(conn: sqlite3.Connection) -> None:
     try:
         users = conn.execute('SELECT * FROM "User"').fetchall()
@@ -376,7 +484,7 @@ def _ensure_default_product_structure(conn: sqlite3.Connection) -> None:
                 """INSERT INTO "PlanSubscription"
                    (id, userId, householdId, provider, planKey, tier, status, itemLimit, storageLimitMb, createdAt, updatedAt)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (make_id(), user["id"], household_id, "paddle", "free", "FREE", "ACTIVE", 10, 100, now, now),
+                (make_id(), user["id"], household_id, "internal", "free", "FREE", "ACTIVE", 30, 100, now, now),
             )
 
         root = conn.execute(
@@ -465,6 +573,10 @@ def _ensure_default_product_structure(conn: sqlite3.Connection) -> None:
 
 def _ensure_default_smart_home_devices(conn: sqlite3.Connection) -> None:
     try:
+        conn.execute(
+            'DELETE FROM "SmartHomeDevice" WHERE providerDeviceId IN (?, ?)',
+            ("demo-living-room-tv", "local-demo-tv"),
+        )
         users = conn.execute('SELECT * FROM "User"').fetchall()
     except sqlite3.OperationalError:
         return
@@ -482,42 +594,8 @@ def _ensure_default_smart_home_devices(conn: sqlite3.Connection) -> None:
         ).fetchone()
         if not connection:
             continue
-        tv_item = conn.execute(
-            """SELECT * FROM "Item"
-               WHERE userId = ? AND (lower(name) LIKE '%tv%' OR lower(category) LIKE '%tv%' OR lower(manufacturer) = 'lg' OR lower(manufacturer) = 'samsung')
-               ORDER BY updatedAt DESC LIMIT 1""",
-            (user["id"],),
-        ).fetchone()
-        exists = conn.execute(
-            'SELECT id FROM "SmartHomeDevice" WHERE userId = ? AND providerDeviceId = ?',
-            (user["id"], "demo-living-room-tv"),
-        ).fetchone()
-        if not exists:
-            conn.execute(
-                """INSERT INTO "SmartHomeDevice"
-                   (id, userId, householdId, connectionId, provider, providerDeviceId, itemId, name, roomName, deviceType, capabilities, status,
-                    powerState, rawJson, lastSeenAt, createdAt, updatedAt)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    make_id(),
-                    user["id"],
-                    household["id"],
-                    connection["id"],
-                    "SAMSUNG_SMARTTHINGS",
-                    "demo-living-room-tv",
-                    tv_item["id"] if tv_item else None,
-                    "Living Room TV",
-                    tv_item["location"] if tv_item and tv_item["location"] else "Wohnzimmer",
-                    "tv",
-                    '["switch","audioVolume","audioMute","mediaInputSource"]',
-                    "ONLINE",
-                    "off",
-                    '{"demo":true,"source":"Avareno seed"}',
-                    now,
-                    now,
-                    now,
-                ),
-            )
+        # Do not seed a demo TV. TVs should come from real local discovery
+        # or an explicit provider connection so users can trust the device list.
 
 
 @contextmanager

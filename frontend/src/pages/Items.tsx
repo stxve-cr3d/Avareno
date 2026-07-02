@@ -88,15 +88,15 @@ export function Items() {
           <span className="av-console-kicker">Object Memory Library</span>
           <div className="av-dashboard-title-row">
             <div>
-              <h1>Dinge</h1>
-              <p>Alle gespeicherten Dinge, Belege, Garantien und offenen Punkte.</p>
+              <h1>Objekte</h1>
+              <p>Alle gespeicherten Objekte, Belege, Garantien und offenen Punkte.</p>
             </div>
             <Link className="av-console-primary" to="/app/capture/item">
-              Ding erfassen <Plus size={14} />
+              Objekt erfassen <Plus size={14} />
             </Link>
           </div>
-          <div className="av-status-grid" aria-label="Dinge status summary">
-            <StatusSummaryCard label="Dinge" value={items.length} />
+          <div className="av-status-grid" aria-label="Objekte status summary">
+            <StatusSummaryCard label="Objekte" value={items.length} />
             <StatusSummaryCard label="Dokumente" value={documentCount} />
             <StatusSummaryCard label="Offen" value={openTotal} tone={openTotal > 0 ? "warning" : "neutral"} />
             <StatusSummaryCard label="Garantie-Risiken" value={warrantyRiskCount} tone={warrantyRiskCount > 0 ? "warning" : "neutral"} />
@@ -120,7 +120,7 @@ export function Items() {
               <Search size={15} />
               <input
                 type="search"
-                placeholder="Ding, Modell, Beleg oder Kategorie suchen"
+                placeholder="Objekt, Modell, Beleg oder Kategorie suchen"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
@@ -149,7 +149,7 @@ export function Items() {
             <div className="av-console-section-head">
               <div>
                 <span>Object memory</span>
-                <h2>{filtered.length} gespeicherte Dinge</h2>
+                <h2>{filtered.length} gespeicherte Objekte</h2>
               </div>
             </div>
 
@@ -182,14 +182,14 @@ export function Items() {
             primary
             to="/app/capture/item"
             icon={<Package size={16} />}
-            title="Ding erfassen"
+            title="Objekt erfassen"
             body="Produkt, Beleg, Garantie und offene Punkte strukturiert starten."
           />
           <QuickActionCard
             to="/app/capture/receipt"
             icon={<ScanLine size={16} />}
             title="Beleg nachtragen"
-            body="Rechnung oder Nachweis mit einem bestehenden Ding verbinden."
+            body="Rechnung oder Nachweis mit einem bestehenden Objekt verbinden."
           />
         </aside>
       </div>
@@ -215,10 +215,10 @@ function LibraryEmpty() {
         />
       </div>
       <div className="av-empty-copy">
-        <h3>Noch keine Dinge gespeichert</h3>
-        <p>Füge dein erstes Ding hinzu und Avareno merkt sich Beleg, Garantie und offene Punkte.</p>
+        <h3>Noch keine Objekte gespeichert</h3>
+        <p>Füge dein erstes Objekt hinzu und Avareno merkt sich Beleg, Garantie und offene Punkte.</p>
         <div className="av-empty-actions">
-          <ActionButton to="/app/capture/item" icon={<Plus size={15} />}>Ding erfassen</ActionButton>
+          <ActionButton to="/app/capture/item" icon={<Plus size={15} />}>Objekt erfassen</ActionButton>
           <SecondaryAction to="/app/capture/receipt" icon={<ScanLine size={15} />}>Rechnung scannen</SecondaryAction>
         </div>
       </div>
@@ -230,7 +230,7 @@ function FilteredEmpty({ onReset }: { onReset: () => void }) {
   return (
     <div className="av-empty">
       <p className="av-empty-title">Keine Treffer</p>
-      <div className="av-empty-body">Ändere Suche oder Filter, um andere Dinge zu sehen.</div>
+      <div className="av-empty-body">Ändere Suche oder Filter, um andere Objekte zu sehen.</div>
       <div style={{ marginTop: "1rem", display: "flex", justifyContent: "center" }}>
         <SecondaryAction onClick={onReset}>Filter zurücksetzen</SecondaryAction>
       </div>

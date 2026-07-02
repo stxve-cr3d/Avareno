@@ -20,7 +20,8 @@ import {
 import { MarketingFooter, MarketingHeader } from "../components/MarketingShell";
 import { Reveal, RevealGroup } from "../components/MarketingReveal";
 import { useLanguage } from "../lib/language";
-import { formatPrice, publicPricingPlans, type BillingPeriod } from "../lib/pricing";
+import { formatPrice, getYearlySavings, publicPricingPlans, type BillingPeriod } from "../lib/pricing";
+import { useAuth } from "../lib/authProvider";
 
 function getHomeContent(language: "de" | "en") {
   if (language === "en") {
@@ -77,7 +78,7 @@ function getHomeContent(language: "de" | "en") {
         aria: "Billing period",
         monthly: "Monthly",
         yearly: "Yearly",
-        yearlyBadge: "Save 2 months"
+        yearlyBadge: "Save yearly"
       },
       features: [
         { icon: <Package size={18} />, title: "Object Memory", line: "Every thing gets a profile.", text: "Store the product, receipt, warranty, manual and open points in one place.", visual: "object" },
@@ -134,7 +135,7 @@ function getHomeContent(language: "de" | "en") {
     },
     featuresHeader: {
       eyebrow: "Produkt",
-      title: "Eine private Struktur für Dinge, die später zählen.",
+      title: "Eine private Struktur für Objekte, die später zählen.",
       text: "Avareno ist keine Notiz-App und keine weitere Aufgabenliste. Es hält Produkte, Nachweise, Dokumente und nächste Schritte ruhig zusammen."
     },
     stepsHeader: {
@@ -145,7 +146,7 @@ function getHomeContent(language: "de" | "en") {
     pricingHeader: {
       eyebrow: "Preise",
       title: "Wähle den Speicher, der zu deinem Alltag passt",
-      text: "Starte kostenlos und erweitere Avareno, wenn dein privater Speicher für Dinge, Belege, Garantien und offene Punkte wächst."
+      text: "Starte kostenlos und erweitere Avareno, wenn dein privater Speicher für Objekte, Belege, Garantien und offene Punkte wächst."
     },
     trustHeader: {
       eyebrow: "Vertrauen",
@@ -159,7 +160,7 @@ function getHomeContent(language: "de" | "en") {
     },
     finalCta: {
       eyebrow: "Start",
-      title: "Starte mit dem ersten echten Ding.",
+      title: "Starte mit dem ersten echten Objekt.",
       text: "Ein Produkt, ein Beleg oder ein Screenshot reicht. Avareno baut daraus den ersten brauchbaren Kontext.",
       primary: "Jetzt starten",
       secondary: "App öffnen"
@@ -170,10 +171,10 @@ function getHomeContent(language: "de" | "en") {
       aria: "Abrechnungszeitraum",
       monthly: "Monatlich",
       yearly: "Jährlich",
-      yearlyBadge: "2 Monate sparen"
+      yearlyBadge: "Jaehrlich guenstiger"
     },
     features: [
-      { icon: <Package size={18} />, title: "Objektgedächtnis", line: "Jedes Ding bekommt ein Profil.", text: "Produkt, Beleg, Garantie, Anleitung und offene Punkte bleiben an einem Ort.", visual: "object" },
+      { icon: <Package size={18} />, title: "Objektgedächtnis", line: "Jedes Objekt bekommt ein Profil.", text: "Produkt, Beleg, Garantie, Anleitung und offene Punkte bleiben an einem Ort.", visual: "object" },
       { icon: <ReceiptText size={18} />, title: "Beleg & Garantie", line: "Der Nachweis bleibt auffindbar.", text: "Avareno verbindet Belege mit Produkten und zeigt, was als Nächstes abläuft.", visual: "receipt" },
       { icon: <ClipboardCheck size={18} />, title: "Resolve", line: "Offene Punkte werden klar.", text: "Fehlende Dokumente, Garantierisiken und unerledigte Care-Punkte werden handhabbar.", visual: "resolve" },
       { icon: <Wrench size={18} />, title: "Care", line: "Reparaturen und Erinnerungen bleiben verbunden.", text: "Support, Wartung und Erinnerungen bleiben beim passenden Objekt, nicht irgendwo im Kopf.", visual: "care" },
@@ -197,7 +198,7 @@ function getHomeContent(language: "de" | "en") {
     ],
     popularBadge: "Empfohlen",
     faqs: [
-      { title: "Ist Avareno eine Notiz-App?", text: "Nein. Avareno ist um echte Dinge herum strukturiert: Produkte, Belege, Garantien, Dokumente, Erinnerungen und Care-Aktionen." },
+      { title: "Ist Avareno eine Notiz-App?", text: "Nein. Avareno ist um echte Objekte herum strukturiert: Produkte, Belege, Garantien, Dokumente, Erinnerungen und Care-Aktionen." },
       { title: "Was passiert nach dem Erfassen?", text: "Avareno macht daraus ein Objektgedächtnis und verbindet hilfreichen Kontext wie Nachweise, Garantiedaten, Dokumente und nächste Schritte." },
       { title: "Sind die Preise final?", text: "Noch nicht. Die aktuellen Preise sind ein öffentlicher Beta-Entwurf. Echte Abrechnung braucht vorher eine eigene Prüfung für Zahlungsanbieter, Steuern, Rechnungen, Kündigung und Datenschutz." },
       { title: "Kann ich wichtige Informationen exportieren?", text: "Die Produktausrichtung sieht Exporte für Support, Versicherung, Garantien und dein eigenes Archiv vor, damit das Gedächtnis auch außerhalb der App nützlich bleibt." }
@@ -205,13 +206,14 @@ function getHomeContent(language: "de" | "en") {
     securityTrust: [
       { icon: <FileLock2 size={18} />, title: "Privat als Standard", text: "Avareno dreht sich um persönliche Produkte, Belege und Dokumente. Privater Kontext ist deshalb produktkritisch." },
       { icon: <ShieldCheck size={18} />, title: "Verständliche Kontrolle", text: "Wichtige Erinnerungen, Garantiefenster und gespeicherte Nachweise bleiben sichtbar, ohne die Website in ein lautes Dashboard zu verwandeln." },
-      { icon: <FolderLock size={18} />, title: "Dokumentengedächtnis", text: "Belege, Anleitungen und Supportmaterial bleiben mit dem echten Ding verbunden, statt in Ordnern zu verschwinden." }
+      { icon: <FolderLock size={18} />, title: "Dokumentengedächtnis", text: "Belege, Anleitungen und Supportmaterial bleiben mit dem echten Objekt verbunden, statt in Ordnern zu verschwinden." }
     ]
   };
 }
 
 export function Home() {
   const { language } = useLanguage();
+  const auth = useAuth();
   const copy = getHomeContent(language);
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
   const priceSuffix = billingPeriod === "yearly" ? copy.year : copy.month;
@@ -242,7 +244,7 @@ export function Home() {
                 {copy.hero.body}
               </Reveal>
               <Reveal className="site-hero-actions" delay={320} aria-label={copy.hero.actionsAria}>
-                <Link className="site-primary-button" to="/app">
+                <Link className="site-primary-button" to={auth.status === "authenticated" ? "/app" : "/signup"}>
                   {copy.hero.primary} <ArrowRight size={16} />
                 </Link>
                 <a className="site-secondary-button" href="#memory-gallery">
@@ -325,16 +327,21 @@ export function Home() {
               onChange={setBillingPeriod}
             />
           </Reveal>
-
           <RevealGroup className="site-pricing-grid" stagger={90}>
             {pricingPlans.map((plan) => (
               <article className={plan.isPopular ? "site-pricing-card is-highlighted" : "site-pricing-card"} key={plan.id}>
                 <div className="site-pricing-card-head">
                   <p>{plan.name}</p>
-                  {plan.isPopular ? <span>{copy.popularBadge}</span> : plan.unavailableLabel ? <span>{plan.unavailableLabel[language]}</span> : null}
+                  {plan.isPopular ? <span>{copy.popularBadge}</span> : null}
                 </div>
-                <h3>{formatPrice(plan, billingPeriod, locale)}<span>{priceSuffix}</span></h3>
-                {billingPeriod === "yearly" && plan.yearlyNote ? <p className="site-pricing-saving">{plan.yearlyNote[language]}</p> : null}
+                <h3>{formatPrice(plan.prices[billingPeriod].amount, plan.currency, locale)}<span>{priceSuffix}</span></h3>
+                {billingPeriod === "yearly" && getYearlySavings(plan.id) > 0 ? (
+                  <p className="site-pricing-saving">
+                    {language === "de" ? "Spare " : "Save "}
+                    {formatPrice(getYearlySavings(plan.id), plan.currency, locale)}
+                    {language === "de" ? " pro Jahr" : " per year"}
+                  </p>
+                ) : null}
                 <p>{plan.description[language]}</p>
                 <ul>
                   {plan.features.map((feature) => (
@@ -344,12 +351,12 @@ export function Home() {
                     </li>
                   ))}
                 </ul>
-                {!plan.isAvailable ? (
-                  <button className="site-secondary-button" disabled type="button">
-                    {plan.ctaLabel[language]}
-                  </button>
+                {plan.id === "free" ? (
+                  <Link className="site-secondary-button" to={plan.ctaHref}>
+                    {plan.ctaLabel[language]} <ArrowRight size={16} />
+                  </Link>
                 ) : (
-                  <Link className={plan.isPopular ? "site-primary-button" : "site-secondary-button"} to={plan.ctaHref}>
+                  <Link className={plan.isPopular ? "site-primary-button" : "site-secondary-button"} to={`/checkout/${plan.id}?interval=${billingPeriod}`}>
                     {plan.ctaLabel[language]} <ArrowRight size={16} />
                   </Link>
                 )}
@@ -397,10 +404,10 @@ export function Home() {
           <h2 id="final-title">{copy.finalCta.title}</h2>
           <p>{copy.finalCta.text}</p>
           <div className="site-hero-actions">
-            <Link className="site-primary-button" to="/app">
+            <Link className="site-primary-button" to={auth.status === "authenticated" ? "/app" : "/signup"}>
               {copy.finalCta.primary} <ArrowRight size={16} />
             </Link>
-            <Link className="site-secondary-button" to="/app">
+            <Link className="site-secondary-button" to={auth.status === "authenticated" ? "/app" : "/login"}>
               {copy.finalCta.secondary}
             </Link>
           </div>

@@ -96,6 +96,9 @@ Disconnect must:
 Current MVP state:
 
 - `POST /api/privacy/connected-sources/{source_id}/disconnect` can disconnect local connector metadata and remove local smart-home device/command records for that provider.
+- `bridge/avareno_bridge.py` is a local-only bridge foundation for Home Assistant metadata preview. It binds to localhost by default and is not production connector infrastructure.
+- `frontend/src/features/home-graph/` contains a provider registry, Device Passport types and planned adapter interfaces. `POST /api/smart-home/home-graph/connect/preview` and `/confirm` provide a safe mock connect flow for non-critical `power`/`brightness` examples only; they do not collect provider credentials or call real provider APIs.
+- Provider cards must not claim real production control until a reviewed adapter, encrypted token storage, consent flow and disconnect flow exist.
 - Real provider token revocation, encrypted token deletion and provider-side deletion receipts remain required before production connectors.
 
 ## Rate Limits And Abuse

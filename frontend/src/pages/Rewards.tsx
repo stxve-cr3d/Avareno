@@ -18,19 +18,28 @@ import {
   Sparkles,
   Trash2,
   UserPlus,
-  UserRound
+  UserRound,
+  Users,
+  X
 } from "lucide-react";
-import { Link, NavLink, useLocation, useParams } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, apiBlob } from "../lib/api";
 import { useAuth } from "../lib/authProvider";
+import { defaultMotivationPrivacy } from "../lib/friendsData";
+import type { MotivationPrivacyPreferences } from "../lib/friendsData";
 import {
-  buildCurrentUserProgress,
-  defaultMotivationPrivacy,
-  mockFriendCircle,
-  mockFriendInvite,
-  mockFriends
-} from "../lib/friendsData";
-import type { FriendProgress, MotivationPrivacyPreferences } from "../lib/friendsData";
+  acceptInvite,
+  addCircleMember,
+  createCircle,
+  deleteCircle,
+  getCircles,
+  getFriendsOverview,
+  getPrivacy,
+  patchPrivacy,
+  removeCircleMember,
+  removeFriend
+} from "../lib/friendsApi";
+import type { ApiCircle, ApiFriend, ApiInvite, SelfProgress } from "../lib/friendsApi";
 import type { PrivacyDataOverviewItem, PrivacySummary } from "../lib/types";
 
 const preferenceKey = "avareno-private-motivation-preferences";
@@ -40,18 +49,16 @@ export function Rewards() {
   const location = useLocation();
   const { friendId } = useParams();
   const [preferences, setPreferences] = useState<MotivationPrivacyPreferences>(() => readMotivationPreferences());
-  const [inviteCode, setInviteCode] = useState("");
+  const [inviteInput, setInviteInput] = useState("");
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [friends, setFriends] = useState<ApiFriend[]>([]);
+  const [invite, setInvite] = useState<ApiInvite | null>(null);
+  const [self, setSelf] = useState<SelfProgress | null>(null);
+  const [friendsStatus, setFriendsStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [friendsMessage, setFriendsMessage] = useState<string | null>(null);
 
-  const acceptedFriends = mockFriends.filter((friend) => friend.status === "accepted");
-  const pendingFriends = mockFriends.filter((friend) => friend.status === "pending");
-  const currentUserProgress = profile ? buildCurrentUserProgress(profile, preferences) : null;
-  const progressRows = useMemo(() => {
-    if (!currentUserProgress) return [];
-    return [currentUserProgress, ...acceptedFriends];
-  }, [acceptedFriends, currentUserProgress]);
   const section = getProfileSection(location.pathname);
-  const selectedFriend = friendId ? progressRows.find((friend) => friend.id === friendId) ?? null : null;
+  const selectedFriend = friendId ? friends.find((friend) => friend.id === friendId) ?? null : null;
   const profileBasePath = location.pathname.startsWith("/app/ich")
     ? "/app/ich"
     : location.pathname.startsWith("/app/profile")
@@ -93,7 +100,28 @@ export function Rewards() {
     };
   }, [section]);
 
-  if (!profile || !currentUserProgress) return <div className="profile-loading">Profil wird geladen...</div>;
+  async function loadFriends() {
+    setFriendsStatus("loading");
+    try {
+      const overview = await getFriendsOverview();
+      setFriends(overview.friends);
+      setInvite(overview.invite);
+      setSelf(overview.self);
+      setFriendsStatus("ready");
+    } catch {
+      setFriendsStatus("error");
+    }
+  }
+
+  useEffect(() => {
+    void loadFriends();
+    // Load the server-side source of truth for motivation-privacy prefs.
+    getPrivacy()
+      .then((serverPrefs) => setPreferences(serverPrefs))
+      .catch(() => undefined);
+  }, []);
+
+  if (!profile) return <div className="profile-loading">Profil wird geladen...</div>;
 
   function updatePreferences(next: Partial<MotivationPrivacyPreferences>) {
     setPreferences((current) => {
@@ -101,11 +129,47 @@ export function Rewards() {
       window.localStorage.setItem(preferenceKey, JSON.stringify(merged));
       return merged;
     });
+    // Persist to the backend — this is what actually controls friend visibility.
+    void patchPrivacy(next).catch(() => undefined);
   }
 
-  function copyInvite() {
+  async function copyInvite() {
+    if (!invite) return;
+    try {
+      await navigator.clipboard?.writeText(invite.inviteCode);
+    } catch {
+      // Clipboard may be blocked; the code stays visible on screen either way.
+    }
     setInviteCopied(true);
     window.setTimeout(() => setInviteCopied(false), 1800);
+  }
+
+  async function handleAcceptCode() {
+    const code = inviteInput.trim();
+    if (!code) return;
+    setFriendsMessage(null);
+    try {
+      const result = await acceptInvite(code);
+      setInviteInput("");
+      setFriendsMessage(
+        result.alreadyConnected
+          ? "Ihr seid bereits verbunden."
+          : `${result.friend.displayName} ist jetzt mit dir verbunden.`
+      );
+      await loadFriends();
+    } catch (error) {
+      setFriendsMessage(error instanceof Error ? error.message : "Code konnte nicht eingelöst werden.");
+    }
+  }
+
+  async function handleRemoveFriend(friendUserId: string) {
+    setFriendsMessage(null);
+    try {
+      await removeFriend(friendUserId);
+      await loadFriends();
+    } catch {
+      setFriendsMessage("Freund konnte nicht entfernt werden.");
+    }
   }
 
   return (
@@ -127,45 +191,43 @@ export function Rewards() {
           <h2>Gemeinsam dranbleiben, ohne Druck.</h2>
           <p>Freunde, Motivation und Sichtbarkeit sind getrennt. Jede Seite hat nur eine Aufgabe.</p>
         </div>
-        <button className="profile-primary-action" onClick={copyInvite} type="button">
+        <button className="profile-primary-action" disabled={!invite} onClick={() => void copyInvite()} type="button">
           <Copy size={16} />
-          {inviteCopied ? "Link bereit" : "Einladung kopieren"}
+          {inviteCopied ? "Code kopiert" : "Einladungscode kopieren"}
         </button>
       </section>
 
       <section className="profile-stats" aria-label="Profil Überblick">
-        <ProfileStat icon={<Sparkles size={18} />} label="Diese Woche" value={preferences.hideXpFromFriends ? "Privat" : `${profile.weeklyXp} XP`} />
-        <ProfileStat icon={<CheckCircle2 size={18} />} label="Streak" value={preferences.hideStreakFromFriends ? "Privat" : `${profile.currentStreakDays} Tage`} />
-        <ProfileStat icon={<PauseCircle size={18} />} label="Pausentage" value={String(profile.freezeDaysAvailable)} />
+        <ProfileStat icon={<Sparkles size={18} />} label="Diese Woche" value={self ? `${self.weeklyXp} XP` : "…"} />
+        <ProfileStat icon={<CheckCircle2 size={18} />} label="Streak" value={self ? `${self.currentStreakDays} Tage` : "…"} />
+        <ProfileStat icon={<UserPlus size={18} />} label="Freunde" value={String(friends.length)} />
       </section>
 
       <ProfileSectionNav app={location.pathname.startsWith("/app")} basePath={profileBasePath} />
 
       {section === "overview" ? (
-        <ProfileOverview
-          acceptedFriends={acceptedFriends}
-          basePath={profileBasePath}
-          preferences={preferences}
-          progressRows={progressRows}
-        />
+        <ProfileOverview basePath={profileBasePath} friendCount={friends.length} preferences={preferences} />
       ) : null}
 
       {section === "friends" ? (
-        <FriendsPage
+        <FriendsPanel
           basePath={profileBasePath}
-          inviteCode={inviteCode}
-          onInviteCodeChange={setInviteCode}
-          pendingFriends={pendingFriends}
-          acceptedFriends={acceptedFriends}
-          progressRows={progressRows}
-          invitesEnabled={preferences.allowFriendInvites}
-          motivationEnabled={preferences.motivationEnabled}
-          progressEnabled={preferences.leaderboardEnabled}
+          friends={sortFriendsByProgress(friends)}
+          self={self}
+          invite={invite}
+          status={friendsStatus}
+          message={friendsMessage}
+          inviteInput={inviteInput}
+          onInviteInputChange={setInviteInput}
+          onAccept={handleAcceptCode}
+          onCopy={copyInvite}
+          copied={inviteCopied}
+          onRetry={loadFriends}
         />
       ) : null}
 
       {section === "friendDetail" ? (
-        <FriendDetailPage basePath={profileBasePath} friend={selectedFriend} />
+        <FriendDetailPage basePath={profileBasePath} friend={selectedFriend} onRemove={handleRemoveFriend} />
       ) : null}
 
       {section === "privacy" ? (
@@ -208,18 +270,14 @@ function ProfileSectionNav({ app, basePath }: { app: boolean; basePath: string }
 }
 
 function ProfileOverview({
-  acceptedFriends,
   basePath,
-  preferences,
-  progressRows
+  friendCount,
+  preferences
 }: {
-  acceptedFriends: FriendProgress[];
   basePath: string;
+  friendCount: number;
   preferences: MotivationPrivacyPreferences;
-  progressRows: FriendProgress[];
 }) {
-  const sharedActions = progressRows.reduce((sum, friend) => sum + friend.helpfulActions, 0);
-
   return (
     <section className="profile-overview-grid">
       <article className="profile-panel">
@@ -227,13 +285,17 @@ function ProfileOverview({
           <div>
             <span>Nächster Bereich</span>
             <h2>Freundeskreis</h2>
-            <p>{acceptedFriends.length} Freunde sind verbunden. Fortschritt bleibt privat und ohne Platzierungen.</p>
+            <p>
+              {friendCount === 0
+                ? "Noch keine Freunde verbunden. Teile deinen Code, um zu starten."
+                : `${friendCount} ${friendCount === 1 ? "Freund ist" : "Freunde sind"} verbunden.`}
+            </p>
           </div>
           <UserPlus size={18} />
         </div>
         <div className="profile-preview-row">
-          <span>{sharedActions} kleine Aktionen</span>
-          <span>{preferences.leaderboardEnabled ? "Sichtbar im Kreis" : "Ausgeblendet"}</span>
+          <span>{friendCount} verbunden</span>
+          <span>Privater Kreis</span>
         </div>
         <Link className="profile-secondary-action" to={`${basePath}/friends`}>Freunde ansehen</Link>
       </article>
@@ -257,31 +319,35 @@ function ProfileOverview({
   );
 }
 
-function FriendsPage({
+function FriendsPanel({
   basePath,
-  inviteCode,
-  onInviteCodeChange,
-  pendingFriends,
-  acceptedFriends,
-  progressRows,
-  invitesEnabled,
-  motivationEnabled,
-  progressEnabled
+  friends,
+  self,
+  invite,
+  status,
+  message,
+  inviteInput,
+  onInviteInputChange,
+  onAccept,
+  onCopy,
+  copied,
+  onRetry
 }: {
   basePath: string;
-  inviteCode: string;
-  onInviteCodeChange: (value: string) => void;
-  pendingFriends: FriendProgress[];
-  acceptedFriends: FriendProgress[];
-  progressRows: FriendProgress[];
-  invitesEnabled: boolean;
-  motivationEnabled: boolean;
-  progressEnabled: boolean;
+  friends: ApiFriend[];
+  self: SelfProgress | null;
+  invite: ApiInvite | null;
+  status: "loading" | "ready" | "error";
+  message: string | null;
+  inviteInput: string;
+  onInviteInputChange: (value: string) => void;
+  onAccept: () => void;
+  onCopy: () => void;
+  copied: boolean;
+  onRetry: () => void;
 }) {
-  const sharedActions = progressRows.reduce((sum, friend) => sum + friend.helpfulActions, 0);
-  const progressText = motivationEnabled && progressEnabled
-    ? `${sharedActions} kleine Aktionen diese Woche`
-    : "Freundliche Motivation ist pausiert";
+  const weeklyTogether =
+    (self?.weeklyXp ?? 0) + friends.reduce((sum, friend) => sum + (friend.hidesXp ? 0 : friend.weeklyXp ?? 0), 0);
 
   return (
     <section className="friends-workspace">
@@ -290,26 +356,38 @@ function FriendsPage({
           <div>
             <span>Freundeskreis</span>
             <h2>Wer dazugehört</h2>
-            <p>{mockFriendCircle.name} ist ein privater Kreis für sanfte Motivation. Fortschritt bleibt ein kurzer Status, nicht ein Vergleich.</p>
+            <p>Ein privater Kreis. Ihr seht voneinander nur, was jede Person zu teilen wählt — ohne Druck.</p>
           </div>
           <UserPlus size={18} />
         </div>
 
-        <div className="friends-week-note">
-          <strong>{progressText}</strong>
-          <span>{acceptedFriends.length} verbundene Freunde, privat geteilt</span>
-        </div>
+        {status === "ready" && friends.length ? (
+          <div className="friends-week-note">
+            <strong>Diese Woche gemeinsam</strong>
+            <span>{weeklyTogether} XP · du und {friends.length} {friends.length === 1 ? "Freund" : "Freunde"}</span>
+          </div>
+        ) : null}
 
-        {acceptedFriends.length ? (
+        {status === "loading" ? (
+          <div className="friends-week-note">
+            <strong>Freunde werden geladen…</strong>
+          </div>
+        ) : status === "error" ? (
+          <div className="private-empty-state">
+            <UserRound size={18} />
+            <p>Freunde konnten nicht geladen werden.</p>
+            <button className="profile-secondary-action" onClick={onRetry} type="button">Erneut versuchen</button>
+          </div>
+        ) : friends.length ? (
           <div className="friend-list" aria-label="Freundesliste">
-            {acceptedFriends.map((friend) => (
+            {friends.map((friend) => (
               <FriendRow basePath={basePath} friend={friend} key={friend.id} />
             ))}
           </div>
         ) : (
           <div className="private-empty-state">
             <UserRound size={18} />
-            <p>Füge enge Freunde hinzu, wenn ihr euch gegenseitig motivieren wollt.</p>
+            <p>Noch keine Freunde. Teile deinen Code oder gib den Code eines Freundes ein.</p>
           </div>
         )}
       </article>
@@ -319,30 +397,204 @@ function FriendsPage({
           <div>
             <span>Einladen</span>
             <h2>Freund hinzufügen</h2>
-            <p>Teile einen privaten Code nur mit Menschen, die du wirklich in deinem Kreis haben willst.</p>
+            <p>Teile deinen Code mit jemandem, den du wirklich in deinem Kreis haben willst — oder gib ihren Code ein.</p>
           </div>
         </div>
 
         <div className="friend-invite-box">
           <label>
-            <span>Einladungscode</span>
+            <span>Dein Einladungscode</span>
+            <div className="friend-invite-code-row">
+              <strong>{invite?.inviteCode ?? "…"}</strong>
+              <button className="profile-secondary-action" disabled={!invite} onClick={onCopy} type="button">
+                <Copy size={15} /> {copied ? "Kopiert" : "Kopieren"}
+              </button>
+            </div>
+          </label>
+
+          <label>
+            <span>Code eines Freundes</span>
             <input
-              disabled={!invitesEnabled}
-              onChange={(event) => onInviteCodeChange(event.target.value)}
-              placeholder={mockFriendInvite.inviteCode}
+              onChange={(event) => onInviteInputChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") onAccept();
+              }}
+              placeholder="AVARENO-XXXXXX"
               type="text"
-              value={inviteCode}
+              value={inviteInput}
             />
           </label>
-          <small>{invitesEnabled ? "Invite-Link Platzhalter: avareno.app/invite/privat" : "Einladungen sind pausiert."}</small>
-        </div>
-
-        <div className="pending-invite-row">
-          <span>Offen</span>
-          <strong>{pendingFriends.map((friend) => friend.displayName).join(", ") || "Keine offenen Einladungen"}</strong>
+          <button className="profile-primary-action" disabled={!inviteInput.trim()} onClick={onAccept} type="button">
+            <UserPlus size={16} /> Verbinden
+          </button>
+          {message ? <small>{message}</small> : null}
         </div>
       </article>
+
+      <FriendCircles friends={friends} />
     </section>
+  );
+}
+
+function FriendCircles({ friends }: { friends: ApiFriend[] }) {
+  const [circles, setCircles] = useState<ApiCircle[]>([]);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    getCircles()
+      .then((result) => setCircles(result.circles))
+      .catch(() => undefined);
+  }, []);
+
+  async function handleCreate() {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setBusy(true);
+    try {
+      const circle = await createCircle(trimmed);
+      setName("");
+      setCircles((current) => [...current, circle]);
+    } catch {
+      // keep the input; the user can retry
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      await deleteCircle(id);
+      setCircles((current) => current.filter((circle) => circle.id !== id));
+    } catch {
+      // no-op
+    }
+  }
+
+  function replaceCircle(updated: ApiCircle) {
+    setCircles((current) => current.map((circle) => (circle.id === updated.id ? updated : circle)));
+  }
+
+  async function handleAdd(id: string, friendUserId: string) {
+    try {
+      replaceCircle(await addCircleMember(id, friendUserId));
+    } catch {
+      // no-op
+    }
+  }
+
+  async function handleRemoveMember(id: string, friendUserId: string) {
+    try {
+      replaceCircle(await removeCircleMember(id, friendUserId));
+    } catch {
+      // no-op
+    }
+  }
+
+  return (
+    <article className="profile-panel friends-circles-panel">
+      <div className="profile-panel-head">
+        <div>
+          <span>Kreise</span>
+          <h2>Private Gruppen</h2>
+          <p>Gruppiere enge Freunde für dich — nur du siehst deine Kreise.</p>
+        </div>
+        <Users size={18} />
+      </div>
+
+      <div className="friend-circle-create">
+        <input
+          onChange={(event) => setName(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void handleCreate();
+          }}
+          placeholder="Neuer Kreis, z. B. Familie"
+          type="text"
+          value={name}
+        />
+        <button className="profile-secondary-action" disabled={!name.trim() || busy} onClick={() => void handleCreate()} type="button">
+          Anlegen
+        </button>
+      </div>
+
+      {circles.length ? (
+        circles.map((circle) => (
+          <FriendCircleRow
+            circle={circle}
+            friends={friends}
+            key={circle.id}
+            onAdd={handleAdd}
+            onDelete={handleDelete}
+            onRemoveMember={handleRemoveMember}
+          />
+        ))
+      ) : (
+        <div className="private-empty-state">
+          <Users size={18} />
+          <p>Noch keine Kreise. Lege einen an, um Freunde privat zu gruppieren.</p>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function FriendCircleRow({
+  circle,
+  friends,
+  onAdd,
+  onDelete,
+  onRemoveMember
+}: {
+  circle: ApiCircle;
+  friends: ApiFriend[];
+  onAdd: (id: string, friendUserId: string) => void;
+  onDelete: (id: string) => void;
+  onRemoveMember: (id: string, friendUserId: string) => void;
+}) {
+  const memberIds = new Set(circle.members.map((member) => member.id));
+  const addable = friends.filter((friend) => !memberIds.has(friend.id));
+
+  return (
+    <div className="friend-circle">
+      <div className="friend-circle-head">
+        <strong>{circle.name}</strong>
+        <button className="friend-circle-del" onClick={() => onDelete(circle.id)} type="button" aria-label={`${circle.name} löschen`}>
+          <Trash2 size={14} />
+        </button>
+      </div>
+
+      <div className="friend-circle-members">
+        {circle.members.length ? (
+          circle.members.map((member) => (
+            <span className="friend-circle-chip" key={member.id}>
+              {member.displayName}
+              <button onClick={() => onRemoveMember(circle.id, member.id)} type="button" aria-label={`${member.displayName} entfernen`}>
+                <X size={12} />
+              </button>
+            </span>
+          ))
+        ) : (
+          <small>Noch niemand im Kreis.</small>
+        )}
+      </div>
+
+      {addable.length ? (
+        <select
+          className="friend-circle-add"
+          onChange={(event) => {
+            if (event.target.value) onAdd(circle.id, event.target.value);
+          }}
+          value=""
+        >
+          <option value="">Freund hinzufügen…</option>
+          {addable.map((friend) => (
+            <option key={friend.id} value={friend.id}>
+              {friend.displayName}
+            </option>
+          ))}
+        </select>
+      ) : null}
+    </div>
   );
 }
 
@@ -356,26 +608,48 @@ function ProfileStat({ icon, label, value }: { icon: ReactNode; label: string; v
   );
 }
 
-function FriendRow({ basePath, friend }: { basePath: string; friend: FriendProgress }) {
-  const progress = friend.hidesXp ? "XP privat" : friend.helpfulActions ? `${friend.helpfulActions} kleine Aktionen` : "Ruhig gestartet";
-  const context = friend.sourceBreakdown.length
-    ? friend.sourceBreakdown.slice(0, 2).map((source) => source.label).join(", ")
-    : "Noch nichts geteilt";
-
+function FriendRow({ basePath, friend }: { basePath: string; friend: ApiFriend }) {
   return (
     <Link className="friend-row" to={`${basePath}/friends/${friend.id}`}>
       <Avatar name={friend.displayName} />
       <div>
         <strong>{friend.displayName}</strong>
-        <small>{progress} - {context}</small>
+        <small>{friendStreakLabel(friend)} · seit {formatFriendDate(friend.addedAt)}</small>
       </div>
-      <span>{friend.hidesStreak ? "Privat" : friend.label}</span>
+      <span>{friend.hidesXp ? "XP privat" : `${friend.weeklyXp ?? 0} XP`}</span>
       <ChevronRight size={16} />
     </Link>
   );
 }
 
-function FriendDetailPage({ basePath, friend }: { basePath: string; friend: FriendProgress | null }) {
+function friendStreakLabel(friend: ApiFriend) {
+  if (friend.hidesStreak) return "Streak privat";
+  const days = friend.currentStreakDays ?? 0;
+  return days > 0 ? `${days} Tage Streak` : "Kein Streak";
+}
+
+// Gently orders friends by shared weekly XP; those keeping XP private sort last
+// (a calm signal, not a competitive ranking).
+function sortFriendsByProgress(friends: ApiFriend[]) {
+  return [...friends].sort((a, b) => {
+    const av = a.hidesXp ? -1 : a.weeklyXp ?? 0;
+    const bv = b.hidesXp ? -1 : b.weeklyXp ?? 0;
+    return bv - av;
+  });
+}
+
+function FriendDetailPage({
+  basePath,
+  friend,
+  onRemove
+}: {
+  basePath: string;
+  friend: ApiFriend | null;
+  onRemove: (friendUserId: string) => Promise<void>;
+}) {
+  const navigate = useNavigate();
+  const [removing, setRemoving] = useState(false);
+
   if (!friend) {
     return (
       <section className="profile-panel friend-detail-panel">
@@ -385,14 +659,22 @@ function FriendDetailPage({ basePath, friend }: { basePath: string; friend: Frie
         </Link>
         <div className="private-empty-state">
           <UserRound size={18} />
-          <p>Dieser Freund ist nicht in deinem privaten Kreis sichtbar.</p>
+          <p>Dieser Freund ist nicht in deinem privaten Kreis.</p>
         </div>
       </section>
     );
   }
 
-  const weeklyLabel = friend.hidesXp ? "XP privat" : `${friend.weeklyXp} XP`;
-  const streakLabel = friend.hidesStreak ? "Privat" : `${friend.currentStreakDays} Tage`;
+  async function handleRemove() {
+    if (!friend) return;
+    setRemoving(true);
+    try {
+      await onRemove(friend.id);
+      navigate(`${basePath}/friends`);
+    } finally {
+      setRemoving(false);
+    }
+  }
 
   return (
     <section className="profile-panel friend-detail-panel">
@@ -406,30 +688,34 @@ function FriendDetailPage({ basePath, friend }: { basePath: string; friend: Frie
         <div>
           <span>Freund</span>
           <h2>{friend.displayName}</h2>
-          <p>{friend.note}</p>
+          <p>Verbunden seit {formatFriendDate(friend.addedAt)}</p>
         </div>
       </div>
 
       <div className="friend-detail-stats" aria-label="Freund Status">
-        <ProfileStat icon={<Sparkles size={18} />} label="Woche" value={weeklyLabel} />
-        <ProfileStat icon={<CheckCircle2 size={18} />} label="Aktionen" value={String(friend.helpfulActions)} />
-        <ProfileStat icon={<PauseCircle size={18} />} label="Streak" value={streakLabel} />
+        <ProfileStat icon={<Sparkles size={18} />} label="Diese Woche" value={friend.hidesXp ? "Privat" : `${friend.weeklyXp ?? 0} XP`} />
+        <ProfileStat icon={<CheckCircle2 size={18} />} label="Streak" value={friend.hidesStreak ? "Privat" : `${friend.currentStreakDays ?? 0} Tage`} />
       </div>
 
       <div className="friend-detail-context">
-        <strong>Warum sichtbar?</strong>
-        <p>Ihr seid in einem privaten Freundeskreis verbunden. Geteilte Werte bleiben optional und können jederzeit ausgeblendet werden.</p>
+        <strong>Privat verbunden</strong>
+        <p>Was du siehst, hängt von den Einstellungen deines Freundes ab. Werte können jederzeit privat gestellt werden.</p>
       </div>
 
-      {friend.sourceBreakdown.length ? (
-        <div className="friend-detail-source-list" aria-label="Fortschrittsquellen">
-          {friend.sourceBreakdown.map((source) => (
-            <span key={source.label}>{source.count} {source.label}</span>
-          ))}
-        </div>
-      ) : null}
+      <button className="leave-circle-button is-danger" disabled={removing} onClick={() => void handleRemove()} type="button">
+        <Trash2 size={16} />
+        {removing ? "Wird entfernt…" : "Freund entfernen"}
+      </button>
     </section>
   );
+}
+
+function formatFriendDate(value: string) {
+  try {
+    return new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
+  } catch {
+    return value;
+  }
 }
 
 function PrivacyCenterPanel({
@@ -537,7 +823,7 @@ function PrivacyCenterPanel({
         </PrivacySection>
 
         <PrivacySection icon={<Download size={18} />} label="Export" title="Kopie deiner Daten">
-          <p>Erhalte eine Kopie deiner gespeicherten Dinge, Dokument-Metadaten und Einstellungen.</p>
+          <p>Erhalte eine Kopie deiner gespeicherten Objekte, Dokument-Metadaten und Einstellungen.</p>
           <button
             className="profile-primary-action privacy-action-button"
             disabled={!summary.export.ready || busyAction === "export"}
@@ -642,13 +928,21 @@ function PrivacyCenterPanel({
         <PrivacySection icon={<LockKeyhole size={18} />} label="Freigaben" title="Freundeskreis sichtbar halten">
           <div className="privacy-toggle-list">
             <PrivacyToggle
+              checked={preferences.leaderboardEnabled}
+              label="Fortschritt mit Freunden teilen"
+              note="Aus: Freunde sehen nur, dass ihr verbunden seid — keine Werte. Serverseitig durchgesetzt."
+              onChange={(checked) => onChange({ leaderboardEnabled: checked })}
+            />
+            <PrivacyToggle
               checked={preferences.hideXpFromFriends}
+              disabled={!preferences.leaderboardEnabled}
               label="Meine XP vor Freunden verbergen"
               note="Freunde sehen dann nur, dass du privat bleibst."
               onChange={(checked) => onChange({ hideXpFromFriends: checked })}
             />
             <PrivacyToggle
               checked={preferences.hideStreakFromFriends}
+              disabled={!preferences.leaderboardEnabled}
               label="Meinen Streak vor Freunden verbergen"
               note="Private Standardeinstellung für sensible Fortschrittsdaten."
               onChange={(checked) => onChange({ hideStreakFromFriends: checked })}
@@ -657,7 +951,7 @@ function PrivacyCenterPanel({
         </PrivacySection>
 
         <PrivacySection danger icon={<Trash2 size={18} />} label="Kritischer Bereich" title="Account und Daten löschen">
-          <p>Eine Löschung muss Nutzerprofil, Auth-User, Dinge, Dokumente, extrahierte Metadaten, Erinnerungen, Care/Resolve-Daten, Connector-Tokens, Logs, Storage-Objekte und Backup-Regeln abdecken.</p>
+          <p>Eine Löschung muss Nutzerprofil, Auth-User, Objekte, Dokumente, extrahierte Metadaten, Erinnerungen, Care/Resolve-Daten, Connector-Tokens, Logs, Storage-Objekte und Backup-Regeln abdecken.</p>
           {deleteState === "confirm" ? (
             <div className="privacy-delete-confirm">
               <strong>Anfrage statt Sofortlöschung</strong>
@@ -774,7 +1068,7 @@ function buildPrivacyFallback(displayName: string): PrivacySummary {
     generatedAt: new Date().toISOString(),
     implementationState: "FOUNDATION_ONLY",
     dataOverview: [
-      { id: "items", label: "Gespeicherte Dinge", value: 0, status: "TODO", note: `${displayName}s Ding-Speicher wird geladen, sobald das Backend erreichbar ist.` },
+      { id: "items", label: "Gespeicherte Objekte", value: 0, status: "TODO", note: `${displayName}s Objekt-Speicher wird geladen, sobald das Backend erreichbar ist.` },
       { id: "documents", label: "Dokumente / Belege", value: 0, status: "TODO", note: "Dokument-Metadaten und Upload-Speicher sind im Exportplan vorgesehen." },
       { id: "sources", label: "Verbundene Quellen", value: 0, status: "TODO", note: "Connect-Quellen werden erst nach bewusster Verknuepfung angezeigt." },
       { id: "ai-analysis", label: "KI-Analyse", value: 0, status: "TODO", note: "Analyse bleibt kontrolliert und korrigierbar." },

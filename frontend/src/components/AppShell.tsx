@@ -1,12 +1,13 @@
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Archive, ChevronDown, FileText, Home, LifeBuoy, LogOut, MessageSquareText, Package, PenLine, Plus, ReceiptText, ShieldCheck, UserRound, UsersRound, X } from "lucide-react";
+import { Archive, ChevronDown, FileText, Home, LifeBuoy, LogOut, MessageSquareText, Package, PenLine, Plus, ReceiptText, Search, ShieldCheck, UserRound, UsersRound, X } from "lucide-react";
 import { Suspense, useEffect, useRef, useState } from "react";
 import avarenoMark from "../assets/avareno-test-logo.png";
 import { useAuth } from "../lib/authProvider";
+import { CommandPalette } from "./CommandPalette";
 
 const nav = [
   { to: "/app", label: "Zuhause", icon: Home },
-  { to: "/app/dinge", label: "Dinge", icon: Archive, activePaths: ["/app/dinge", "/app/items"] },
+  { to: "/app/dinge", label: "Objekte", icon: Archive, activePaths: ["/app/dinge", "/app/items"] },
   { to: "/app/resolve", label: "Resolve", icon: LifeBuoy },
   { to: "/app/care", label: "Care", icon: PenLine },
   { to: "/app/profile", label: "Ich", icon: UserRound, activePaths: ["/app/profile", "/app/ich", "/app/rewards", "/app/friends", "/app/settings"] }
@@ -15,7 +16,7 @@ const nav = [
 const captureOptions = [
   { label: "Smart erfassen", helper: "Ein Flow für Foto, Beleg, Text und Barcode", to: "/app/capture", icon: Plus },
   { label: "Beleg", helper: "Nachweis, Garantie und Produktkarte", to: "/app/capture/receipt", icon: ReceiptText },
-  { label: "Ding", helper: "Produktpass für ein echtes Objekt starten", to: "/app/capture/item", icon: Package },
+  { label: "Objekt", helper: "Produktpass für ein echtes Objekt starten", to: "/app/capture/item", icon: Package },
   { label: "Nachricht", helper: "Kontext in Erinnerung verwandeln", to: "/app/capture/message", icon: MessageSquareText },
   { label: "Dokument", helper: "Speichern und später verbinden", to: "/app/capture/receipt", icon: FileText },
   { label: "Care", helper: "Garantie, Reparatur, Service, Rückgabe", to: "/app/care", icon: PenLine }
@@ -23,19 +24,34 @@ const captureOptions = [
 
 export function AppShell() {
   const [open, setOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const captureModalRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const auth = useAuth();
-  const isMarketingSurface = ["/", "/pricing", "/impressum", "/datenschutz", "/cookies"].includes(location.pathname);
+  const isMarketingSurface = ["/", "/pricing", "/impressum", "/datenschutz", "/cookies"].includes(location.pathname) || location.pathname.startsWith("/checkout/");
   const isAuthSurface = ["/login", "/signup", "/forgot-password", "/reset-password", "/auth/callback", "/auth/verify-email", "/onboarding"].includes(location.pathname);
   const isProtectedSurface = !isMarketingSurface && !isAuthSurface;
 
   useEffect(() => {
     setProfileMenuOpen(false);
+    setPaletteOpen(false);
   }, [location.pathname]);
+
+  // ⌘K / Ctrl+K opens global search from anywhere in the app.
+  useEffect(() => {
+    if (!isProtectedSurface) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen((current) => !current);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isProtectedSurface]);
 
   // Profile menu: roving arrow-key navigation, Escape/Tab close, focus restore.
   useEffect(() => {
@@ -155,7 +171,16 @@ export function AppShell() {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
-  const isSmartSurface = location.pathname === "/smart-home" || location.pathname === "/app" || location.pathname === "/app/smart-home";
+  const isSmartSurface =
+    location.pathname === "/smart-home" ||
+    location.pathname === "/app" ||
+    location.pathname === "/app/smart-home" ||
+    location.pathname === "/home-graph" ||
+    location.pathname.startsWith("/home-graph/") ||
+    location.pathname === "/app/home" ||
+    location.pathname.startsWith("/app/home/") ||
+    location.pathname === "/app/home-graph" ||
+    location.pathname.startsWith("/app/home-graph/");
 
   return (
     <div className="avareno-app-shell min-h-screen">
@@ -191,6 +216,9 @@ export function AppShell() {
           </nav>
 
           <div className="avareno-app-actions">
+            <button className="avareno-app-search" onClick={() => setPaletteOpen(true)} type="button" aria-label="Suche (⌘K)" title="Suche · ⌘K">
+              <Search size={17} />
+            </button>
             <button className="avareno-app-capture" onClick={() => setOpen(true)}>
               <Plus size={17} />
               <span>Erfassen</span>
@@ -252,6 +280,8 @@ export function AppShell() {
         </div>
       </header>
 
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+
       <main className={isSmartSurface ? "avareno-app-content is-smart-surface" : "avareno-app-content"}>
         <Suspense fallback={<RouteFallback />}>
           <Outlet />
@@ -273,7 +303,7 @@ export function AppShell() {
               <div>
                 <p className="text-xs font-black uppercase text-muted">Erfassen</p>
                 <h2 id="capture-modal-title" className="mt-1 text-3xl font-black text-ink">Etwas Echtes hinzufügen.</h2>
-                <p className="mt-2 max-w-lg text-sm font-semibold leading-6 text-muted">Wähle eine Quelle. Avareno macht daraus ein Ding, einen Nachweis oder eine Care-Erinnerung.</p>
+                <p className="mt-2 max-w-lg text-sm font-semibold leading-6 text-muted">Wähle eine Quelle. Avareno macht daraus ein Objekt, einen Nachweis oder eine Care-Erinnerung.</p>
               </div>
               <button className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted hover:bg-wash hover:text-ink" onClick={() => setOpen(false)} type="button" aria-label="Schließen">
                 <X size={18} />

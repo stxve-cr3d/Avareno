@@ -46,6 +46,8 @@ npm run pages:deploy
 
 The current Cloudflare setup deploys the React frontend to Pages. The Python/FastAPI backend still uses local SQLite and local uploads, so production API hosting needs a second step: either host the backend separately and set `VITE_API_ORIGIN`, or migrate the API/storage to Cloudflare Workers, D1, and R2.
 
+Cloudflare Pages can proxy `/api/*` to a separately hosted backend when the Pages environment variable `AVARENO_API_ORIGIN` is set to an HTTPS backend origin, for example `https://api.avareno.app`. Without that variable, `/api/*` intentionally returns `501` so Stripe webhooks and app requests do not appear successful while no real backend is available. See `docs/backend-deployment.md`.
+
 ## MVP Flows
 
 - Add a receipt upload, run mock extraction, edit fields, then create a smart item.

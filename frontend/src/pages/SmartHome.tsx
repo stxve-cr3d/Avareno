@@ -1,645 +1,679 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import {
-  Archive,
-  ArrowRight,
-  BellRing,
-  ChevronRight,
-  FileText,
-  LifeBuoy,
-  Monitor,
-  Package,
-  ReceiptText,
-  ShieldCheck,
-  Volume2,
-  Wrench
-} from "lucide-react";
 import { Link } from "react-router-dom";
-import { api, isoDate } from "../lib/api";
-import { formatUiText } from "../lib/uiText";
-import {
-  ConsoleSkeleton,
-  DottedGridPanel,
-  ObjectMemoryMap,
-  ObjectMemoryCard,
-  QuickActionCard,
-  StatusSummaryCard,
-  defaultMemoryMapNodes
-} from "../components/app/AppKit";
+import { ChevronDown, Cpu, Lightbulb, Link2, Power, Printer, Radar, RefreshCw, Router, Search, Trash2, Tv } from "lucide-react";
+import { api } from "../lib/api";
+import { ConsoleSkeleton } from "../components/app/AppKit";
 import type {
   Item,
   LocalDiscoveryCandidate,
   LocalDiscoveryPayload,
+  SmartHomeCommand,
   SmartHomeDevice,
-  SmartHomeInsight,
   SmartHomePayload
 } from "../lib/types";
 
-/* ── constants ──────────────────────────────────────────────── */
+type BusyActionName = "command" | "load" | "discover" | "import" | "pair";
 
-const smartHomeTextReplacements: [RegExp, string][] = [
-  [/3d[-\s]?printer/gi, "device"],
-  [/printer/gi, "device"],
-  [/print-finished alerts/gi, "care reminders"],
-  [/print done/gi, "completed"],
-  [/printing/gi, "running"],
-  [/print/gi, "run"],
-  [/filament/gi, "material"],
-  [/spool/gi, "stock"],
-  [/nozzle/gi, "sensor"],
-  [/chamber/gi, "area"],
-  [/bambu lab/gi, "Device setup"],
-  [/bambu/gi, "Avareno"]
-];
-
-function cleanUiText(value: string | null | undefined) {
-  if (!value) return "";
-  return smartHomeTextReplacements.reduce(
-    (text, [pattern, replacement]) => text.replace(pattern, replacement),
-    formatUiText(value)
-  );
-}
-
-/* ── fallback demo data ─────────────────────────────────────── */
-
-const smartFallbackPayload: SmartHomePayload = {
-  mode: "DEMO",
-  providers: [
-    {
-      id: "BAMBU_LAB",
-      name: "Device setup",
-      mode: "DEMO",
-      status: "READY",
-      tokenConfigured: false,
-      authNote: "Prepare local device identity, room and product match before live status is enabled."
-    },
-    {
-      id: "LOCAL_DISCOVERY",
-      name: "Local Discovery",
-      mode: "DEMO",
-      status: "READY",
-      tokenConfigured: false,
-      authNote: "Demo discovery keeps the UI usable until LAN probes are explicitly enabled on the server."
-    },
-    {
-      id: "SAMSUNG_SMARTTHINGS",
-      name: "Samsung SmartThings",
-      mode: "PLANNED",
-      status: "PLANNED",
-      tokenConfigured: false,
-      authNote: "SmartThings can sync household devices once OAuth credentials are configured."
-    }
-  ],
-  devices: [
-    {
-      id: "demo-smart-device",
-      userId: "demo-user",
-      provider: "BAMBU_LAB",
-      providerDeviceId: "demo-smart-device",
-      itemId: null,
-      itemName: null,
-      itemImageUrl: null,
-      name: "LG OLED C3",
-      roomName: "Wohnzimmer",
-      deviceType: "tv",
-      capabilities: ["documents", "warranty", "networkPresence", "maintenance"],
-      status: "ONLINE",
-      powerState: "on",
-      rawJson: { accessMode: "DEMO", documents: 18, warrantyProgress: 72, openLoops: 3 },
-      lastSeenAt: "2026-06-23T18:00:00.000Z"
-    }
-  ],
-  commands: [],
-  insights: [
-    {
-      id: "demo-warranty-alerts",
-      type: "PRINT_ALERTS",
-      deviceId: "demo-smart-device",
-      itemId: null,
-      title: "Garantie-Check vorbereiten",
-      subtitle: "Erinnere dich rechtzeitig an Belege, Fristen und fehlende Dokumente.",
-      signal: "45 Tage verbleiben",
-      priority: "HIGH",
-      actionType: "CREATE_PLAN",
-      cta: "Plan erstellen",
-      status: "READY",
-      automation: {
-        trigger: "Garantiefenster verändert sich",
-        action: "Benachrichtigen und Erinnerung am Produktgedächtnis speichern",
-        outcome: "Wichtige Fristen gehen nicht mehr unter"
-      }
-    },
-    {
-      id: "demo-document-stock",
-      type: "FILAMENT_STOCK",
-      deviceId: "demo-smart-device",
-      itemId: null,
-      title: "Dokumente prüfen",
-      subtitle: "Sammle Rechnung, Anleitung und Garantiebeleg an einem Ort.",
-      signal: "18 Dokumente",
-      priority: "MEDIUM",
-      actionType: "CREATE_PLAN",
-      cta: "Check planen",
-      status: "READY"
-    },
-    {
-      id: "demo-maintenance",
-      type: "MAINTENANCE",
-      deviceId: "demo-smart-device",
-      itemId: null,
-      title: "Reparaturhistorie anlegen",
-      subtitle: "Notiere Service, Ersatzteile und Ansprechpartner beim Objekt.",
-      signal: "Care fällig",
-      priority: "LOW",
-      actionType: "CREATE_PLAN",
-      cta: "Loop erstellen",
-      status: "READY"
-    }
-  ],
-  quickActions: [],
-  localDiscovery: { mode: "DEMO", enabled: false, note: "Demo-Fallback." },
-  wow: { label: "objektbewusste Steuerung", promise: "Verbinde Geräte mit den echten Dingen, zu denen sie gehören." }
-};
-
-/* ── types ──────────────────────────────────────────────────── */
-
-type ImportantHomeItem = {
-  action: string;
-  detail: string;
-  icon: ReactNode;
-  progress: number;
-  product: string;
-  signal: string;
-  title: string;
-  to: string;
-  type: "warranty" | "invoice" | "care";
-};
-
-type RecentHomeThing = {
-  category: string;
-  completeness: number;
-  invoiceStatus: string;
-  name: string;
-  openPoints: number;
-  to: string;
-  warrantyStatus: string;
-};
-
-/* ── main component ─────────────────────────────────────────── */
+type BusyAction = {
+  candidateId?: string;
+  deviceId?: string;
+  action: BusyActionName;
+} | null;
 
 export function SmartHome() {
   const [payload, setPayload] = useState<SmartHomePayload | null>(null);
   const [items, setItems] = useState<Item[]>([]);
+  const [localCandidates, setLocalCandidates] = useState<LocalDiscoveryCandidate[]>([]);
+  const [probeHost, setProbeHost] = useState("");
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState<BusyAction>({ action: "load" });
 
   async function load() {
+    setBusy({ action: "load" });
+    setStatus((current) => (current === "ready" ? "ready" : "loading"));
+    setMessage("");
     try {
-      const [smartHome, allItems] = await Promise.all([
-        api<SmartHomePayload>("/api/smart-home"),
-        api<Item[]>("/api/items")
-      ]);
-      setPayload(smartHome);
-      setItems(allItems);
+      const [next, nextItems] = await Promise.all([api<SmartHomePayload>("/api/smart-home"), api<Item[]>("/api/items")]);
+      setPayload(next);
+      setItems(nextItems);
+      setStatus("ready");
     } catch (error) {
-      console.warn("Smart home API unavailable; using demo fallback.", error);
-      setPayload(smartFallbackPayload);
-      setItems([]);
+      console.warn("Smart home data could not be loaded.", error);
+      setStatus("error");
+    } finally {
+      setBusy(null);
     }
   }
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    void load();
+  }, []);
 
-  if (!payload) {
+  const devices = useMemo(() => mainSmartHomeDevices(payload?.devices ?? []), [payload]);
+  const smartLocalCandidates = useMemo(
+    () => sortLocalCandidates(localCandidates.filter(isUsefulLocalCandidate).filter((candidate) => !isAlreadyImported(candidate, devices))),
+    [devices, localCandidates]
+  );
+
+  async function sendCommand(device: SmartHomeDevice, command: "power_on" | "power_off" | "set_brightness", value?: number) {
+    setBusy({ action: "command", deviceId: device.id });
+    setMessage("");
+    try {
+      const result = await api<SmartHomeCommand>(`/api/smart-home/devices/${device.id}/commands`, {
+        method: "POST",
+        body: JSON.stringify({ command, value })
+      });
+      setMessage(commandFeedback(device, command, result));
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Befehl konnte nicht ausgeführt werden.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function linkDevice(device: SmartHomeDevice, itemId: string | null) {
+    setBusy({ action: "command", deviceId: device.id });
+    setMessage("");
+    try {
+      await api(`/api/smart-home/devices/${device.id}/link`, {
+        method: "PATCH",
+        body: JSON.stringify({ itemId })
+      });
+      setMessage(itemId ? `${device.name} wurde mit einer Produktakte verbunden.` : `${device.name} wurde von der Produktakte gelöst.`);
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Gerät konnte nicht verbunden werden.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function deleteDevice(device: SmartHomeDevice) {
+    setBusy({ action: "command", deviceId: device.id });
+    setMessage("");
+    try {
+      await api(`/api/smart-home/devices/${device.id}`, { method: "DELETE" });
+      setMessage(`${device.name} wurde entfernt.`);
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Gerät konnte nicht entfernt werden.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function pairDevice(device: SmartHomeDevice) {
+    setBusy({ action: "pair", deviceId: device.id });
+    setMessage("Avareno wartet auf die Freigabe am Gerät. Bitte am Fernseher bestätigen, falls ein Hinweis erscheint.");
+    try {
+      const result = await api<{ paired?: boolean; result?: { pairingHint?: string } }>(`/api/smart-home/devices/${device.id}/pair`, {
+        method: "POST"
+      });
+      setMessage(
+        result.paired
+          ? `${device.name}: Fernbedienung freigegeben. Ein und Aus kannst du jetzt testen.`
+          : `${device.name}: Bitte am Fernseher Avareno als Fernbedienung zulassen und danach erneut testen.`
+      );
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Freigabe konnte nicht gestartet werden.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function discoverLocalDevices() {
+    setBusy({ action: "discover" });
+    setMessage("");
+    try {
+      const result = await api<LocalDiscoveryPayload>("/api/smart-home/local/discover", { method: "POST" });
+      const usefulCandidates = result.candidates.filter(isUsefulLocalCandidate);
+      setLocalCandidates(usefulCandidates);
+      setMessage(
+        usefulCandidates.length
+          ? `${usefulCandidates.length} steuerbares Gerät gefunden.`
+          : result.candidates.length
+            ? "Nur Netzwerkgeräte ohne sichere Steuerung gefunden. Diese bleiben ausgeblendet."
+          : result.enabled
+            ? "Keine lokalen Geräte gefunden. Du kannst eine IP gezielt prüfen."
+            : "Die lokale Suche ist serverseitig noch nicht aktiviert. Du kannst eine private IP gezielt prüfen."
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Lokale Suche konnte nicht gestartet werden.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function probeLocalHost() {
+    const host = probeHost.trim();
+    if (!host) {
+      setMessage("Bitte gib die lokale IP oder Host-Adresse deines Geräts ein.");
+      return;
+    }
+    setBusy({ action: "discover" });
+    setMessage("");
+    try {
+      const result = await api<LocalDiscoveryPayload>("/api/smart-home/local/probe", {
+        method: "POST",
+        body: JSON.stringify({ host })
+      });
+      const usefulCandidates = result.candidates.filter(isUsefulLocalCandidate);
+      setLocalCandidates(usefulCandidates);
+      setMessage(usefulCandidates.length ? `${host} wurde als steuerbares Gerät erkannt.` : `${host} wurde nicht als steuerbares Gerät erkannt.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Diese Adresse konnte nicht geprüft werden.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function importLocalDevice(candidate: LocalDiscoveryCandidate) {
+    setBusy({ action: "import", candidateId: candidate.id });
+    setMessage("");
+    try {
+      await api("/api/smart-home/local/import", {
+        method: "POST",
+        body: JSON.stringify({ candidateId: candidate.id })
+      });
+      setMessage(`${candidate.name} wurde zu Avareno hinzugefügt.`);
+      setLocalCandidates((current) => current.filter((entry) => entry.id !== candidate.id));
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Gerät konnte nicht hinzugefügt werden.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (status === "loading") {
     return <ConsoleSkeleton />;
   }
 
-  const insights = payload.insights ?? [];
-  const openInsightCount = insights.filter((i) => i.status !== "ACTIVE").length;
-  const dashboardDocumentCount = items.reduce((n, item) => n + (item.documents?.length ?? 0), 0) || 18;
-  const matchItem = items.find((item) => /oled|tv|fernseher/i.test([item.name, item.category, item.manufacturer, item.model].join(" "))) ?? null;
-  const matchName = matchItem?.name ?? "LG OLED C3";
-  const itemCount = items.length || payload.devices.length || 7;
+  if (status === "error" || !payload) {
+    return (
+      <main className="sh-page">
+        <section className="sh-hero">
+          <div className="sh-hero-top">
+            <div>
+              <span className="sh-kicker">Avareno Zuhause</span>
+              <h1>Smart Home nicht erreichbar</h1>
+            </div>
+            <button className="sh-ghost" onClick={() => void load()} type="button">
+              <RefreshCw size={15} /> Erneut versuchen
+            </button>
+          </div>
+          <p className="sh-hero-sub">Die Verbindung ist gerade nicht erreichbar. Deine Zugangsdaten werden nicht im Browser gespeichert.</p>
+        </section>
+      </main>
+    );
+  }
 
-  const nextItems = buildHomeNextItems(items, matchName, dashboardDocumentCount, openInsightCount);
-  const importantItems = buildTodayImportantItems(items, matchName);
-  const recentThings = buildRecentThings(items, matchName);
-
-  const appPath = (path: string) => (path === "/" ? "/app" : `/app${path}`);
+  const linkedCount = devices.filter((device) => device.itemId).length;
+  const onCount = devices.filter((device) => canPowerDevice(device) && device.powerState === "on").length;
 
   return (
-    <main className="av-console">
-      <section className="av-console-top">
-        <div className="av-dashboard-header">
-          <span className="av-console-kicker">Private workspace</span>
-          <div className="av-dashboard-title-row">
-            <div>
-              <h1>Avareno Home</h1>
-              <p>Dein privater Speicher für Dinge, Belege, Garantien und offene Punkte.</p>
-            </div>
-            <Link className="av-console-primary" to={appPath("/care")}>
-              Offene Punkte prüfen <ArrowRight size={14} />
-            </Link>
+    <main className="sh-page">
+      <section className="sh-hero">
+        <div className="sh-hero-top">
+          <div>
+            <span className="sh-kicker">Avareno Zuhause</span>
+            <h1>Smart Home</h1>
           </div>
-          <div className="av-status-grid" aria-label="Status summary">
-            <StatusSummaryCard label="Status" value="Bereit" tone="success" />
-            <StatusSummaryCard label="Dinge" value={itemCount} />
-            <StatusSummaryCard label="Dokumente" value={dashboardDocumentCount} />
-            <StatusSummaryCard label="Offen" value={openInsightCount || 3} tone="warning" />
-            <StatusSummaryCard label="Letzter Scan" value="Heute" />
-          </div>
+          <button className="sh-ghost" disabled={busy?.action === "load"} onClick={() => void load()} type="button">
+            <RefreshCw size={15} /> Aktualisieren
+          </button>
         </div>
-
-        <DottedGridPanel>
-          <ObjectMemoryMap nodes={defaultMemoryMapNodes(importantItems[0]?.product)} />
-        </DottedGridPanel>
+        <p className="sh-hero-sub">Steuere deine verbundenen Geräte — ohne technische Netzwerkdetails.</p>
+        {devices.length ? (
+          <div className="sh-hero-stats">
+            <HeroStat label="Geräte" value={devices.length} />
+            <HeroStat label="Mit Produktakte" value={linkedCount} />
+            <HeroStat label="Aktiv" value={onCount} tone="accent" />
+          </div>
+        ) : null}
       </section>
 
-      <div className="av-console-grid">
-        <div className="av-console-main">
-          <article className="av-console-section">
-            <div className="av-console-section-head">
-              <div>
-                <span>Needs attention</span>
-                <h2>Aktuelle offene Punkte</h2>
-              </div>
-              <Link to={appPath("/care")}>Care öffnen</Link>
-            </div>
-            <div className="av-attention-list">
-              {importantItems.map((item, i) => (
-                <AttentionCard key={item.product + item.title} item={item} primary={i === 0} />
-              ))}
-            </div>
-          </article>
+      {message ? <p className="sh-message">{message}</p> : null}
 
-          <article className="av-console-section">
-            <div className="av-console-section-head">
-              <div>
-                <span>Object memory</span>
-                <h2>Zuletzt gespeicherte Dinge</h2>
-              </div>
-              <Link to={appPath("/items")}>Alle Dinge</Link>
-            </div>
-            <div className="av-things-grid">
-              {recentThings.map((thing) => {
-                const warranty = shortWarranty(thing.warrantyStatus);
-                return (
-                  <ObjectMemoryCard
-                    key={thing.name}
-                    to={thing.to}
-                    category={thing.category}
-                    name={thing.name}
-                    icon={categoryIcon(thing.category)}
-                    completeness={thing.completeness}
-                    invoicePresent={!thing.invoiceStatus.toLowerCase().includes("fehlt")}
-                    warranty={warranty}
-                    openPoints={thing.openPoints}
-                  />
-                );
-              })}
-            </div>
-          </article>
+      {devices.length ? (
+        <section className="sh-section">
+          <div className="sh-section-head">
+            <h2>Deine Geräte</h2>
+            <span className="sh-count">{devices.length}</span>
+          </div>
+          <div className="sh-device-list">
+            {devices.map((device) => (
+              <DeviceCard
+                key={device.id}
+                busy={busy?.deviceId === device.id}
+                device={device}
+                items={items}
+                onBrightness={(value) => void sendCommand(device, "set_brightness", value)}
+                onDelete={() => void deleteDevice(device)}
+                onLinkItem={(itemId) => void linkDevice(device, itemId)}
+                onPair={() => void pairDevice(device)}
+                onPowerOff={() => void sendCommand(device, "power_off")}
+                onPowerOn={() => void sendCommand(device, "power_on")}
+              />
+            ))}
+          </div>
+        </section>
+      ) : (
+        <section className="sh-section">
+          <div className="sh-empty">
+            <span className="sh-empty-icon"><Link2 size={20} /></span>
+            <strong>Noch kein Gerät verbunden</strong>
+            <p>Verbinde starke Bridges oder finde lokale Geräte in deinem Netzwerk. Avareno importiert keine Zugangsdaten in den Browser.</p>
+          </div>
+        </section>
+      )}
 
-          <article className="av-console-section">
-            <div className="av-console-section-head">
-              <div>
-                <span>Memory Capture</span>
-                <h2>Schnell erfassen</h2>
-              </div>
-            </div>
-            <div className="av-quick-action-grid">
-              <QuickActionCard
-                primary
-                to={appPath("/capture/item")}
-                icon={<Archive size={16} />}
-                title="Produkt hinzufügen"
-                body="Ein Ding mit Beleg, Garantie und Care-Kontext starten."
-              />
-              <QuickActionCard
-                to={appPath("/capture/receipt")}
-                icon={<ReceiptText size={16} />}
-                title="Rechnung scannen"
-                body="Nachweis speichern und mit einem Objekt verbinden."
-              />
-              <QuickActionCard
-                to={appPath("/resolve/create")}
-                icon={<LifeBuoy size={16} />}
-                title="Ticket erstellen"
-                body="Eine konkrete Care-Frage zu einem Ding öffnen."
-              />
-              <QuickActionCard
-                to={appPath("/capture/loop")}
-                icon={<BellRing size={16} />}
-                title="Erinnerung anlegen"
-                body="Frist, Rückgabe oder offenen Punkt festhalten."
-              />
-            </div>
-          </article>
+      <details className="sh-connect" open={!devices.length}>
+        <summary>
+          <span className="sh-connect-summary">
+            <strong>{devices.length ? "Weiteres Gerät verbinden" : "Gerät verbinden"}</strong>
+            <small>Nur bei Bedarf. Router, Drucker und unsichere Netzwerkfunde bleiben ausgeblendet.</small>
+          </span>
+          <ChevronDown className="sh-connect-chevron" size={16} />
+        </summary>
+
+        <p className="sh-connect-note">Avareno sucht erst, wenn du es startest. Es werden keine Zugangsdaten importiert.</p>
+
+        <div className="sh-connect-actions">
+          <button className="sh-primary" disabled={busy?.action === "discover"} onClick={() => void discoverLocalDevices()} type="button">
+            <Radar size={15} /> Suche starten
+          </button>
+          <form
+            className="sh-probe"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void probeLocalHost();
+            }}
+          >
+            <Search size={14} />
+            <input
+              aria-label="IP oder Host prüfen"
+              disabled={busy?.action === "discover"}
+              onChange={(event) => setProbeHost(event.currentTarget.value)}
+              placeholder="IP prüfen"
+              value={probeHost}
+            />
+            <button disabled={busy?.action === "discover"} type="submit">Prüfen</button>
+          </form>
         </div>
 
-        <aside className="av-console-side">
-          <ModuleNav appPath={appPath} itemCount={itemCount} openCount={openInsightCount} />
-        </aside>
-      </div>
+        {smartLocalCandidates.length ? (
+          <div className="sh-candidate-list">
+            {smartLocalCandidates.map((candidate) => (
+              <CandidateRow
+                busy={busy?.candidateId === candidate.id}
+                candidate={candidate}
+                key={candidate.id}
+                onImport={() => void importLocalDevice(candidate)}
+              />
+            ))}
+          </div>
+        ) : null}
+      </details>
     </main>
   );
 }
 
-/* ── presentation components ────────────────────────────────── */
-
-function AttentionCard({ item, primary = false }: { item: ImportantHomeItem; primary?: boolean }) {
+function HeroStat({ label, value, tone }: { label: string; value: number; tone?: "accent" }) {
   return (
-    <Link
-      className={`av-attention-card av-att-${item.type}${primary ? " av-att-primary" : ""}`}
-      to={item.to}
-    >
-      <span className="av-att-icon">{item.icon}</span>
-      <div className="av-att-copy">
-        <small>{item.title}</small>
-        <strong>{item.product}</strong>
-        <p>{item.detail}</p>
-      </div>
-      <div className="av-att-right">
-        <span className={`av-tag av-tag-${item.type}`}>{item.signal}</span>
-        <em className="av-att-cta">{item.action}</em>
-      </div>
-      {/* Progress strip spanning full card width — shows warranty/completeness */}
-      {primary && (
-        <div className="av-att-track">
-          <div className="av-att-bar" style={{ width: `${item.progress}%` }} />
-        </div>
-      )}
-    </Link>
-  );
-}
-
-function shortWarranty(status: string): { text: string; urgent: boolean } {
-  const s = status.toLowerCase();
-  if (s.includes("unbekannt")) return { text: "Unbekannt", urgent: false };
-  if (s.includes("fällig")) return { text: "Fällig", urgent: true };
-  const dayMatch = status.match(/(\d+)\s*Tag/i);
-  if (dayMatch) return { text: `${dayMatch[1]} Tage`, urgent: true };
-  if (s.includes("bis")) return { text: status.replace(/.*bis\s*/i, "bis "), urgent: false };
-  if (s.includes("offen")) return { text: "Offen", urgent: false };
-  return { text: status, urgent: false };
-}
-
-function QuickCapture({ appPath }: { appPath: (path: string) => string }) {
-  return (
-    <div className="av-capture">
-      <span className="av-capture-label">Quick Capture</span>
-      <Link className="av-capture-lead" to={appPath("/capture/item")}>
-        {/* Scan corner brackets — two spans give all four corners */}
-        <span className="av-scan-frame av-scan-a" aria-hidden="true" />
-        <span className="av-scan-frame av-scan-b" aria-hidden="true" />
-        <span className="av-capture-icon"><Archive size={21} /></span>
-        <div>
-          <strong>Produkt hinzufügen</strong>
-          <small>Ein Ding mit Beleg, Garantie und Care-Kontext starten</small>
-        </div>
-        <ChevronRight size={15} />
-      </Link>
-      <div className="av-capture-actions">
-        <Link className="av-capture-action" to={appPath("/capture/receipt")}>
-          <ReceiptText size={15} /> Rechnung scannen
-        </Link>
-        <Link className="av-capture-action" to={appPath("/resolve/create")}>
-          <LifeBuoy size={15} /> Ticket erstellen
-        </Link>
-        <Link className="av-capture-action" to={appPath("/capture/loop")}>
-          <BellRing size={15} /> Erinnerung anlegen
-        </Link>
-      </div>
+    <div className={tone === "accent" ? "sh-stat is-accent" : "sh-stat"}>
+      <strong>{value}</strong>
+      <small>{label}</small>
     </div>
   );
 }
 
-function MemoryStatus({ itemCount, docCount, openCount }: {
-  itemCount: number;
-  docCount: number;
-  openCount: number;
+function DeviceCard({
+  busy,
+  device,
+  items,
+  onBrightness,
+  onDelete,
+  onLinkItem,
+  onPair,
+  onPowerOff,
+  onPowerOn
+}: {
+  busy: boolean;
+  device: SmartHomeDevice;
+  items: Item[];
+  onBrightness: (value: number) => void;
+  onDelete: () => void;
+  onLinkItem: (itemId: string | null) => void;
+  onPair: () => void;
+  onPowerOff: () => void;
+  onPowerOn: () => void;
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const powerable = canPowerDevice(device);
+  const on = device.powerState === "on";
+  const canDim = device.capabilities.some((capability) => capability.toLowerCase().includes("switchlevel"));
+  const needsPairing = powerable && isTvLike(device) && !hasSamsungToken(device);
+  const currentBrightness = brightnessFromDevice(device);
+
+  return (
+    <article className="sh-device">
+      <span className={`sh-device-icon${on ? " is-on" : ""}`}>{deviceIcon(device)}</span>
+
+      <div className="sh-device-main">
+        <strong>{device.name}</strong>
+        <span className="sh-device-meta">
+          {deviceTypeLabel(device)}
+          {device.roomName ? ` · ${device.roomName}` : ""}
+        </span>
+
+        {device.itemId ? (
+          <Link className="sh-device-link" to={`/app/dinge/${device.itemId}`}>
+            <Link2 size={13} /> {device.itemName || "Produktakte"}
+          </Link>
+        ) : (
+          <label className="sh-device-select">
+            <span>Produktakte</span>
+            <select disabled={busy} defaultValue="" onChange={(event) => onLinkItem(event.currentTarget.value || null)}>
+              <option value="">Verbinden…</option>
+              {items.slice(0, 24).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+
+      <div className="sh-device-controls">
+        {powerable ? (
+          needsPairing ? (
+            <button className="sh-pair" disabled={busy} onClick={onPair} type="button">
+              Fernbedienung freigeben
+            </button>
+          ) : (
+            <div className="sh-toggle" role="group" aria-label={`${device.name} steuern`}>
+              <button className={on ? "is-active" : ""} disabled={busy} onClick={onPowerOn} type="button" aria-pressed={on}>
+                <Power size={13} /> Ein
+              </button>
+              <button className={!on ? "is-active" : ""} disabled={busy} onClick={onPowerOff} type="button" aria-pressed={!on}>
+                Aus
+              </button>
+            </div>
+          )
+        ) : (
+          <span className="sh-status">{powerStateLabel(device)}</span>
+        )}
+
+        {canDim ? (
+          <label className="sh-slider">
+            <span>Helligkeit</span>
+            <input
+              aria-label={`${device.name} Helligkeit`}
+              defaultValue={currentBrightness}
+              disabled={busy}
+              max={100}
+              min={0}
+              onKeyUp={(event) => {
+                if (event.key === "ArrowLeft" || event.key === "ArrowRight" || event.key === "Home" || event.key === "End") {
+                  onBrightness(Number(event.currentTarget.value));
+                }
+              }}
+              onMouseUp={(event) => onBrightness(Number(event.currentTarget.value))}
+              onTouchEnd={(event) => onBrightness(Number(event.currentTarget.value))}
+              step={10}
+              type="range"
+            />
+          </label>
+        ) : null}
+
+        <button
+          className={confirmDelete ? "sh-device-del is-confirm" : "sh-device-del"}
+          disabled={busy}
+          onBlur={() => setConfirmDelete(false)}
+          onClick={() => {
+            if (confirmDelete) onDelete();
+            else setConfirmDelete(true);
+          }}
+          type="button"
+        >
+          <Trash2 size={12} /> {confirmDelete ? "Wirklich entfernen?" : "Entfernen"}
+        </button>
+        <Link className="sh-device-details" to={`/app/home-graph/devices/${device.id}`}>
+          <Link2 size={12} /> Home Graph
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+function CandidateRow({
+  busy,
+  candidate,
+  onImport
+}: {
+  busy: boolean;
+  candidate: LocalDiscoveryCandidate;
+  onImport: () => void;
 }) {
   return (
-    <div className="av-mem-status">
-      <span className="av-mem-label">Privater Speicher</span>
-      <div className="av-mem-numbers">
-        <div className="av-mem-number">
-          <strong>{itemCount}</strong>
-          <small>Dinge</small>
-        </div>
-        <div className="av-mem-number">
-          <strong>{docCount}</strong>
-          <small>Dokumente</small>
-        </div>
-        <div className={`av-mem-number${openCount > 0 ? " is-warn" : ""}`}>
-          <strong>{openCount || 3}</strong>
-          <small>Offen</small>
-        </div>
+    <article className="sh-candidate">
+      <span className="sh-candidate-icon">{localCandidateIcon(candidate)}</span>
+      <div className="sh-candidate-main">
+        <strong>{candidate.name}</strong>
+        <span className="sh-candidate-meta">
+          {candidateTypeLabel(candidate)}
+          {candidate.host ? ` · ${candidate.host}` : ""}
+        </span>
+        <small>{candidate.matchedItemName ? `Passende Produktakte: ${candidate.matchedItemName}` : "Kann als Smart-Home-Gerät gespeichert werden."}</small>
+        {candidate.capabilities.length ? (
+          <div className="sh-device-caps">
+            {candidate.capabilities.slice(0, 3).map((capability) => (
+              <span key={capability}>{capabilityLabel(capability)}</span>
+            ))}
+          </div>
+        ) : null}
       </div>
-    </div>
+      <button className="sh-secondary" disabled={busy} onClick={onImport} type="button">
+        {busy ? "Wird hinzugefügt…" : "Hinzufügen"}
+      </button>
+    </article>
   );
 }
 
-function ModuleNav({ appPath, itemCount, openCount }: {
-  appPath: (path: string) => string;
-  itemCount: number;
-  openCount: number;
-}) {
-  return (
-    <div className="av-module-list">
-      <Link className="av-module-row av-mod-teal" to={appPath("/items")}>
-        <span className="av-module-icon"><Archive size={14} /></span>
-        <div className="av-module-copy">
-          <strong>Dinge</strong>
-          <small>Produktakten</small>
-        </div>
-        <em className="av-module-count">{itemCount}</em>
-        <ChevronRight size={13} />
-      </Link>
-      <Link className="av-module-row av-mod-warn" to={appPath("/resolve")}>
-        <span className="av-module-icon"><LifeBuoy size={14} /></span>
-        <div className="av-module-copy">
-          <strong>Resolve</strong>
-          <small>Offene Anfragen</small>
-        </div>
-        <em className="av-module-count">{openCount || 2}</em>
-        <ChevronRight size={13} />
-      </Link>
-      <Link className="av-module-row" to={appPath("/care")}>
-        <span className="av-module-icon"><BellRing size={14} /></span>
-        <div className="av-module-copy">
-          <strong>Care</strong>
-          <small>Garantien & Erinnerungen</small>
-        </div>
-        <em className="av-module-count">3</em>
-        <ChevronRight size={13} />
-      </Link>
-    </div>
-  );
-}
+/* ── feedback + parsing ─────────────────────────────────────── */
 
-function categoryIcon(category: string) {
-  const n = category.toLowerCase();
-  if (n.includes("audio") || n.includes("sound")) return <Volume2 size={14} />;
-  if (n.includes("werkstatt") || n.includes("repair")) return <Wrench size={14} />;
-  if (n.includes("tv") || n.includes("media")) return <Monitor size={14} />;
-  return <Package size={14} />;
-}
-
-/* ── data helpers ───────────────────────────────────────────── */
-
-function buildHomeNextItems(
-  items: Item[],
-  matchName: string,
-  documentCount: number,
-  openInsightCount: number
-) {
-  const itemWithMissingContext = items.find((item) => (item.documents?.length ?? 0) === 0 || !item.warrantyUntil);
-  const itemWithWarranty = items.find((item) => item.warrantyUntil);
-
-  return [
-    {
-      body: `${openInsightCount || 2} offene Punkte sinnvoll einordnen`,
-      icon: <LifeBuoy size={16} />,
-      title: "Resolve fortsetzen",
-      to: "/app/resolve"
-    },
-    {
-      body: itemWithMissingContext
-        ? `${displayHomeItemName(itemWithMissingContext.name)} braucht noch einen Beleg`
-        : `${documentCount} Dokumente sind abgelegt`,
-      icon: <FileText size={16} />,
-      title: "Beleg ergänzen",
-      to: itemWithMissingContext ? `/app/dinge/${itemWithMissingContext.id}` : "/app/reports/home-binder"
-    },
-    {
-      body: itemWithWarranty?.warrantyUntil
-        ? `Garantie bis ${displayHomeDate(itemWithWarranty.warrantyUntil)}`
-        : `${displayHomeItemName(matchName)} in 45 Tagen prüfen`,
-      icon: <ShieldCheck size={16} />,
-      title: "Garantie prüfen",
-      to: itemWithWarranty ? `/app/dinge/${itemWithWarranty.id}` : "/app/care"
-    }
-  ];
-}
-
-function buildTodayImportantItems(items: Item[], matchName: string): ImportantHomeItem[] {
-  const itemWithMissingInvoice = items.find((item) => (item.documents?.length ?? 0) === 0);
-  const itemWithOpenLoop =
-    items.find((item) => (item.loops ?? []).some((loop) => loop.status === "OPEN")) ??
-    items.find((item) => item.repairLogs?.some((repair) => repair.status !== "RESOLVED"));
-
-  return [
-    {
-      action: "Erinnerung öffnen",
-      detail: "Garantie läuft in 45 Tagen ab",
-      icon: <ShieldCheck size={16} />,
-      progress: 74,
-      product: displayHomeItemName(matchName),
-      signal: "45 Tage",
-      title: "Garantie endet bald",
-      to: "/app/care",
-      type: "warranty"
-    },
-    {
-      action: "Beleg hinzufügen",
-      detail: "Rechnung fehlt noch",
-      icon: <ReceiptText size={16} />,
-      progress: 38,
-      product: displayHomeItemName(itemWithMissingInvoice?.name ?? "Sony WH-1000XM5"),
-      signal: "Beleg fehlt",
-      title: "Nachweis unvollständig",
-      to: itemWithMissingInvoice ? `/app/dinge/${itemWithMissingInvoice.id}` : "/app/capture/receipt",
-      type: "invoice"
-    },
-    {
-      action: "Ansehen",
-      detail: "Wartung offen",
-      icon: <Wrench size={16} />,
-      progress: 62,
-      product: displayHomeItemName(itemWithOpenLoop?.name ?? "Bambu Lab X1C"),
-      signal: "Offen",
-      title: "Care-Punkt offen",
-      to: itemWithOpenLoop ? `/app/dinge/${itemWithOpenLoop.id}` : "/app/care",
-      type: "care"
-    }
-  ];
-}
-
-function buildRecentThings(items: Item[], matchName: string): RecentHomeThing[] {
-  if (items.length) {
-    return items.slice(0, 3).map((item) => {
-      const openPoints =
-        (item.missingFields?.length ?? 0) +
-        (item.loops?.filter((loop) => loop.status === "OPEN").length ?? 0) +
-        (item.repairLogs?.filter((repair) => repair.status !== "RESOLVED").length ?? 0);
-      return {
-        category: cleanUiText(item.category || item.itemType || "Ding"),
-        completeness: item.completenessScore ?? 64,
-        invoiceStatus: (item.documents?.length ?? 0) > 0 ? "Rechnung gespeichert" : "Rechnung fehlt",
-        name: displayHomeItemName(item.name),
-        openPoints,
-        to: `/app/dinge/${item.id}`,
-        warrantyStatus: item.warrantyUntil
-          ? `Garantie bis ${displayHomeDate(item.warrantyUntil)}`
-          : "Garantie unbekannt"
-      };
-    });
+function commandFeedback(device: SmartHomeDevice, command: "power_on" | "power_off" | "set_brightness", result: SmartHomeCommand) {
+  const parsed = parseCommandResult(result.result);
+  if (parsed?.mode === "already_off") return `${device.name} ist bereits aus.`;
+  if (parsed?.mode === "already_on") return `${device.name} ist bereits an.`;
+  if (parsed?.mode === "unknown_state") {
+    return `${device.name}: Status nicht eindeutig. Avareno hat Ausschalten nicht gesendet, um kein Einschalten auszulösen.`;
   }
-
-  return [
-    {
-      category: "TV · Media",
-      completeness: 86,
-      invoiceStatus: "Rechnung gespeichert",
-      name: displayHomeItemName(matchName),
-      openPoints: 1,
-      to: "/app/dinge",
-      warrantyStatus: "Garantie endet in 45 Tagen"
-    },
-    {
-      category: "Audio",
-      completeness: 48,
-      invoiceStatus: "Rechnung fehlt",
-      name: "Sony WH-1000XM5",
-      openPoints: 1,
-      to: "/app/capture/receipt",
-      warrantyStatus: "Garantie offen"
-    },
-    {
-      category: "Werkstatt",
-      completeness: 72,
-      invoiceStatus: "Beleg gespeichert",
-      name: "Bambu Lab X1C",
-      openPoints: 2,
-      to: "/app/care",
-      warrantyStatus: "Wartung fällig"
-    }
-  ];
+  if (parsed?.pairingHint) {
+    return `${device.name}: Befehl gesendet. Falls nichts passiert, bestätige am Gerät die Fernbedienung für Avareno.`;
+  }
+  if (parsed?.mode === "wake_on_lan") {
+    return `${device.name}: Aufwecken gesendet. Das Gerät kann ein paar Sekunden brauchen.`;
+  }
+  if (command === "power_off") return `${device.name}: Ausschalten gesendet.`;
+  if (command === "power_on") return `${device.name}: Einschalten gesendet.`;
+  return `${device.name}: Befehl gesendet.`;
 }
 
-function displayHomeDate(value?: string | null) {
-  return isoDate(value);
+function parseCommandResult(raw: string | null | undefined): { mode?: string; pairingHint?: string } | null {
+  if (!raw) return null;
+  try {
+    const data = JSON.parse(raw) as { mode?: string; pairingHint?: string };
+    return data && typeof data === "object" ? data : null;
+  } catch {
+    return null;
+  }
 }
 
-function displayHomeItemName(name: string) {
-  if (name.toLowerCase().includes("3d printer")) return "Smartes Gerät";
-  if (name.toLowerCase().includes("test passport")) return "Produktpass";
-  return name;
+/* ── device helpers (behavior preserved) ────────────────────── */
+
+function brightnessFromDevice(device: SmartHomeDevice) {
+  const raw = device.rawJson;
+  if (raw && typeof raw === "object" && "brightness" in raw && typeof raw.brightness === "number") {
+    return raw.brightness;
+  }
+  return device.powerState === "on" ? 70 : 0;
 }
 
-/* ── preserved rank helpers ─────────────────────────────────── */
-
-function rankItems(device: SmartHomeDevice, items: Item[]) {
-  return [...items].sort((a, b) => itemScore(device, b) - itemScore(device, a));
+function powerStateLabel(device: SmartHomeDevice) {
+  if (!canPowerDevice(device)) return "Erkannt";
+  if (device.powerState === "on") return "An";
+  if (device.powerState === "off") return "Aus";
+  return "Bereit";
 }
 
-function itemScore(device: SmartHomeDevice, item: Item) {
-  const haystack = [item.name, item.category, item.manufacturer, item.model, item.location, item.space?.name, item.itemType]
-    .join(" ")
-    .toLowerCase();
-  const words = device.name.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
-  let score = words.filter((w) => haystack.includes(w)).length;
-  if (device.roomName && haystack.includes(device.roomName.toLowerCase())) score += 3;
-  if (device.deviceType === "tv" && (haystack.includes("tv") || haystack.includes("oled"))) score += 5;
-  if (device.deviceType === "light" && (haystack.includes("light") || haystack.includes("lampe"))) score += 4;
-  return score;
+function isTvLike(device: SmartHomeDevice) {
+  const text = `${device.name} ${device.deviceType}`.toLowerCase();
+  return text.includes("tv") || text.includes("samsung");
+}
+
+function deviceTypeLabel(device: SmartHomeDevice) {
+  const text = `${device.name} ${device.deviceType}`.toLowerCase();
+  if (text.includes("tv") || text.includes("samsung")) return "Fernseher";
+  if (text.includes("cast") || text.includes("media")) return "Media-Gerät";
+  if (text.includes("3d_printer") || text.includes("printer") || text.includes("bambu")) return "Drucker";
+  if (text.includes("hub") || text.includes("assistant") || text.includes("bridge")) return "Bridge";
+  if (text.includes("light") || text.includes("lampe")) return "Licht";
+  return "Smart-Home-Gerät";
+}
+
+function hasSamsungToken(device: SmartHomeDevice) {
+  return typeof device.rawJson?.samsungRemoteToken === "string" && device.rawJson.samsungRemoteToken.length > 0;
+}
+
+function candidateTypeLabel(candidate: LocalDiscoveryCandidate) {
+  const text = `${candidate.name} ${candidate.deviceType} ${candidate.category ?? ""}`.toLowerCase();
+  if (text.includes("tv") || text.includes("samsung")) return "Fernseher";
+  if (text.includes("cast") || text.includes("media")) return "Media-Gerät";
+  if (text.includes("3d_printer") || text.includes("printer") || text.includes("bambu")) return "Drucker";
+  if (text.includes("hub") || text.includes("assistant") || text.includes("bridge")) return "Bridge";
+  if (text.includes("light") || text.includes("lampe")) return "Licht";
+  return "Smart-Home-Gerät";
+}
+
+function localCandidateIcon(candidate: LocalDiscoveryCandidate) {
+  const text = `${candidate.name} ${candidate.deviceType} ${candidate.category ?? ""}`.toLowerCase();
+  if (text.includes("tv") || text.includes("cast") || text.includes("media")) return <Tv size={17} />;
+  if (text.includes("printer") || text.includes("bambu")) return <Printer size={17} />;
+  if (candidate.category === "hub" || text.includes("hub") || text.includes("router") || text.includes("bridge")) return <Router size={17} />;
+  return <Cpu size={17} />;
+}
+
+function deviceIcon(device: SmartHomeDevice) {
+  const text = `${device.deviceType} ${device.name}`.toLowerCase();
+  if (text.includes("tv") || text.includes("samsung") || text.includes("cast") || text.includes("media")) return <Tv size={17} />;
+  if (text.includes("printer") || text.includes("bambu")) return <Printer size={17} />;
+  if (text.includes("light") || text.includes("lampe")) return <Lightbulb size={17} />;
+  if (text.includes("hub") || text.includes("bridge") || text.includes("router") || text.includes("assistant")) return <Router size={17} />;
+  return <Cpu size={17} />;
+}
+
+function capabilityLabel(value: string) {
+  const normalized = value.toLowerCase();
+  if (normalized === "networkpresence") return "Netzwerk";
+  if (normalized === "mediarenderer") return "Medien";
+  if (normalized === "printerjob") return "Druckauftrag";
+  if (normalized === "temperature") return "Temperatur";
+  if (normalized === "filament") return "Material";
+  if (normalized === "bridge") return "Bridge";
+  if (normalized === "deviceimport") return "Import";
+  if (normalized === "switch") return "Schalten";
+  if (normalized === "switchlevel") return "Helligkeit";
+  if (normalized === "admininterface") return "Router";
+  return "Funktion";
+}
+
+function mainSmartHomeDevices(devices: SmartHomeDevice[]) {
+  return devices.filter((device) => {
+    const rawSource = typeof device.rawJson?.avarenoSource === "string" ? device.rawJson.avarenoSource.toLowerCase() : "";
+    const providerDeviceId = device.providerDeviceId.toLowerCase();
+    if (providerDeviceId.includes("demo") || rawSource.includes("demo") || rawSource.includes("mock")) return false;
+    return isSmartHomeCapableDevice(device);
+  });
+}
+
+function isSmartHomeCapableDevice(device: SmartHomeDevice) {
+  const text = `${device.name} ${device.deviceType}`.toLowerCase();
+  const capabilities = device.capabilities.map((capability) => capability.toLowerCase());
+  return (
+    text.includes("tv") ||
+    text.includes("samsung") ||
+    text.includes("cast") ||
+    text.includes("media") ||
+    text.includes("printer") ||
+    text.includes("bambu") ||
+    text.includes("hub") ||
+    text.includes("assistant") ||
+    capabilities.includes("switch") ||
+    capabilities.includes("switchlevel") ||
+    capabilities.includes("mediarenderer") ||
+    capabilities.includes("printerjob") ||
+    capabilities.includes("bridge") ||
+    capabilities.includes("deviceimport")
+  );
+}
+
+function canPowerDevice(device: SmartHomeDevice) {
+  const text = `${device.name} ${device.deviceType}`.toLowerCase();
+  const capabilities = device.capabilities.map((capability) => capability.toLowerCase());
+  return text.includes("tv") || text.includes("samsung") || capabilities.includes("switch");
+}
+
+function isUsefulLocalCandidate(candidate: LocalDiscoveryCandidate) {
+  const text = `${candidate.name} ${candidate.deviceType} ${candidate.category ?? ""}`.toLowerCase();
+  const capabilities = candidate.capabilities.map((capability) => capability.toLowerCase());
+  return (
+    text.includes("samsung") ||
+    text.includes("tv") ||
+    text.includes("cast") ||
+    text.includes("media") ||
+    text.includes("printer") ||
+    text.includes("bambu") ||
+    text.includes("hub") ||
+    text.includes("assistant") ||
+    capabilities.includes("switch") ||
+    capabilities.includes("switchlevel") ||
+    capabilities.includes("mediarenderer") ||
+    capabilities.includes("printerjob") ||
+    capabilities.includes("bridge") ||
+    capabilities.includes("deviceimport")
+  );
+}
+
+function isAlreadyImported(candidate: LocalDiscoveryCandidate, devices: SmartHomeDevice[]) {
+  const candidateId = candidate.id.toLowerCase();
+  const candidateHost = hostWithoutPort(candidate.host).toLowerCase();
+  return devices.some((device) => {
+    const providerDeviceId = device.providerDeviceId.toLowerCase();
+    const rawHost = typeof device.rawJson?.host === "string" ? hostWithoutPort(device.rawJson.host).toLowerCase() : "";
+    return providerDeviceId === candidateId || Boolean(candidateHost && rawHost === candidateHost);
+  });
+}
+
+function hostWithoutPort(host: string) {
+  const value = host.trim();
+  const parts = value.split(":");
+  if (parts.length === 2 && /^\d+$/.test(parts[1])) return parts[0];
+  return value;
+}
+
+function sortLocalCandidates(candidates: LocalDiscoveryCandidate[]) {
+  return [...candidates].sort((a, b) => localCandidateRank(a) - localCandidateRank(b) || b.confidence - a.confidence);
+}
+
+function localCandidateRank(candidate: LocalDiscoveryCandidate) {
+  if (candidate.category === "media" || candidate.deviceType.toLowerCase().includes("tv")) return 0;
+  if (candidate.category === "hub") return 1;
+  return 2;
 }

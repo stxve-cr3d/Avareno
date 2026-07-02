@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Check, Cookie, FileText, LockKeyhole, Mail, MapPin, Scale, Server, Settings, ShieldCheck } from "lucide-react";
 import { MarketingFooter, MarketingHeader } from "../components/MarketingShell";
 import { Reveal, RevealGroup } from "../components/MarketingReveal";
-import { formatPrice, publicPricingPlans, type BillingPeriod } from "../lib/pricing";
+import { formatPrice, getYearlySavings, publicPricingPlans, type BillingPeriod } from "../lib/pricing";
 
 const lastUpdated = "24. Juni 2026";
 
@@ -23,7 +23,7 @@ const pricingFaq = [
   },
   {
     title: "Ist Billing schon aktiv?",
-    text: "Die technische Grundlage ist für Paddle als bevorzugte Merchant-of-Record-Richtung vorbereitet. Ohne konfigurierte Paddle-Keys und Price-IDs startet Avareno keinen Checkout und zeigt keinen Zahlungserfolg."
+    text: "Die technische Grundlage ist fuer Stripe-Subscriptions vorbereitet. Ohne serverseitige Stripe Checkout Sessions, Price-Aufloesung und Webhooks startet Avareno keinen Zahlungslauf."
   }
 ];
 
@@ -41,7 +41,7 @@ const privacySections = [
   {
     icon: <FileText size={19} />,
     title: "App-Inhalte",
-    text: "Avareno kann Dinge, Dokumente, Garantien, Erinnerungen, Räume und Notizen speichern. Vor Produktivbetrieb muss festgelegt werden, wo diese Daten liegen und wie lange sie gespeichert bleiben."
+    text: "Avareno kann Objekte, Dokumente, Garantien, Erinnerungen, Räume und Notizen speichern. Vor Produktivbetrieb muss festgelegt werden, wo diese Daten liegen und wie lange sie gespeichert bleiben."
   },
   {
     icon: <LockKeyhole size={19} />,
@@ -131,7 +131,7 @@ function BillingPeriodSwitch({ value, onChange }: { value: BillingPeriod; onChan
         Monatlich
       </button>
       <button aria-pressed={value === "yearly"} className={value === "yearly" ? "is-active" : ""} onClick={() => onChange("yearly")} type="button">
-        Jährlich <span>2 Monate sparen</span>
+        Jährlich <span>jährlich günstiger</span>
       </button>
     </div>
   );
@@ -165,11 +165,11 @@ export function PricingPage() {
         <StandardHero
           eyebrow="Preise"
           title="Wähle den Speicher, der zu deinem Alltag passt"
-          text="Starte kostenlos und erweitere Avareno, wenn dein privater Speicher für Dinge, Belege, Garantien und offene Punkte wächst."
+          text="Starte kostenlos und erweitere Avareno, wenn dein privater Speicher für Objekte, Belege, Garantien und offene Punkte wächst."
         >
           <div className="avareno-price-signal">
-            <span>MoR geplant</span>
-            <strong>Paddle als bevorzugte Billing-Richtung</strong>
+            <span>Stripe-ready</span>
+            <strong>Lookup Keys statt Live Price IDs in der UI</strong>
           </div>
         </StandardHero>
       </Reveal>
@@ -183,10 +183,12 @@ export function PricingPage() {
           <article className={plan.isPopular ? "avareno-pricing-card is-highlighted" : "avareno-pricing-card"} key={plan.id}>
             <div className="avareno-pricing-card-head">
               <p>{plan.name}</p>
-              {plan.isPopular ? <span>Empfohlen</span> : plan.unavailableLabel ? <span>{plan.unavailableLabel.de}</span> : null}
+              {plan.isPopular ? <span>Empfohlen</span> : null}
             </div>
-            <h2>{formatPrice(plan, billingPeriod, "de-DE")}<span>{periodLabel}</span></h2>
-            {billingPeriod === "yearly" && plan.yearlyNote ? <p className="avareno-pricing-saving">{plan.yearlyNote.de}</p> : null}
+            <h2>{formatPrice(plan.prices[billingPeriod].amount, plan.currency, "de-DE")}<span>{periodLabel}</span></h2>
+            {billingPeriod === "yearly" && getYearlySavings(plan.id) > 0 ? (
+              <p className="avareno-pricing-saving">Spare {formatPrice(getYearlySavings(plan.id), plan.currency, "de-DE")} pro Jahr</p>
+            ) : null}
             <small>{plan.description.de}</small>
             <ul>
               {plan.features.map((feature) => (
@@ -196,12 +198,12 @@ export function PricingPage() {
                 </li>
               ))}
             </ul>
-            {!plan.isAvailable ? (
-              <button className="avareno-secondary-cta" disabled type="button">
-                {plan.ctaLabel.de}
-              </button>
+            {plan.id === "free" ? (
+              <Link className="avareno-secondary-cta" to={plan.ctaHref}>
+                {plan.ctaLabel.de} <ArrowRight size={16} />
+              </Link>
             ) : (
-              <Link className={plan.isPopular ? "avareno-primary-cta" : "avareno-secondary-cta"} to={plan.ctaHref}>
+              <Link className={plan.isPopular ? "avareno-primary-cta" : "avareno-secondary-cta"} to={`/checkout/${plan.id}?interval=${billingPeriod}`}>
                 {plan.ctaLabel.de} <ArrowRight size={16} />
               </Link>
             )}
@@ -299,7 +301,7 @@ export function DatenschutzPage() {
       <StandardHero
         eyebrow="Datenschutz"
         title="Datenschutz transparent vorbereiten."
-        text="Avareno arbeitet mit Dingen, Dokumenten und Erinnerungen. Genau deshalb muss die Datenschutzerklärung vor dem Launch konkret und verständlich sein."
+        text="Avareno arbeitet mit Objekten, Dokumenten und Erinnerungen. Genau deshalb muss die Datenschutzerklärung vor dem Launch konkret und verständlich sein."
       >
         <DraftNotice />
       </StandardHero>

@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from app.db import PROJECT_ROOT, rows_to_dicts
+from app.services.document_storage import UPLOAD_ROOT
+from app.db import rows_to_dicts
 from app.utils import make_id, now_iso
 
 
@@ -21,6 +22,7 @@ KNOWN_USER_TABLES = [
     "HouseholdMember",
     "Space",
     "PlanSubscription",
+    "BillingInvoice",
     "Item",
     "Document",
     "RepairLog",
@@ -47,7 +49,7 @@ DELETION_TODO_AREAS = [
     "tickets/care/resolve",
     "connector configs",
     "connector secrets/tokens",
-    "billing subscription state",
+    "billing subscription and invoice metadata",
     "AI analysis records",
     "logs/audit entries",
     "storage objects",
@@ -69,7 +71,7 @@ EXPORT_ACTIVE_AREAS = [
     "care reminders and loops",
     "repair logs",
     "smart-home/connector metadata stored locally",
-    "billing plan/subscription state stored locally",
+    "billing plan/subscription state and invoice metadata stored locally",
     "consent and privacy audit history stored locally",
 ]
 
@@ -127,7 +129,7 @@ def privacy_summary(conn: sqlite3.Connection, user_id: str) -> dict[str, Any]:
         "dataOverview": [
             {
                 "id": "items",
-                "label": "Gespeicherte Dinge",
+                "label": "Gespeicherte Objekte",
                 "value": item_count,
                 "status": "Aktiv",
                 "note": "Produktpässe, Kategorien, Seriennummern, Garantie- und Care-Kontext.",
@@ -151,7 +153,7 @@ def privacy_summary(conn: sqlite3.Connection, user_id: str) -> dict[str, Any]:
                 "label": "Plan & Abrechnung",
                 "value": _count_with_optional_table(conn, 'SELECT COUNT(*) FROM "PlanSubscription" WHERE userId = ?', (user_id,)),
                 "status": "Foundation",
-                "note": "Paddle-Billing ist vorbereitet; Zahlungs- und Kartendaten werden nicht in Avareno gespeichert.",
+                "note": "Stripe-Billing ist vorbereitet; Zahlungsdaten werden nicht gespeichert, Rechnungen werden nur als Metadaten/Stripe-Links synchronisiert.",
             },
             {
                 "id": "ai-analysis",
@@ -188,7 +190,7 @@ def privacy_summary(conn: sqlite3.Connection, user_id: str) -> dict[str, Any]:
         "deletion": deletion_plan(user_id),
         "thirdPartyProviders": [
             "Supabase Auth (configured in auth foundation)",
-            "Paddle billing only after Merchant-of-Record/legal/tax review and production configuration",
+            "Stripe billing only after Checkout, webhook, tax, legal and production configuration review",
             "SmartThings only when token/OAuth is configured",
             "OpenAI or AI provider TODO before real AI extraction",
             "Hosting/email/analytics providers TODO before launch",
@@ -218,7 +220,7 @@ def deletion_plan(user_id: str) -> dict[str, Any]:
         "userId": user_id,
         "ready": False,
         "knownTables": KNOWN_USER_TABLES,
-        "knownStorageRoots": [str(PROJECT_ROOT / "uploads")],
+        "knownStorageRoots": [str(UPLOAD_ROOT)],
         "requiredAreas": DELETION_TODO_AREAS,
         "authDeletion": "Supabase auth user deletion requires server-side admin orchestration; never run from the browser.",
         "backupPolicyNote": "Define retention and restore exclusions before claiming irreversible deletion.",
@@ -232,7 +234,7 @@ def document_deletion_plan(user_id: str) -> dict[str, Any]:
         "userId": user_id,
         "ready": True,
         "tables": ["Document", "ItemActivity"],
-        "storageRoots": [str(PROJECT_ROOT / "uploads")],
+        "storageRoots": [str(UPLOAD_ROOT)],
         "notes": [
             "Delete database metadata and physical storage objects together.",
             "Recalculate item completeness after document deletion.",
@@ -449,6 +451,7 @@ def _build_user_export_payload(
                 (user_id,),
             ),
             "planSubscriptions": _rows(conn, 'SELECT * FROM "PlanSubscription" WHERE userId = ? ORDER BY createdAt ASC', (user_id,)),
+            "billingInvoices": _rows(conn, 'SELECT * FROM "BillingInvoice" WHERE userId = ? ORDER BY COALESCE(invoiceCreatedAt, createdAt) ASC', (user_id,)),
             "items": _rows(conn, 'SELECT * FROM "Item" WHERE userId = ? ORDER BY createdAt ASC', (user_id,)),
             "documents": _rows(conn, 'SELECT * FROM "Document" WHERE userId = ? ORDER BY createdAt ASC', (user_id,)),
             "repairLogs": _rows(conn, 'SELECT * FROM "RepairLog" WHERE userId = ? ORDER BY createdAt ASC', (user_id,)),
@@ -544,8 +547,8 @@ def _safe_local_export_upload_path(file_path: str | None) -> Path | None:
     if not file_path or not file_path.startswith("/uploads/"):
         return None
 
-    root = (PROJECT_ROOT / "uploads").resolve()
-    target = (PROJECT_ROOT / file_path.lstrip("/")).resolve()
+    root = UPLOAD_ROOT.resolve()
+    target = (root / file_path.removeprefix("/uploads/")).resolve()
     try:
         target.relative_to(root)
     except ValueError:

@@ -6,23 +6,24 @@ from fastapi import APIRouter, HTTPException, Request
 
 from app.db import db
 from app.services.billing import (
+    ACTIVE_PROVIDER,
     BillingConfigurationError,
     BillingProviderError,
     BillingValidationError,
     mark_event_processed,
-    process_paddle_event,
+    process_stripe_event,
     record_webhook_event,
-    verify_paddle_signature,
+    verify_stripe_signature,
 )
 
 router = APIRouter()
 
 
-@router.post("/paddle")
-async def paddle_webhook(request: Request) -> dict:
+@router.post("/stripe")
+async def stripe_webhook(request: Request) -> dict:
     raw_body = await request.body()
     try:
-        verify_paddle_signature(request.headers.get("Paddle-Signature"), raw_body)
+        verify_stripe_signature(request.headers.get("Stripe-Signature"), raw_body)
     except BillingConfigurationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except BillingValidationError as exc:
@@ -35,11 +36,11 @@ async def paddle_webhook(request: Request) -> dict:
 
     with db() as conn:
         try:
-            event_record_id, duplicate = record_webhook_event(conn, payload)
+            event_record_id, duplicate = record_webhook_event(conn, payload, ACTIVE_PROVIDER)
             if duplicate:
                 return {"ok": True, "status": "duplicate"}
 
-            status = process_paddle_event(conn, payload)
+            status = process_stripe_event(conn, payload)
             mark_event_processed(conn, event_record_id, status)
             return {"ok": True, "status": status.lower()}
         except BillingValidationError as exc:
@@ -48,3 +49,4 @@ async def paddle_webhook(request: Request) -> dict:
             if "event_record_id" in locals():
                 mark_event_processed(conn, event_record_id, "FAILED", str(exc))
             raise HTTPException(status_code=422, detail="Webhook could not be processed safely") from exc
+

@@ -241,33 +241,69 @@ Decision:
 - Feature name: Billing and subscription foundation
 - Owner: Engineering/Product
 - Route/module: `backend/app/services/billing.py`, `backend/app/routers/billing.py`, `backend/app/routers/webhooks.py`, `frontend/src/pages/Home.tsx`, `frontend/src/pages/MarketingPages.tsx`, `frontend/src/pages/AuthPages.tsx`
-- Backend/API changes: billing status, checkout, portal placeholder and Paddle webhook endpoint
+- Backend/API changes: billing status, server-side Stripe Checkout, Stripe Billing Portal session creation and Stripe webhook endpoint
 - Database/storage changes: `PlanSubscription` billing columns, `BillingEvent` safe event table
-- Third-party providers: Paddle preferred first Merchant-of-Record direction; Lemon Squeezy/Stripe future alternatives only
-- Launch state: foundation; paid checkout requires server-side Paddle env configuration; Family disabled by default
+- Third-party providers: Stripe as preferred subscription billing direction
+- Launch state: Stripe foundation; paid checkout is implemented server-side and production launch still requires Stripe Tax, invoice, retention, cancellation and legal/tax review
 
 Required questions:
 
-1. Personal data: Avareno user id, plan key, subscription status, provider customer id, provider subscription id, period dates, cancellation flag, safe webhook event id/type/status. Paddle may process email, payment, invoice and tax/VAT metadata.
+1. Personal data: Avareno user id, plan key, billing interval, subscription status, provider customer id, provider subscription id, provider price id, period dates, cancellation flag, safe webhook event id/type/status. Stripe may process email, payment, invoice and tax/VAT metadata.
 2. Purpose: create and manage paid subscription state and provider webhook synchronization.
 3. Avoid collection: Free plan avoids provider checkout. Paid plans require provider-side billing data.
 4. Data minimization: client sends only `planKey`; prices and provider ids are server-side. Avareno stores no card/payment method details and no raw webhook payloads.
-5. Storage: local SQLite MVP now; future production database with RLS. Paddle stores provider-side billing/payment records.
+5. Storage: local SQLite MVP now; future production database with RLS. Stripe stores provider-side billing/payment records after Checkout is implemented.
 6. Retention: local/provider retention is not final and must be defined before paid launch.
 7. Export: export flow must include local subscription state.
 8. Deletion: account deletion must include local subscription state and provider-side cancellation/deletion process notes.
-9. Third-party sharing: yes, Paddle when checkout is configured and used.
+9. Third-party sharing: yes, Stripe when checkout is implemented and used.
 10. AI: no.
 11. Consent/legal basis: needs lawyer/DSB/tax review; paid subscription processing likely contract necessity, but public policy/terms must be reviewed.
 12. Connected accounts: no.
 13. Sensitive documents: no direct document processing, but billing links to an account that may store sensitive documents.
-14. Tokens/secrets/API credentials: `PADDLE_API_KEY` and `PADDLE_WEBHOOK_SECRET` are server-side only.
+14. Tokens/secrets/API credentials: future `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` must be server-side only.
 15. Logs: no raw webhook payloads, card data, payment method details, invoice records or secrets should be logged.
-16. Abuse/security risks: forged webhooks, duplicate events, client-side price tampering, disabled Family purchase bypass. Foundation mitigates with signature verification, idempotent event ids, server-side price ids and disabled Family checkout.
+16. Abuse/security risks: forged webhooks, duplicate events, client-side price tampering, wrong env Price mapping and fake paid-plan activation. Checkout resolves Price IDs server-side, webhooks require signatures, events are idempotent and direct paid plan changes are rejected.
 
 Decision:
 
 - Privacy review complete: yes for foundation
-- Safe to implement now: yes as non-production foundation with safe failure when Paddle is not configured
+- Safe to implement now: yes as non-production Stripe foundation with server-side secret handling
 - Needs lawyer/DSB review first: yes before accepting production payments
-- Notes: verify Paddle MoR scope, VAT/tax handling, invoice handling, DPA/AVV, subprocessors, region/transfers, retention/deletion, customer portal/cancellation and public legal copy before paid launch.
+- Notes: verify configured Stripe Products/Prices, test Checkout/webhooks/portal in Stripe test mode, verify Stripe Tax/VAT/invoice handling, DPA/AVV, subprocessors, region/transfers, retention/deletion, cancellation and public legal copy before paid launch.
+
+## Completed Review: Avareno Home Graph Foundation
+
+- Feature name: Avareno Home Graph Foundation
+- Owner: Engineering/Product
+- Route/module: `frontend/src/pages/HomeGraphConnect.tsx`, `frontend/src/features/home-graph/*`, `backend/app/routers/smart_home.py`, `backend/app/services/smart_home.py`
+- Backend/API changes: safe Home Graph connect preview/confirm endpoints for mock provider import; local Samsung TV command path supports power plus basic volume/mute/source-menu commands for already paired local TVs
+- Database/storage changes: confirm stores mock smart-home connections/devices in existing `SmartHomeConnection`/`SmartHomeDevice`; Device Passport remains typed/mock-only for now
+- Third-party providers: provider registry entries only; no real provider calls added
+- Launch state: UI/data-model foundation; real adapters blocked until connector review
+
+Required questions:
+
+1. Personal data: mock device names, room names, provider/app names and safe capability metadata may be stored when the user confirms the mock flow; future Device Passports may include links to receipts, warranties, manuals and support notes.
+2. Purpose: help users understand and organize home/smart-home devices and prepare explicit provider connection flows.
+3. Avoid collection: yes; no real provider account data is collected and mock import is user-confirmed.
+4. Data minimization: registry contains provider metadata only; mock connect stores only device name, room, type and safe `power`/`brightness` capability metadata; local TV control stores reduced device metadata and remote token only in backend/local storage; no provider secrets are exposed to frontend code.
+5. Storage: frontend source code for registry/types/mock examples; existing local SQLite smart-home tables for user-confirmed mock imports.
+6. Retention: not applicable for this foundation; future persisted Device Passports need retention rules.
+7. Export: future Device Passport records must be included in account export before launch.
+8. Deletion: future Device Passport and connector records must be deletable and disconnectable.
+9. Third-party sharing: none added; future adapters will share data with or receive data from selected providers only after explicit user action.
+10. AI: no AI added.
+11. Consent/legal basis: future provider connections need explicit user action, transparent scopes and revocation; legal basis needs review before production.
+12. Connected accounts: conceptually yes, but no real accounts connected in this task.
+13. Sensitive/private documents: not directly; future links to receipts/warranties/manuals may touch sensitive documents.
+14. Tokens/secrets/API credentials: no token storage added; real adapters remain blocked until encrypted server-side token storage exists.
+15. Logs: no new logs; future sync logs must avoid raw payloads and secrets.
+16. Abuse/security risks: unsafe device control, safety-critical locks/cameras/alarms/heaters, provider token leakage, over-broad imports and misleading integration claims. This foundation limits real commands to local TV-style controls and keeps safety-critical device classes blocked until dedicated review.
+
+Decision:
+
+- Privacy review complete: yes for registry/UI/mock foundation
+- Safe to implement now: yes
+- Needs lawyer/DSB review first: yes before real provider connections, production token storage, command execution or public claims of working integrations
+- Notes: keep Home Graph useful even when devices are not controllable; do not implement real control for locks, cameras, alarms, heaters, ovens or similar safety-critical devices without a dedicated safety/security review.

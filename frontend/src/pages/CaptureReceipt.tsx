@@ -10,7 +10,7 @@ export function CaptureReceipt() {
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
   const [document, setDocument] = useState<Document | null>(null);
-  const [manualText, setManualText] = useState("MediaMarkt LG OLED Beleg");
+  const [manualText, setManualText] = useState("");
   const [extracted, setExtracted] = useState<ExtractedReceipt | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -55,7 +55,7 @@ export function CaptureReceipt() {
         documentId: document?.id
       })
     });
-    navigate(`/items/${item.id}`);
+    navigate(`/app/items/${item.id}`);
   }
 
   function updateField(field: keyof ExtractedReceipt, value: string) {
@@ -94,7 +94,7 @@ export function CaptureReceipt() {
           className="mt-4 min-h-28 w-full rounded-2xl border border-line bg-white p-4 text-sm font-semibold leading-6 outline-none focus:border-leaf"
           placeholder="Optionaler Text für die Vorschau-Extraktion"
         />
-        <Button className="mt-4 w-full" onClick={extract} disabled={busy} icon={<Wand2 size={18} />}>
+        <Button className="mt-4 w-full" onClick={extract} disabled={busy || (!file && !manualText.trim())} icon={<Wand2 size={18} />}>
           {busy ? "Wird ausgelesen..." : "Informationen auslesen"}
         </Button>
       </Card>
@@ -107,7 +107,7 @@ export function CaptureReceipt() {
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {[
-              ["itemName", "Name des Dings"],
+              ["itemName", "Name des Objekts"],
               ["merchant", "Händler"],
               ["manufacturer", "Hersteller"],
               ["model", "Modell"],
@@ -152,7 +152,7 @@ export function CaptureReceipt() {
             </label>
           </div>
           <Button className="mt-5 w-full" onClick={createItem}>
-            Ding erstellen
+            Objekt erstellen
           </Button>
         </Card>
       ) : null}

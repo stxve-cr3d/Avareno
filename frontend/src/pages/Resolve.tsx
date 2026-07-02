@@ -460,7 +460,7 @@ function HelperCard({ helper }: { helper: HelperProfile }) {
       <div className="resolve-helper-stats">
         <span>
           <strong>{helper.productsOwned}</strong>
-          Dinge
+          Objekte
         </span>
         <span>
           <strong>{helper.solvedTickets}</strong>

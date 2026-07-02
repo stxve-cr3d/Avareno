@@ -14,7 +14,7 @@ const examples = [
 export function UniversalCapture() {
   const navigate = useNavigate();
   const [structure, setStructure] = useState<ProductStructure | null>(null);
-  const [text, setText] = useState(examples[0]);
+  const [text, setText] = useState("");
   const [inputType, setInputType] = useState("TEXT");
   const [spaceId, setSpaceId] = useState("");
   const [draft, setDraft] = useState<UniversalCaptureDraft | null>(null);
@@ -43,7 +43,7 @@ export function UniversalCapture() {
       method: "POST",
       body: JSON.stringify(draft.draftItem)
     });
-    navigate(`/items/${item.id}`);
+    navigate(`/app/items/${item.id}`);
   }
 
   return (
@@ -77,7 +77,12 @@ export function UniversalCapture() {
             </span>
           </div>
 
-          <textarea className="capture-textarea" value={text} onChange={(event) => setText(event.target.value)} />
+          <textarea
+            className="capture-textarea"
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            placeholder="Beschreibe ein Objekt, z. B. „LG OLED C3 im Wohnzimmer, gekauft bei MediaMarkt“ — oder wähle unten ein Beispiel."
+          />
 
           <select className="capture-select" value={spaceId} onChange={(event) => setSpaceId(event.target.value)}>
             <option value="">Raum automatisch erkennen</option>

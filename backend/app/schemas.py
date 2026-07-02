@@ -137,12 +137,33 @@ class HouseholdInviteCreate(BaseModel):
     role: str = "VIEWER"
 
 
+class FriendInviteAccept(BaseModel):
+    code: str = Field(min_length=1)
+
+
+class MotivationPrivacyPatch(BaseModel):
+    motivationEnabled: bool | None = None
+    leaderboardEnabled: bool | None = None
+    hideXpFromFriends: bool | None = None
+    hideStreakFromFriends: bool | None = None
+    allowFriendInvites: bool | None = None
+
+
+class FriendCircleCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+
+
+class FriendCircleMemberAdd(BaseModel):
+    friendUserId: str = Field(min_length=1)
+
+
 class PlanTierUpdate(BaseModel):
     tier: str
 
 
 class BillingCheckoutRequest(BaseModel):
     planKey: str = Field(min_length=1)
+    billingInterval: str = "monthly"
 
 
 class BillingPortalRequest(BaseModel):
@@ -151,6 +172,15 @@ class BillingPortalRequest(BaseModel):
 
 class SmartHomeConnectRequest(BaseModel):
     provider: str = "HOME_ASSISTANT"
+
+
+class HomeGraphConnectPreviewRequest(BaseModel):
+    providerId: str = Field(min_length=1)
+
+
+class HomeGraphConnectConfirmRequest(BaseModel):
+    providerId: str = Field(min_length=1)
+    acceptedCapabilities: list[str] = Field(default_factory=list)
 
 
 class SmartHomeCommandRequest(BaseModel):

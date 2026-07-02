@@ -89,7 +89,8 @@ Add these URLs in Supabase Auth URL Configuration:
 1. Configure the Google OAuth consent screen.
 2. Add the Supabase callback URL from the Supabase Google provider settings in Google Cloud.
 3. Store Google client id/secret only in Supabase provider settings.
-4. Set `VITE_AUTH_GOOGLE_ENABLED=true` after the provider is active.
+4. Verify the OAuth client is enabled in Google Cloud and that a real test login reaches `/auth/callback`.
+5. Set `VITE_AUTH_GOOGLE_ENABLED=true` only after the provider is active and the test login succeeds. If Google returns `disabled_client`, keep this flag `false` until the Google OAuth client is re-enabled or replaced.
 
 ## Apple OAuth Setup
 

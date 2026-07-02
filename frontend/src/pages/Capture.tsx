@@ -9,7 +9,7 @@ const kinds: { value: CaptureKind; label: string; helper: string; icon: React.Co
   { value: "RECEIPT", label: "Beleg", helper: "Kauf & Garantie", icon: ReceiptText },
   { value: "MESSAGE", label: "Nachricht", helper: "Antwort merken", icon: MessageSquareText },
   { value: "DOCUMENT", label: "Dokument", helper: "Sicher ablegen", icon: FileText },
-  { value: "ITEM", label: "Ding", helper: "Karte starten", icon: Package },
+  { value: "ITEM", label: "Objekt", helper: "Karte starten", icon: Package },
   { value: "LOOP", label: "Loop", helper: "Gedanke parken", icon: ListChecks }
 ];
 

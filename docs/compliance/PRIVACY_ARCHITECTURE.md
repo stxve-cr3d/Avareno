@@ -178,7 +178,7 @@ Every provider must be documented before production use:
 - SMS provider such as Twilio if enabled
 - OAuth providers such as Google or Apple
 - AI/OCR providers
-- billing provider such as Paddle if paid subscriptions are enabled
+- billing provider such as Stripe if paid subscriptions are enabled
 - analytics providers if any
 - newsletter provider if any
 - affiliate providers if any

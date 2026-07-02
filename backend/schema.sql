@@ -1,6 +1,7 @@
 PRAGMA foreign_keys = ON;
 
 DROP TABLE IF EXISTS "AffiliateClick";
+DROP TABLE IF EXISTS "BillingInvoice";
 DROP TABLE IF EXISTS "BillingEvent";
 DROP TABLE IF EXISTS "ItemActivity";
 DROP TABLE IF EXISTS "SmartHomeCommand";
@@ -113,13 +114,15 @@ CREATE TABLE "PlanSubscription" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "userId" TEXT NOT NULL,
   "householdId" TEXT,
-  "provider" TEXT NOT NULL DEFAULT 'paddle',
+  "provider" TEXT NOT NULL DEFAULT 'internal',
   "providerCustomerId" TEXT,
   "providerSubscriptionId" TEXT,
+  "stripePriceId" TEXT,
+  "billingInterval" TEXT,
   "planKey" TEXT NOT NULL DEFAULT 'free',
   "tier" TEXT NOT NULL DEFAULT 'FREE',
   "status" TEXT NOT NULL DEFAULT 'ACTIVE',
-  "itemLimit" INTEGER NOT NULL DEFAULT 10,
+  "itemLimit" INTEGER NOT NULL DEFAULT 30,
   "storageLimitMb" INTEGER NOT NULL DEFAULT 100,
   "currentPeriodStart" TEXT,
   "currentPeriodEnd" TEXT,
@@ -141,6 +144,35 @@ CREATE TABLE "BillingEvent" (
   "safeError" TEXT,
   UNIQUE ("provider", "eventId")
 );
+
+CREATE TABLE "BillingInvoice" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "provider" TEXT NOT NULL DEFAULT 'stripe',
+  "providerInvoiceId" TEXT NOT NULL,
+  "providerCustomerId" TEXT,
+  "providerSubscriptionId" TEXT,
+  "invoiceNumber" TEXT,
+  "status" TEXT NOT NULL,
+  "currency" TEXT NOT NULL DEFAULT 'eur',
+  "amountDue" INTEGER NOT NULL DEFAULT 0,
+  "amountPaid" INTEGER NOT NULL DEFAULT 0,
+  "amountRemaining" INTEGER NOT NULL DEFAULT 0,
+  "periodStart" TEXT,
+  "periodEnd" TEXT,
+  "hostedInvoiceUrl" TEXT,
+  "invoicePdfUrl" TEXT,
+  "invoiceCreatedAt" TEXT,
+  "finalizedAt" TEXT,
+  "paidAt" TEXT,
+  "createdAt" TEXT NOT NULL,
+  "updatedAt" TEXT NOT NULL,
+  UNIQUE ("provider", "providerInvoiceId"),
+  FOREIGN KEY ("userId") REFERENCES "User" ("id")
+);
+
+CREATE INDEX "BillingInvoice_userId_createdAt_idx" ON "BillingInvoice" ("userId", "invoiceCreatedAt");
+CREATE INDEX "BillingInvoice_providerInvoiceId_idx" ON "BillingInvoice" ("provider", "providerInvoiceId");
 
 CREATE TABLE "SmartHomeConnection" (
   "id" TEXT NOT NULL PRIMARY KEY,

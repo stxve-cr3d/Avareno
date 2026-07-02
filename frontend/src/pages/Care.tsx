@@ -36,70 +36,7 @@ import {
 } from "../components/app/AppKit";
 import type { CareStep, GraphEdge, StatusTone } from "../components/app/AppKit";
 
-type CareStatus = "loading" | "ready";
-
-const mockCareLoops: Loop[] = [
-  {
-    id: "care_return_monitor",
-    itemId: "item_monitor",
-    title: "Rückgabe Monitor prüfen",
-    description: "Rückgabefenster endet bald. Beleg und Originalverpackung liegen im Arbeitszimmer.",
-    sourceType: "MANUAL",
-    priority: "HIGH",
-    status: "OPEN",
-    dueDate: daysFromNow(2),
-    reminderAt: daysFromNow(1),
-    xpReward: 50,
-    item: {
-      id: "item_monitor",
-      name: "Dell UltraSharp Monitor",
-      category: "Elektronik",
-      currency: "EUR",
-      completenessScore: 82,
-      status: "ACTIVE"
-    }
-  },
-  {
-    id: "care_bike_service",
-    itemId: "item_bike",
-    title: "Fahrrad Service nachfassen",
-    description: "Werkstatt wollte sich mit Kostenvoranschlag melden.",
-    sourceType: "MANUAL",
-    priority: "MEDIUM",
-    status: "OPEN",
-    dueDate: daysFromNow(5),
-    reminderAt: daysFromNow(5),
-    xpReward: 25,
-    item: {
-      id: "item_bike",
-      name: "VanMoof S3",
-      category: "Mobilität",
-      currency: "EUR",
-      completenessScore: 76,
-      status: "ACTIVE"
-    }
-  },
-  {
-    id: "care_warranty_washer",
-    itemId: "item_washer",
-    title: "Garantie Waschmaschine sichern",
-    description: "Seriennummer fehlt noch auf der Produktkarte. Rechnung ist vorhanden.",
-    sourceType: "RECEIPT",
-    priority: "LOW",
-    status: "SNOOZED",
-    dueDate: daysFromNow(12),
-    reminderAt: daysFromNow(9),
-    xpReward: 10,
-    item: {
-      id: "item_washer",
-      name: "Bosch Serie 6 Waschmaschine",
-      category: "Haushalt",
-      currency: "EUR",
-      completenessScore: 68,
-      status: "ACTIVE"
-    }
-  }
-];
+type CareStatus = "loading" | "ready" | "error";
 
 function daysFromNow(days: number) {
   const date = new Date();
@@ -113,7 +50,6 @@ export function Care() {
   const location = useLocation();
   const [loops, setLoops] = useState<Loop[]>([]);
   const [status, setStatus] = useState<CareStatus>("loading");
-  const [usingDemo, setUsingDemo] = useState(false);
   const careBasePath = location.pathname.startsWith("/app") ? "/app/care" : "/care";
 
   async function loadLoops() {
@@ -121,12 +57,10 @@ export function Care() {
     try {
       const data = await api<Loop[]>("/api/loops");
       setLoops(data);
-      setUsingDemo(false);
-    } catch {
-      setLoops(mockCareLoops);
-      setUsingDemo(true);
-    } finally {
       setStatus("ready");
+    } catch {
+      setLoops([]);
+      setStatus("error");
     }
   }
 
@@ -142,15 +76,15 @@ export function Care() {
         loops={loops}
         loading={status === "loading"}
         setLoops={setLoops}
-        usingDemo={usingDemo}
       />
     );
   }
 
-  return <CareOverview basePath={careBasePath} loading={status === "loading"} loops={loops} usingDemo={usingDemo} />;
+  return <CareOverview basePath={careBasePath} status={status} loops={loops} onRetry={loadLoops} />;
 }
 
-function CareOverview({ basePath, loading, loops, usingDemo }: { basePath: string; loading: boolean; loops: Loop[]; usingDemo: boolean }) {
+function CareOverview({ basePath, status, loops, onRetry }: { basePath: string; status: CareStatus; loops: Loop[]; onRetry: () => void }) {
+  const loading = status === "loading";
   const openLoops = useMemo(() => sortOpenLoops(loops), [loops]);
   const focus = openLoops[0];
   const dueSoon = openLoops.filter((loop) => isWithinDays(loop.dueDate ?? loop.reminderAt, 7));
@@ -192,15 +126,17 @@ function CareOverview({ basePath, loading, loops, usingDemo }: { basePath: strin
         </AppSection>
       ) : null}
 
-      <AppSection title="Offene Punkte" link={usingDemo ? undefined : undefined}>
+      <AppSection title="Offene Punkte">
         {loading ? (
           <div className="av-loop-list">
             <div className="av-skeleton-row" />
             <div className="av-skeleton-row" />
             <div className="av-skeleton-row" />
           </div>
+        ) : status === "error" ? (
+          <CareLoadError onRetry={onRetry} />
         ) : openLoops.length === 0 ? (
-          <EmptyState title="Nichts fällig.">Wenn etwas wieder auftauchen soll, lege eine Care-Erinnerung an.</EmptyState>
+          <CareEmpty />
         ) : (
           <div className="av-loop-list">
             {openLoops.map((loop) => (
@@ -226,15 +162,13 @@ function CareDetail({
   loading,
   loopId,
   loops,
-  setLoops,
-  usingDemo
+  setLoops
 }: {
   basePath: string;
   loading: boolean;
   loopId: string;
   loops: Loop[];
   setLoops: Dispatch<SetStateAction<Loop[]>>;
-  usingDemo: boolean;
 }) {
   const navigate = useNavigate();
   const loop = loops.find((entry) => entry.id === loopId);
@@ -253,7 +187,7 @@ function CareDetail({
     let ignore = false;
     setLinkedItem(loop?.item ?? null);
 
-    if (!loop?.itemId || usingDemo) return () => {
+    if (!loop?.itemId) return () => {
       ignore = true;
     };
 
@@ -266,7 +200,7 @@ function CareDetail({
     return () => {
       ignore = true;
     };
-  }, [loop?.itemId, loop?.item, usingDemo]);
+  }, [loop?.itemId, loop?.item]);
 
   function replaceLoop(nextLoop: Loop) {
     setLoops((current) => current.map((entry) => (entry.id === nextLoop.id ? nextLoop : entry)));
@@ -277,11 +211,6 @@ function CareDetail({
     setSaving(true);
     setActionMessage(null);
     try {
-      if (usingDemo) {
-        replaceLoop({ ...loop, status: "DONE" });
-        navigate(basePath);
-        return;
-      }
       const result = await api<{ loop: Loop }>(`/api/loops/${loop.id}/complete`, { method: "POST" });
       replaceLoop(result.loop);
       navigate(basePath);
@@ -298,11 +227,6 @@ function CareDetail({
     setActionMessage(null);
     try {
       const nextDate = daysFromNow(2);
-      if (usingDemo) {
-        replaceLoop({ ...loop, status: "SNOOZED", reminderAt: nextDate });
-        setActionMessage({ tone: "success", text: "Care-Punkt wurde um 2 Tage verschoben." });
-        return;
-      }
       const updated = await api<Loop>(`/api/loops/${loop.id}/snooze`, {
         method: "POST",
         body: JSON.stringify({ reminderAt: nextDate })
@@ -325,11 +249,6 @@ function CareDetail({
         dueDate: dueDate ? new Date(dueDate).toISOString() : null,
         reminderAt: reminderAt ? new Date(reminderAt).toISOString() : null
       };
-      if (usingDemo) {
-        replaceLoop({ ...loop, ...payload });
-        setActionMessage({ tone: "success", text: "Datum wurde gespeichert." });
-        return;
-      }
       const updated = await api<Loop>(`/api/loops/${loop.id}`, {
         method: "PATCH",
         body: JSON.stringify(payload)
@@ -390,7 +309,7 @@ function CareDetail({
           </AppSection>
 
           {linkedItem ? (
-            <AppSection title="Produktkontext" link={{ to: `${itemBasePath}/${linkedItem.id}`, label: "Ding öffnen" }}>
+            <AppSection title="Produktkontext" link={{ to: `${itemBasePath}/${linkedItem.id}`, label: "Objekt öffnen" }}>
               <ObjectMemoryGraph
                 title={linkedItem.name}
                 category={linkedItem.category || "Produkt"}
@@ -444,6 +363,46 @@ function CareDetail({
         </AppSideColumn>
       </AppMainGrid>
     </AppPage>
+  );
+}
+
+function CareLoadError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="av-empty">
+      <p className="av-empty-title">Care konnte nicht geladen werden</p>
+      <div className="av-empty-body">Die Verbindung ist gerade nicht erreichbar. Deine offenen Punkte sind sicher gespeichert — versuche es gleich noch einmal.</div>
+      <div style={{ marginTop: "1rem", display: "flex", justifyContent: "center" }}>
+        <SecondaryAction onClick={onRetry}>Erneut versuchen</SecondaryAction>
+      </div>
+    </div>
+  );
+}
+
+function CareEmpty() {
+  return (
+    <div className="av-empty-rich">
+      <div className="av-empty-visual">
+        <ObjectMemoryGraph
+          title="Bosch Waschmaschine"
+          category="Beispiel · so sieht ein Care-Punkt aus"
+          icon={<PackageCheck size={14} />}
+          edges={[
+            { tone: "amber", label: "Garantie endet in 30 Tagen" },
+            { tone: "teal", label: "Erinnerung: Seriennummer nachtragen" },
+            { tone: "green", label: "Beleg gespeichert" }
+          ]}
+        />
+      </div>
+      <div className="av-empty-copy">
+        <h3>Nichts steht gerade an</h3>
+        <p>Care behält Garantie-Enden, Rückgaben, Reparaturen und offene Zusagen im Blick und meldet sich, bevor eine Frist verstreicht. Lege eine Erinnerung an, damit nichts untergeht.</p>
+        <div className="av-empty-actions">
+          <ActionButton to="/app/capture/loop" icon={<Plus size={15} />}>
+            Erinnerung hinzufügen
+          </ActionButton>
+        </div>
+      </div>
+    </div>
   );
 }
 

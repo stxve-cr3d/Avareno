@@ -1,7 +1,7 @@
 import { FormEvent, useCallback, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, BookOpen, Camera, LifeBuoy, PackagePlus, ReceiptText, ScanBarcode, ShieldCheck, Tag } from "lucide-react";
+import { ArrowRight, BookOpen, Camera, ChevronDown, LifeBuoy, PackagePlus, ReceiptText, ScanBarcode, ShieldCheck, Tag } from "lucide-react";
 import { api } from "../lib/api";
 import type { BarcodeLookup, Item } from "../lib/types";
 import { parseAvarenoProductQr } from "../lib/productQr";
@@ -95,7 +95,7 @@ export function CaptureItem() {
           visibility: "HOUSEHOLD"
         })
       });
-      navigate(`/items/${item.id}`);
+      navigate(`/app/items/${item.id}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Der Produktpass konnte nicht erstellt werden.");
     } finally {
@@ -159,7 +159,7 @@ export function CaptureItem() {
         <div className="grid gap-5 bg-[#101111] p-5 text-white md:grid-cols-[minmax(0,1fr)_18rem] md:p-7">
           <div>
             <p className="text-xs font-bold uppercase text-white/50">Produktpass</p>
-            <h1 className="mt-3 max-w-3xl text-[clamp(2.6rem,7vw,5.8rem)] font-semibold leading-[0.94]">Ein Ding sauber merken</h1>
+            <h1 className="mt-3 max-w-3xl text-[clamp(2.6rem,7vw,5.8rem)] font-semibold leading-[0.94]">Ein Objekt sauber merken</h1>
             <p className="mt-5 max-w-xl text-base font-semibold leading-7 text-white/62">
               Fang mit dem an, was du gerade weißt. Barcode scannen oder einfügen, den Rest kannst du später in Ruhe ergänzen.
             </p>
@@ -175,7 +175,8 @@ export function CaptureItem() {
 
       <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-5">
-          <PassportSection icon={<PackagePlus size={19} />} eyebrow="Schritt 1" title="Identität">
+          <PassportSection icon={<PackagePlus size={19} />} eyebrow="Das Wichtigste" title="Identität" helper="Nur der Name ist nötig. Ein Barcode-Scan füllt Hersteller und Modell automatisch aus.">
+
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
@@ -205,7 +206,7 @@ export function CaptureItem() {
                     {lookupResult.item ? (
                       <span>
                         Schon gespeichert als <strong className="text-ink">{lookupResult.item.name}</strong>.
-                        <button className="ml-2 font-black text-leaf" onClick={() => navigate(`/items/${lookupResult.item?.id}`)} type="button">
+                        <button className="ml-2 font-black text-leaf" onClick={() => navigate(`/app/items/${lookupResult.item?.id}`)} type="button">
                           Öffnen
                         </button>
                       </span>
@@ -214,7 +215,7 @@ export function CaptureItem() {
                         Gefunden über <strong className="text-ink">{lookupResult.product.sourceName}</strong>. Die Felder wurden vorbereitet.
                       </span>
                     ) : (
-                      <span>Noch kein öffentlicher Produkttreffer. Der Barcode wird trotzdem lokal am Ding gespeichert.</span>
+                      <span>Noch kein öffentlicher Produkttreffer. Der Barcode wird trotzdem lokal am Objekt gespeichert.</span>
                     )}
                   </div>
                 ) : null}
@@ -228,7 +229,7 @@ export function CaptureItem() {
             </div>
           </PassportSection>
 
-          <PassportSection icon={<ReceiptText size={19} />} eyebrow="Schritt 2" title="Kauf & Garantie">
+          <PassportSection icon={<ReceiptText size={19} />} eyebrow="Optional" title="Kauf & Garantie" helper="Hilft später bei Garantie, Rückgabe und Support — kannst du auch jederzeit nachtragen.">
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Händler" value={form.merchant} onChange={(value) => updateField("merchant", value)} placeholder="MediaMarkt" />
               <Field label="Preis" value={form.price} onChange={(value) => updateField("price", value)} placeholder="1499" inputMode="decimal" />
@@ -237,7 +238,8 @@ export function CaptureItem() {
             </div>
           </PassportSection>
 
-          <PassportSection icon={<BookOpen size={19} />} eyebrow="Schritt 3" title="Handbuch & Support">
+          <PassportSection collapsible icon={<BookOpen size={19} />} eyebrow="Optional" title="Handbuch & Support" helper="Handbuch, Treiber und Support direkt verbinden. Zum Aufklappen tippen.">
+
             <div className="grid gap-3">
               <Field label="Handbuch-URL" value={form.manualUrl} onChange={(value) => updateField("manualUrl", value)} placeholder="https://brand.com/manual" />
               <div className="grid gap-3 sm:grid-cols-2">
@@ -286,17 +288,47 @@ function nullable(value: string) {
   return value.trim() || null;
 }
 
-function PassportSection({ children, eyebrow, icon, title }: { children: ReactNode; eyebrow: string; icon: ReactNode; title: string }) {
+function PassportSection({
+  children,
+  eyebrow,
+  icon,
+  title,
+  helper,
+  collapsible = false
+}: {
+  children: ReactNode;
+  eyebrow: string;
+  icon: ReactNode;
+  title: string;
+  helper?: string;
+  collapsible?: boolean;
+}) {
+  const [open, setOpen] = useState(!collapsible);
+  const bodyId = `passport-section-${title.replace(/\s+/g, "-").toLowerCase()}`;
+
+  const heading = (
+    <div className="flex w-full items-start justify-between gap-3 text-left">
+      <div>
+        <p className="text-xs font-black uppercase text-muted">{eyebrow}</p>
+        <h2 className="mt-1 text-2xl font-black text-ink">{title}</h2>
+        {helper ? <p className="mt-1 text-sm font-semibold leading-6 text-muted">{helper}</p> : null}
+      </div>
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-leaf/10 text-leaf">
+        {collapsible ? <ChevronDown className={`transition-transform ${open ? "rotate-180" : ""}`} size={19} /> : icon}
+      </span>
+    </div>
+  );
+
   return (
     <section className="rounded-lg border border-line bg-white p-4 shadow-soft md:p-5">
-      <div className="mb-5 flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-black uppercase text-muted">{eyebrow}</p>
-          <h2 className="mt-1 text-2xl font-black text-ink">{title}</h2>
-        </div>
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-leaf/10 text-leaf">{icon}</span>
-      </div>
-      {children}
+      {collapsible ? (
+        <button aria-controls={bodyId} aria-expanded={open} className={open ? "mb-5 w-full" : "w-full"} onClick={() => setOpen((value) => !value)} type="button">
+          {heading}
+        </button>
+      ) : (
+        <div className="mb-5">{heading}</div>
+      )}
+      {open ? <div id={bodyId}>{children}</div> : null}
     </section>
   );
 }

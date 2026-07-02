@@ -1,90 +1,89 @@
-export type BillingPeriod = "monthly" | "yearly";
 export type PlanId = "free" | "personal" | "pro" | "family";
+export type BillingInterval = "monthly" | "yearly";
+export type BillingPeriod = BillingInterval;
 export type AppLocale = "de" | "en";
+export type CurrencyCode = "EUR";
 
-export type PlanFeatureId =
-  | "object-memory"
-  | "documents"
-  | "manual-reminders"
-  | "warranty-tracking"
-  | "ai-extraction"
-  | "private-vault"
-  | "shared-spaces"
-  | "custom-fields"
-  | "exports"
-  | "priority-care";
-
-export type PlanLimitKey =
-  | "items"
-  | "documents"
-  | "storageMb"
-  | "reminders"
+export type PlanFeature =
   | "warrantyTracking"
-  | "aiUsage"
-  | "vaultSpaces"
-  | "sharedSpaces"
+  | "receiptTracking"
+  | "basicExports"
   | "customFields"
-  | "exports";
+  | "fullExports"
+  | "advancedAiAssistance"
+  | "sharedSpaces"
+  | "familyReminders";
 
-export type PlanLimitValue = number | null;
+export type PlanLimitKey = keyof PlanLimits;
 
 export type LocalizedText = Record<AppLocale, string>;
 
-export type PlanFeature = {
-  id: PlanFeatureId;
+export type PlanFeatureItem = {
+  id: PlanFeature;
   label: LocalizedText;
 };
 
-export type PlanLimits = Record<PlanLimitKey, PlanLimitValue>;
+export type PlanLimits = {
+  items: number;
+  documentStorageMb: number;
+  reminders: number;
+  aiActionsPerMonth: number;
+  vaults: number;
+  users: number;
+  householdMembers: number;
+};
 
-export type SubscriptionPlan = {
+export type PlanPrice = {
+  amount: number;
+  currency: CurrencyCode;
+  interval: BillingInterval;
+  stripeLookupKey?: string;
+  stripePriceEnvName?: string;
+  taxBehavior: "inclusive";
+};
+
+export type PricingPlan = {
   id: PlanId;
   name: string;
   description: LocalizedText;
-  monthlyPrice: number;
-  yearlyPrice: number;
-  currency: "EUR";
-  features: PlanFeature[];
+  currency: CurrencyCode;
+  prices: Record<BillingInterval, PlanPrice>;
   limits: PlanLimits;
+  features: PlanFeatureItem[];
   isPopular: boolean;
-  isAvailable: boolean;
+  isStripeSubscription: boolean;
   ctaLabel: LocalizedText;
   ctaHref: string;
-  unavailableLabel?: LocalizedText;
-  yearlyNote?: LocalizedText;
 };
 
-export const subscriptionPlans = [
+export const pricingPlans = [
   {
     id: "free",
     name: "Free",
     description: {
-      de: "Für die ersten Dinge und zum Ausprobieren.",
+      de: "Fuer die ersten Objekte und zum Ausprobieren.",
       en: "For the first things and trying Avareno."
     },
-    monthlyPrice: 0,
-    yearlyPrice: 0,
     currency: "EUR",
-    features: [
-      feature("object-memory", "Bis zu 10 Dinge", "Up to 10 things"),
-      feature("documents", "Begrenzte Belege und Dokumente", "Limited receipts and documents"),
-      feature("manual-reminders", "Manuelle Erinnerungen", "Manual reminders"),
-      feature("warranty-tracking", "Basis-Garantieübersicht", "Basic warranty overview")
-    ],
-    limits: {
-      items: 10,
-      documents: 20,
-      storageMb: 100,
-      reminders: 5,
-      warrantyTracking: 5,
-      aiUsage: 5,
-      vaultSpaces: 0,
-      sharedSpaces: 0,
-      customFields: 0,
-      exports: 1
+    prices: {
+      monthly: price("monthly", 0),
+      yearly: price("yearly", 0)
     },
+    limits: {
+      items: 30,
+      documentStorageMb: 100,
+      reminders: 5,
+      aiActionsPerMonth: 10,
+      vaults: 1,
+      users: 1,
+      householdMembers: 1
+    },
+    features: [
+      feature("warrantyTracking", "Garantie-Tracking", "Warranty tracking"),
+      feature("receiptTracking", "Beleg-Tracking", "Receipt tracking")
+    ],
     isPopular: false,
-    isAvailable: true,
+    isStripeSubscription: false,
     ctaLabel: { de: "Kostenlos starten", en: "Start free" },
     ctaHref: "/signup"
   },
@@ -92,144 +91,175 @@ export const subscriptionPlans = [
     id: "personal",
     name: "Personal",
     description: {
-      de: "Für deinen privaten Speicher im Alltag.",
+      de: "Fuer deinen privaten Speicher im Alltag.",
       en: "For your private everyday memory."
     },
-    monthlyPrice: 9,
-    yearlyPrice: 90,
     currency: "EUR",
-    features: [
-      feature("object-memory", "Großzügige Dinge mit Fair Use", "Generous things with fair use"),
-      feature("documents", "Belege, Garantien und Handbücher", "Receipts, warranties and manuals"),
-      feature("manual-reminders", "Care-Loops und Erinnerungen", "Care loops and reminders"),
-      feature("ai-extraction", "Basis-KI-Extraktion mit Fair Use", "Basic AI extraction with fair use"),
-      feature("private-vault", "Datenexport und Private Vault Basic", "Data export and Private Vault Basic")
-    ],
-    limits: {
-      items: 1000,
-      documents: 1000,
-      storageMb: 5120,
-      reminders: null,
-      warrantyTracking: null,
-      aiUsage: 100,
-      vaultSpaces: 1,
-      sharedSpaces: 0,
-      customFields: 20,
-      exports: 12
+    prices: {
+      monthly: price("monthly", 4.99, "avareno_personal_monthly", "STRIPE_PRICE_PERSONAL_MONTHLY"),
+      yearly: price("yearly", 49, "avareno_personal_yearly", "STRIPE_PRICE_PERSONAL_YEARLY")
     },
-    isPopular: true,
-    isAvailable: true,
-    ctaLabel: { de: "Personal wählen", en: "Choose Personal" },
-    ctaHref: "/signup?plan=personal",
-    yearlyNote: { de: "2 Monate sparen", en: "Save 2 months" }
+    limits: {
+      items: 300,
+      documentStorageMb: 2048,
+      reminders: 100,
+      aiActionsPerMonth: 100,
+      vaults: 1,
+      users: 1,
+      householdMembers: 1
+    },
+    features: [
+      feature("warrantyTracking", "Garantie-Tracking", "Warranty tracking"),
+      feature("receiptTracking", "Beleg-Tracking", "Receipt tracking"),
+      feature("basicExports", "Basis-Exporte", "Basic exports")
+    ],
+    isPopular: false,
+    isStripeSubscription: true,
+    ctaLabel: { de: "Personal waehlen", en: "Choose Personal" },
+    ctaHref: "/signup?plan=personal"
   },
   {
     id: "pro",
     name: "Pro",
     description: {
-      de: "Für power-user, Selbstständige und größere Objektgedächtnisse.",
-      en: "For power users, freelancers and larger object memories."
+      de: "Fuer groessere Objektgedaechtnisse und mehr AI-Unterstuetzung.",
+      en: "For larger object memories and more AI assistance."
     },
-    monthlyPrice: 15,
-    yearlyPrice: 150,
     currency: "EUR",
-    features: [
-      feature("object-memory", "Alles aus Personal mit höheren Limits", "Everything in Personal with higher limits"),
-      feature("custom-fields", "Eigene Felder und erweiterte Struktur", "Custom fields and extended structure"),
-      feature("exports", "Mehr Exporte für Versicherung und Support", "More exports for insurance and support"),
-      feature("priority-care", "Mehr Care- und Garantie-Kontext", "More care and warranty context")
-    ],
-    limits: {
-      items: 3000,
-      documents: 3000,
-      storageMb: 15360,
-      reminders: null,
-      warrantyTracking: null,
-      aiUsage: 300,
-      vaultSpaces: 2,
-      sharedSpaces: 1,
-      customFields: 80,
-      exports: null
+    prices: {
+      monthly: price("monthly", 8.99, "avareno_pro_monthly", "STRIPE_PRICE_PRO_MONTHLY"),
+      yearly: price("yearly", 89, "avareno_pro_yearly", "STRIPE_PRICE_PRO_YEARLY")
     },
-    isPopular: false,
-    isAvailable: true,
-    ctaLabel: { de: "Pro wählen", en: "Choose Pro" },
-    ctaHref: "/signup?plan=pro",
-    yearlyNote: { de: "2 Monate sparen", en: "Save 2 months" }
+    limits: {
+      items: 2000,
+      documentStorageMb: 20480,
+      reminders: 1000,
+      aiActionsPerMonth: 500,
+      vaults: 3,
+      users: 1,
+      householdMembers: 1
+    },
+    features: [
+      feature("warrantyTracking", "Garantie-Tracking", "Warranty tracking"),
+      feature("receiptTracking", "Beleg-Tracking", "Receipt tracking"),
+      feature("customFields", "Eigene Felder", "Custom fields"),
+      feature("fullExports", "Vollstaendige Exporte", "Full exports"),
+      feature("advancedAiAssistance", "Erweiterte AI-Unterstuetzung", "Advanced AI assistance")
+    ],
+    isPopular: true,
+    isStripeSubscription: true,
+    ctaLabel: { de: "Pro waehlen", en: "Choose Pro" },
+    ctaHref: "/signup?plan=pro"
   },
   {
     id: "family",
     name: "Family",
     description: {
-      de: "Für Haushalte, Familie und gemeinsame Verantwortung.",
+      de: "Fuer Haushalte, Familie und gemeinsame Verantwortung.",
       en: "For households, families and shared responsibility."
     },
-    monthlyPrice: 19,
-    yearlyPrice: 190,
     currency: "EUR",
-    features: [
-      feature("object-memory", "Alles aus Pro", "Everything in Pro"),
-      feature("shared-spaces", "Mehrere Haushaltsmitglieder", "Multiple household members"),
-      feature("manual-reminders", "Geteilte Dinge und Erinnerungen", "Shared things and reminders"),
-      feature("ai-extraction", "Mehr Speicher und KI-Fair-Use", "More storage and AI fair use"),
-      feature("private-vault", "Erweiterter Private Vault", "Extended Private Vault")
-    ],
-    limits: {
-      items: 6000,
-      documents: 6000,
-      storageMb: 30720,
-      reminders: null,
-      warrantyTracking: null,
-      aiUsage: 600,
-      vaultSpaces: 4,
-      sharedSpaces: 4,
-      customFields: null,
-      exports: null
+    prices: {
+      monthly: price("monthly", 12.99, "avareno_family_monthly", "STRIPE_PRICE_FAMILY_MONTHLY"),
+      yearly: price("yearly", 129, "avareno_family_yearly", "STRIPE_PRICE_FAMILY_YEARLY")
     },
+    limits: {
+      items: 5000,
+      documentStorageMb: 51200,
+      reminders: 2500,
+      aiActionsPerMonth: 1000,
+      vaults: 5,
+      users: 5,
+      householdMembers: 5
+    },
+    features: [
+      feature("warrantyTracking", "Garantie-Tracking", "Warranty tracking"),
+      feature("receiptTracking", "Beleg-Tracking", "Receipt tracking"),
+      feature("sharedSpaces", "Geteilte Bereiche", "Shared spaces"),
+      feature("familyReminders", "Familien-Erinnerungen", "Family reminders"),
+      feature("customFields", "Eigene Felder", "Custom fields"),
+      feature("fullExports", "Vollstaendige Exporte", "Full exports")
+    ],
     isPopular: false,
-    isAvailable: false,
-    ctaLabel: { de: "Family vormerken", en: "Reserve Family" },
-    ctaHref: "/pricing",
-    unavailableLabel: { de: "Bald verfügbar", en: "Coming soon" },
-    yearlyNote: { de: "2 Monate sparen", en: "Save 2 months" }
+    isStripeSubscription: true,
+    ctaLabel: { de: "Family waehlen", en: "Choose Family" },
+    ctaHref: "/signup?plan=family"
   }
-] satisfies SubscriptionPlan[];
+] satisfies PricingPlan[];
 
-export function getPlanById(planId: PlanId | string): SubscriptionPlan {
-  return subscriptionPlans.find((plan) => plan.id === planId) ?? subscriptionPlans[0];
+export const subscriptionPlans = pricingPlans;
+
+export function getPlanById(planId: PlanId | string | null | undefined): PricingPlan {
+  return pricingPlans.find((plan) => plan.id === planId) ?? pricingPlans[0];
 }
 
-export function getPlanLimits(planId: PlanId | string): PlanLimits {
+export function getPaidPlans(): PricingPlan[] {
+  return pricingPlans.filter((plan) => plan.isStripeSubscription);
+}
+
+export function getStripeLookupKey(planId: PlanId | string | null | undefined, interval: BillingInterval): string | null {
+  return getPlanById(planId).prices[interval]?.stripeLookupKey ?? null;
+}
+
+export function getStripePriceId(_: PlanId | string | null | undefined, __: BillingInterval): string | null {
+  return null;
+}
+
+export function getStripePriceEnvName(planId: PlanId | string | null | undefined, interval: BillingInterval): string | null {
+  return getPlanById(planId).prices[interval]?.stripePriceEnvName ?? null;
+}
+
+export function getPlanByStripePriceId(_: string | null | undefined): { plan: PricingPlan; billingInterval: BillingInterval } | null {
+  return null;
+}
+
+export function getPlanLimits(planId: PlanId | string | null | undefined): PlanLimits {
   return getPlanById(planId).limits;
 }
 
-export function canUseFeature(planId: PlanId | string, featureId: PlanFeatureId): boolean {
+export function canUseFeature(planId: PlanId | string | null | undefined, featureId: PlanFeature): boolean {
   return getPlanById(planId).features.some((featureItem) => featureItem.id === featureId);
 }
 
-export function isWithinPlanLimit(planId: PlanId | string, limitKey: PlanLimitKey, currentUsage: number, requestedAmount = 1): boolean {
+export function isWithinPlanLimit(
+  planId: PlanId | string | null | undefined,
+  limitKey: PlanLimitKey,
+  currentValue: number,
+  requestedAmount = 0
+): boolean {
   const limit = getPlanLimits(planId)[limitKey];
-  return limit === null || currentUsage + requestedAmount <= limit;
+  return currentValue + requestedAmount <= limit;
 }
 
-export function formatPrice(planOrPrice: SubscriptionPlan | number, period: BillingPeriod = "monthly", locale = "de-DE"): string {
-  const planPrice = typeof planOrPrice === "number"
-    ? planOrPrice
-    : period === "yearly" ? planOrPrice.yearlyPrice : planOrPrice.monthlyPrice;
-  const currency = typeof planOrPrice === "number" ? "EUR" : planOrPrice.currency;
+export function formatPrice(amount: number, currency: CurrencyCode = "EUR", locale = "de-DE"): string {
+  const hasMinorUnits = !Number.isInteger(amount);
 
   return new Intl.NumberFormat(locale, {
     currency,
-    maximumFractionDigits: 0,
-    minimumFractionDigits: 0,
+    maximumFractionDigits: hasMinorUnits ? 2 : 0,
+    minimumFractionDigits: hasMinorUnits ? 2 : 0,
     style: "currency"
-  }).format(planPrice);
+  }).format(amount);
 }
 
-export function publicPricingPlans(): SubscriptionPlan[] {
-  return [...subscriptionPlans];
+export function getPlanPrice(planOrId: PricingPlan | PlanId | string, interval: BillingInterval): PlanPrice {
+  const plan = typeof planOrId === "string" ? getPlanById(planOrId) : planOrId;
+  return plan.prices[interval];
 }
 
-function feature(id: PlanFeatureId, de: string, en: string): PlanFeature {
+export function getYearlySavings(planId: PlanId | string | null | undefined): number {
+  const plan = getPlanById(planId);
+  return Math.max(0, Number((plan.prices.monthly.amount * 12 - plan.prices.yearly.amount).toFixed(2)));
+}
+
+export function publicPricingPlans(): PricingPlan[] {
+  return [...pricingPlans];
+}
+
+function price(interval: BillingInterval, amount: number, stripeLookupKey?: string, stripePriceEnvName?: string): PlanPrice {
+  return { amount, currency: "EUR", interval, stripeLookupKey, stripePriceEnvName, taxBehavior: "inclusive" };
+}
+
+function feature(id: PlanFeature, de: string, en: string): PlanFeatureItem {
   return { id, label: { de, en } };
 }

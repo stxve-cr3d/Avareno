@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import QRCode from "qrcode";
@@ -39,9 +39,10 @@ import {
   UploadCloud,
   Users,
   Volume2,
+  VolumeX,
   Wrench
 } from "lucide-react";
-import { api, apiResourceUrl, isoDate } from "../lib/api";
+import { api, apiResourceUrl, dateInputValue, isoDate } from "../lib/api";
 import { getAuthAccessToken } from "../lib/authClient";
 import { productQrUrl } from "../lib/productQr";
 import type { Document as MemoryDocument, Item, Loop, RepairLog, SmartHomeDevice, SupportDraft } from "../lib/types";
@@ -93,6 +94,19 @@ type ProductRecommendation = {
   verification: "exact" | "check";
 };
 
+type OwnershipForm = {
+  merchant: string;
+  purchaseDate: string;
+  price: string;
+  warrantyUntil: string;
+  manufacturer: string;
+  model: string;
+  serialNumber: string;
+  barcode: string;
+  location: string;
+  supportContact: string;
+};
+
 const documentTypes = ["RECEIPT", "WARRANTY", "MANUAL", "DRIVER", "SOFTWARE", "OTHER"] as const;
 
 export function ItemDetail() {
@@ -100,6 +114,18 @@ export function ItemDetail() {
   const navigate = useNavigate();
   const [item, setItem] = useState<Item | null>(null);
   const [serialNumber, setSerialNumber] = useState("");
+  const [ownershipForm, setOwnershipForm] = useState<OwnershipForm>({
+    merchant: "",
+    purchaseDate: "",
+    price: "",
+    warrantyUntil: "",
+    manufacturer: "",
+    model: "",
+    serialNumber: "",
+    barcode: "",
+    location: "",
+    supportContact: ""
+  });
   const [passportLinks, setPassportLinks] = useState({
     manualUrl: "",
     driverUrl: "",
@@ -135,6 +161,18 @@ export function ItemDetail() {
     const result = await api<Item>(`/api/items/${id}`);
     setItem(result);
     setSerialNumber(result.serialNumber ?? "");
+    setOwnershipForm({
+      merchant: result.merchant ?? "",
+      purchaseDate: dateInputValue(result.purchaseDate),
+      price: result.price != null ? String(result.price) : "",
+      warrantyUntil: dateInputValue(result.warrantyUntil),
+      manufacturer: result.manufacturer ?? "",
+      model: result.model ?? "",
+      serialNumber: result.serialNumber ?? "",
+      barcode: result.barcode ?? "",
+      location: result.location ?? result.space?.name ?? "",
+      supportContact: result.supportContact ?? result.supportUrl ?? ""
+    });
     setPassportLinks({
       manualUrl: result.manualUrl ?? "",
       driverUrl: result.driverUrl ?? "",
@@ -187,6 +225,41 @@ export function ItemDetail() {
     setItem(await api<Item>(`/api/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ serialNumber }) }));
   }
 
+  function updateOwnershipField(field: keyof OwnershipForm, value: string) {
+    setOwnershipForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function saveOwnership() {
+    if (!item) return;
+    setBusy("ownership-save");
+    try {
+      const supportValue = ownershipForm.supportContact.trim();
+      const updated = await api<Item>(`/api/items/${item.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          merchant: nullableText(ownershipForm.merchant),
+          purchaseDate: ownershipForm.purchaseDate || null,
+          price: ownershipForm.price.trim() ? Number(ownershipForm.price) : null,
+          warrantyUntil: ownershipForm.warrantyUntil || null,
+          manufacturer: nullableText(ownershipForm.manufacturer),
+          model: nullableText(ownershipForm.model),
+          serialNumber: nullableText(ownershipForm.serialNumber),
+          barcode: nullableText(ownershipForm.barcode),
+          location: nullableText(ownershipForm.location),
+          supportContact: supportValue && !/^https?:\/\//i.test(supportValue) ? supportValue : null,
+          supportUrl: supportValue && /^https?:\/\//i.test(supportValue) ? supportValue : item.supportUrl ?? null
+        })
+      });
+      setItem(updated);
+      setSerialNumber(updated.serialNumber ?? "");
+      setDetailMessage("Grunddaten gespeichert");
+    } catch (error) {
+      setDetailMessage(error instanceof Error ? error.message : "Grunddaten konnten nicht gespeichert werden");
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function savePassportLinks() {
     if (!item) return;
     const cleaned = Object.fromEntries(
@@ -222,7 +295,7 @@ export function ItemDetail() {
     setBusy(`document-delete-${documentId}`);
     try {
       await api(`/api/documents/${documentId}`, { method: "DELETE" });
-      setDetailMessage("Dokument gelöscht");
+      setDetailMessage("Dokument gelÃ¶scht");
       await load();
     } finally {
       setBusy("");
@@ -235,7 +308,7 @@ export function ItemDetail() {
       const signedDownload = await api<SignedDocumentDownload>(`/api/documents/${encodeURIComponent(document.id)}/signed-download`, { method: "POST" });
       await openPrivateDocument(signedDownload.url, signedDownload.fileName || document.fileName);
     } catch (error) {
-      setDetailMessage(error instanceof Error ? error.message : "Dokument konnte nicht geöffnet werden");
+      setDetailMessage(error instanceof Error ? error.message : "Dokument konnte nicht geÃ¶ffnet werden");
     } finally {
       setBusy("");
     }
@@ -254,7 +327,7 @@ export function ItemDetail() {
     try {
       extractedJson = parseExtractedJson(reviewJsonText);
     } catch {
-      setReviewError("JSON ist nicht gültig. Bitte korrigiere die Struktur oder leere das Feld.");
+      setReviewError("JSON ist nicht gÃ¼ltig. Bitte korrigiere die Struktur oder leere das Feld.");
       return;
     }
 
@@ -286,7 +359,7 @@ export function ItemDetail() {
       });
       setReviewText("");
       setReviewJsonText("");
-      setDetailMessage("KI-Extraktion gelöscht");
+      setDetailMessage("KI-Extraktion gelÃ¶scht");
       await load();
     } finally {
       setBusy("");
@@ -339,7 +412,7 @@ export function ItemDetail() {
         body: JSON.stringify({
           itemId: item.id,
           title: reminderTitle,
-          description: `Offener Punkt für ${item.name}`,
+          description: `Offener Punkt fÃ¼r ${item.name}`,
           sourceType: "DEVICE",
           priority: "MEDIUM",
           dueDate: due.toISOString(),
@@ -389,8 +462,10 @@ export function ItemDetail() {
         method: "POST",
         body: JSON.stringify({ command })
       });
-      setDetailMessage(`Smart-Befehl: ${command.replace("_", " ")}`);
+      setDetailMessage(smartCommandLabel(command));
       await load();
+    } catch (error) {
+      setDetailMessage(error instanceof Error ? error.message : "Smart-Home-Befehl konnte nicht gesendet werden");
     } finally {
       setBusy("");
     }
@@ -477,7 +552,7 @@ export function ItemDetail() {
   return (
     <main className="av-page">
       <Link className="av-back" to="/app/items">
-        <ArrowLeft size={15} /> Zurück zu Dinge
+        <ArrowLeft size={15} /> ZurÃ¼ck zu Objekte
       </Link>
 
       <AppPageHeader
@@ -486,9 +561,9 @@ export function ItemDetail() {
         subtitle={identity}
         actions={
           receiptPresent ? (
-            <ActionButton to="/app/care" icon={<BellRing size={15} />}>Erinnerung öffnen</ActionButton>
+            <ActionButton to="/app/care" icon={<BellRing size={15} />}>Erinnerung Ã¶ffnen</ActionButton>
           ) : (
-            <ActionButton to="/app/capture/receipt" icon={<Plus size={15} />}>Beleg hinzufügen</ActionButton>
+            <ActionButton to="/app/capture/receipt" icon={<Plus size={15} />}>Beleg hinzufÃ¼gen</ActionButton>
           )
         }
       />
@@ -499,8 +574,8 @@ export function ItemDetail() {
             <InlineNotice
               variant="warning"
               title="Beleg fehlt"
-              description={`Für ${item.name} ist noch kein Kaufnachweis gespeichert.`}
-              actionLabel="Beleg hinzufügen"
+              description={`FÃ¼r ${item.name} ist noch kein Kaufnachweis gespeichert.`}
+              actionLabel="Beleg hinzufÃ¼gen"
               actionTo="/app/capture/receipt"
             />
           ) : null}
@@ -510,9 +585,9 @@ export function ItemDetail() {
               title="Garantie endet bald"
               description={`${item.name} ${warrantyCountdownLabel(wDays ?? 0)}. Du kannst eine Erinnerung anlegen.`}
               actionLabel="Erinnerung anlegen"
-              secondaryActionLabel="Später"
+              secondaryActionLabel="SpÃ¤ter"
               onAction={() => {
-                setReminderTitle((current) => current || "Garantie prüfen");
+                setReminderTitle((current) => current || "Garantie prÃ¼fen");
                 document.getElementById("item-care-reminder")?.scrollIntoView({ behavior: "smooth", block: "center" });
               }}
               onDismiss={() => setDismissedWarrantyItemId(item.id)}
@@ -566,8 +641,8 @@ export function ItemDetail() {
             <WarrantyTimeline
               elapsedPct={warrantyElapsedPct(item.purchaseDate, item.warrantyUntil)}
               daysLeft={wDays}
-              purchaseLabel={`Kauf · ${formatDate(item.purchaseDate)}`}
-              endLabel={`Ende · ${formatDate(item.warrantyUntil)}`}
+              purchaseLabel={`Kauf Â· ${formatDate(item.purchaseDate)}`}
+              endLabel={`Ende Â· ${formatDate(item.warrantyUntil)}`}
             />
           </div>
         </div>
@@ -577,16 +652,22 @@ export function ItemDetail() {
         <div className="space-y-5">
           <section className="object-panel rounded-lg p-4 md:p-5">
             <SectionTitle eyebrow="Grunddaten" title="Besitz und Kauf" icon={<FileText size={19} />} />
-            <div className="mt-5 divide-y divide-line/70 rounded-lg border border-line bg-white">
-              <DetailRow icon={<Store size={18} />} label="Gekauft bei" value={item.merchant ?? "Unbekannt"} />
-              <DetailRow icon={<CalendarClock size={18} />} label="Gekauft am" value={formatDate(item.purchaseDate)} />
-              <DetailRow icon={<CreditCard size={18} />} label="Gezahlt" value={`${item.price ?? 0} ${item.currency}`} />
-              <DetailRow icon={<ShieldCheck size={18} />} label="Garantie bis" value={formatDate(item.warrantyUntil)} />
-              <DetailRow icon={<Package size={18} />} label="Marke / Modell" value={identity} />
-              <DetailRow icon={<ClipboardCheck size={18} />} label="Seriennummer" value={item.serialNumber ?? "Fehlt"} />
-              <DetailRow icon={<ScanBarcode size={18} />} label="Barcode / GTIN" value={item.barcode ?? "Fehlt"} />
-              <DetailRow icon={<MapPin size={18} />} label="Standort" value={item.location ?? "Unbekannt"} />
-              <DetailRow icon={<LifeBuoy size={18} />} label="Support" value={item.supportContact ?? item.supportUrl ?? "Fehlt"} />
+            <div className="mt-5 grid gap-3 rounded-lg border border-line bg-white p-3">
+              <EditableDetailField icon={<Store size={18} />} label="Gekauft bei" value={ownershipForm.merchant} onChange={(value) => updateOwnershipField("merchant", value)} placeholder="Händler oder Shop" />
+              <EditableDetailField icon={<CalendarClock size={18} />} label="Gekauft am" value={ownershipForm.purchaseDate} onChange={(value) => updateOwnershipField("purchaseDate", value)} type="date" />
+              <EditableDetailField icon={<CreditCard size={18} />} label={`Gezahlt (${item.currency})`} value={ownershipForm.price} onChange={(value) => updateOwnershipField("price", value)} placeholder="0.00" type="number" />
+              <EditableDetailField icon={<ShieldCheck size={18} />} label="Garantie bis" value={ownershipForm.warrantyUntil} onChange={(value) => updateOwnershipField("warrantyUntil", value)} type="date" />
+              <EditableDetailField icon={<Package size={18} />} label="Marke" value={ownershipForm.manufacturer} onChange={(value) => updateOwnershipField("manufacturer", value)} placeholder="Samsung" />
+              <EditableDetailField icon={<Package size={18} />} label="Modell" value={ownershipForm.model} onChange={(value) => updateOwnershipField("model", value)} placeholder="OLED, Modellnummer..." />
+              <EditableDetailField icon={<ClipboardCheck size={18} />} label="Seriennummer" value={ownershipForm.serialNumber} onChange={(value) => updateOwnershipField("serialNumber", value)} placeholder="Seriennummer" />
+              <EditableDetailField icon={<ScanBarcode size={18} />} label="Barcode / GTIN" value={ownershipForm.barcode} onChange={(value) => updateOwnershipField("barcode", value)} placeholder="EAN / GTIN" />
+              <EditableDetailField icon={<MapPin size={18} />} label="Standort" value={ownershipForm.location} onChange={(value) => updateOwnershipField("location", value)} placeholder="Wohnzimmer" />
+              <EditableDetailField icon={<LifeBuoy size={18} />} label="Support" value={ownershipForm.supportContact} onChange={(value) => updateOwnershipField("supportContact", value)} placeholder="Support-URL, E-Mail oder Notiz" />
+              <div className="flex justify-end">
+                <Button onClick={saveOwnership} icon={<Save size={18} />} disabled={busy === "ownership-save"}>
+                  {busy === "ownership-save" ? "Speichert..." : "Grunddaten speichern"}
+                </Button>
+              </div>
             </div>
           </section>
 
@@ -647,10 +728,10 @@ export function ItemDetail() {
             <div className="mt-5 rounded-lg border border-line bg-white p-3">
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem_auto] md:items-end">
                 <label className="block text-sm font-bold text-ink">
-                  Dokument hinzufügen
+                  Dokument hinzufÃ¼gen
                   <span className="mt-2 flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line bg-[#f8faf9] px-3 text-sm font-black text-muted transition hover:border-leaf hover:bg-leaf/5">
                     <UploadCloud className="shrink-0 text-leaf" size={18} />
-                    <span className="min-w-0 truncate">{documentFile ? documentFile.name : "Datei wählen"}</span>
+                    <span className="min-w-0 truncate">{documentFile ? documentFile.name : "Datei wÃ¤hlen"}</span>
                     <input
                       className="hidden"
                       type="file"
@@ -674,7 +755,7 @@ export function ItemDetail() {
                   </select>
                 </label>
                 <Button onClick={uploadPassportDocument} disabled={!documentFile || busy === "document-upload"} icon={<UploadCloud size={18} />} type="button">
-                  {busy === "document-upload" ? "Lädt hoch..." : "Anhängen"}
+                  {busy === "document-upload" ? "LÃ¤dt hoch..." : "AnhÃ¤ngen"}
                 </Button>
               </div>
             </div>
@@ -690,7 +771,7 @@ export function ItemDetail() {
                       disabled={busy === `document-open-${document.id}`}
                       onClick={() => void openPassportDocument(document)}
                       type="button"
-                      aria-label={`${document.fileName} öffnen`}
+                      aria-label={`${document.fileName} Ã¶ffnen`}
                     >
                       <ReceiptText size={19} />
                     </button>
@@ -704,21 +785,21 @@ export function ItemDetail() {
                       onClick={() => void openPassportDocument(document)}
                       type="button"
                     >
-                      Öffnen
+                      Ã–ffnen
                     </button>
                     <button
                       className="rounded-md border border-line px-3 py-2 text-xs font-black text-ink transition hover:border-leaf hover:text-leaf"
                       onClick={() => openDocumentReview(document)}
                       type="button"
                     >
-                      Prüfen
+                      PrÃ¼fen
                     </button>
                     <button
                       className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-red-200/70 text-red-600 transition hover:bg-red-50 disabled:opacity-45"
                       disabled={busy === `document-delete-${document.id}`}
                       onClick={() => void deletePassportDocument(document.id)}
                       type="button"
-                      aria-label={`${document.fileName} löschen`}
+                      aria-label={`${document.fileName} lÃ¶schen`}
                     >
                       <Trash2 size={16} />
                     </button>
@@ -732,16 +813,16 @@ export function ItemDetail() {
               <div className="mt-4 rounded-lg border border-line bg-white p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <span className="text-[0.68rem] font-black uppercase tracking-[0.08em] text-muted">KI-Extraktion prüfen</span>
+                    <span className="text-[0.68rem] font-black uppercase tracking-[0.08em] text-muted">KI-Extraktion prÃ¼fen</span>
                     <h3 className="mt-1 text-base font-black text-ink">{reviewDocument.fileName}</h3>
-                    <p className="mt-1 text-sm font-semibold leading-6 text-muted">Korrigiere nur die gespeicherten Extraktionsdaten. Die Originaldatei bleibt unverändert.</p>
+                    <p className="mt-1 text-sm font-semibold leading-6 text-muted">Korrigiere nur die gespeicherten Extraktionsdaten. Die Originaldatei bleibt unverÃ¤ndert.</p>
                   </div>
                   <button
                     className="rounded-md border border-line px-3 py-2 text-xs font-black text-muted transition hover:border-leaf hover:text-leaf"
                     onClick={() => setReviewDocumentId(null)}
                     type="button"
                   >
-                    Schließen
+                    SchlieÃŸen
                   </button>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -780,7 +861,7 @@ export function ItemDetail() {
                     onClick={() => void clearDocumentExtraction()}
                     type="button"
                   >
-                    {busy === `document-review-clear-${reviewDocument.id}` ? "Löscht..." : "Extraktion löschen"}
+                    {busy === `document-review-clear-${reviewDocument.id}` ? "LÃ¶scht..." : "Extraktion lÃ¶schen"}
                   </button>
                 </div>
               </div>
@@ -841,7 +922,7 @@ export function ItemDetail() {
               </label>
               <div className="flex items-end">
                 <Button className="w-full" onClick={addRepairLog} icon={<Plus size={18} />} disabled={!repairDraft.problem.trim()}>
-                  Reparatur hinzufügen
+                  Reparatur hinzufÃ¼gen
                 </Button>
               </div>
             </div>
@@ -855,7 +936,7 @@ export function ItemDetail() {
           </section>
 
           <section className="object-panel rounded-lg p-4 md:p-5">
-            <SectionTitle eyebrow="Verlauf" title="Aktivität" icon={<CheckCircle2 size={19} />} />
+            <SectionTitle eyebrow="Verlauf" title="AktivitÃ¤t" icon={<CheckCircle2 size={19} />} />
             <div className="mt-5 grid gap-3">
               {item.activities?.length ? (
                 item.activities.map((activity) => (
@@ -874,7 +955,7 @@ export function ItemDetail() {
 
         <aside className="space-y-5 lg:sticky lg:top-28 lg:self-start">
           <section className="object-panel rounded-lg p-4" id="item-care-reminder">
-            <SectionTitle eyebrow="Smart-Gerät" title="Gerätesteuerung" icon={<RadioTower size={19} />} />
+            <SectionTitle eyebrow="Smart-GerÃ¤t" title="GerÃ¤testeuerung" icon={<RadioTower size={19} />} />
             <div className="mt-5 grid gap-3">
               {item.smartHomeDevices?.length ? (
                 item.smartHomeDevices.map((device) => (
@@ -883,7 +964,7 @@ export function ItemDetail() {
                       <div className="min-w-0">
                         <p className="text-xs font-black uppercase text-muted">{device.provider}</p>
                         <h3 className="mt-1 truncate text-lg font-black text-ink">{device.name}</h3>
-                        <p className="mt-1 text-sm font-semibold text-muted">{[device.roomName, device.status, device.powerState].filter(Boolean).join(" · ")}</p>
+                        <p className="mt-1 text-sm font-semibold text-muted">{[device.roomName, device.status, powerStateLabel(device)].filter(Boolean).join(" · ")}</p>
                       </div>
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-leaf/10 text-leaf">
                         <PlugZap size={17} />
@@ -891,21 +972,33 @@ export function ItemDetail() {
                     </div>
                     {device.provider === "BAMBU_LAB" && device.deviceType === "3d_printer" ? (
                       <PrinterObjectControls busy={busy} device={device} onBambuEvent={recordBambuEvent} onCommand={smartCommand} />
-                    ) : device.capabilities.some((capability) => ["switch", "audioVolume", "audioMute"].includes(capability)) ? (
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <button className="smart-mini-action" onClick={() => smartCommand(device.id, "power_on")} type="button">
-                        <Power size={15} /> On
-                      </button>
-                      <button className="smart-mini-action smart-mini-action-light" onClick={() => smartCommand(device.id, "power_off")} type="button">
-                        Off
-                      </button>
-                      <button className="smart-mini-action smart-mini-action-light" onClick={() => smartCommand(device.id, "volume_up")} type="button">
-                        <Volume2 size={15} /> +
-                      </button>
-                      <button className="smart-mini-action smart-mini-action-light" onClick={() => smartCommand(device.id, "mute")} type="button">
-                        Mute
-                      </button>
-                    </div>
+                    ) : canControlSmartDevice(device) ? (
+                      <div className="mt-4 grid gap-2">
+                        <button
+                          className="smart-mini-action"
+                          disabled={busy.startsWith(`${device.id}-power_`)}
+                          onClick={() => smartCommand(device.id, device.powerState === "on" ? "power_off" : "power_on")}
+                          type="button"
+                        >
+                          <Power size={15} /> {busy.startsWith(`${device.id}-power_`) ? "Wird gesendet..." : device.powerState === "on" ? "Ausschalten" : "Einschalten"}
+                        </button>
+                        {isTvLikeDevice(device) ? (
+                          <div className="grid grid-cols-3 gap-2">
+                            <button className="smart-mini-action smart-mini-action-light" disabled={busy === `${device.id}-volume_down`} onClick={() => smartCommand(device.id, "volume_down")} type="button">
+                              <Volume2 size={15} /> Leiser
+                            </button>
+                            <button className="smart-mini-action smart-mini-action-light" disabled={busy === `${device.id}-volume_up`} onClick={() => smartCommand(device.id, "volume_up")} type="button">
+                              <Volume2 size={15} /> Lauter
+                            </button>
+                            <button className="smart-mini-action smart-mini-action-light" disabled={busy === `${device.id}-mute_toggle`} onClick={() => smartCommand(device.id, "mute_toggle")} type="button">
+                              <VolumeX size={15} /> Stumm
+                            </button>
+                          </div>
+                        ) : null}
+                        <Link className="smart-mini-action smart-mini-action-light" to={`/app/home-graph/devices/${device.id}`}>
+                          Gerätdetail öffnen
+                        </Link>
+                      </div>
                     ) : (
                       <div className="object-device-note">
                         <p>Local identity gespeichert</p>
@@ -921,11 +1014,11 @@ export function ItemDetail() {
                 ))
               ) : (
                 <div className="rounded-lg border border-dashed border-line bg-white/70 p-4 text-sm font-bold text-muted">
-                  Noch kein Smart-Home-Gerät verbunden.
+                  Noch kein Smart-Home-GerÃ¤t verbunden.
                 </div>
               )}
-              <Link className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-ink px-4 text-sm font-black text-white" to="/smart-home">
-                <Link2 size={16} /> Smart-Gerät verbinden
+              <Link className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-ink px-4 text-sm font-black text-white" to="/app/smart-home">
+                <Link2 size={16} /> {item.smartHomeDevices?.length ? "Smart-Home öffnen" : "Smart-Gerät verbinden"}
               </Link>
             </div>
           </section>
@@ -945,7 +1038,7 @@ export function ItemDetail() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Shop öffnen <ExternalLink size={16} />
+                  Shop Ã¶ffnen <ExternalLink size={16} />
                 </a>
               ) : (
                 <div className="rounded-lg border border-dashed border-line bg-white/70 p-4 text-sm font-bold text-muted">Kein Nachkauf-Link verbunden.</div>
@@ -981,7 +1074,7 @@ export function ItemDetail() {
           </section>
 
           <section className="object-panel rounded-lg p-4">
-            <SectionTitle eyebrow="Nächster fehlender Punkt" title="Seriennummer" icon={<Wrench size={19} />} />
+            <SectionTitle eyebrow="NÃ¤chster fehlender Punkt" title="Seriennummer" icon={<Wrench size={19} />} />
             <label className="mt-5 block text-sm font-bold text-ink">
               Seriennummer
               <input
@@ -1051,7 +1144,7 @@ export function ItemDetail() {
                     {supportDraft.attachments.length ? (
                       supportDraft.attachments.map((attachment) => <SupportAttachmentLine attachment={attachment} key={attachment.id} />)
                     ) : (
-                      <div className="rounded-lg border border-dashed border-line bg-white/70 p-3 text-xs font-black text-muted">Noch keine Anhänge vorbereitet.</div>
+                      <div className="rounded-lg border border-dashed border-line bg-white/70 p-3 text-xs font-black text-muted">Noch keine AnhÃ¤nge vorbereitet.</div>
                     )}
                   </div>
 
@@ -1073,7 +1166,7 @@ export function ItemDetail() {
           </section>
 
           <section className="object-panel rounded-lg p-4">
-            <SectionTitle eyebrow="Care" title="Offene Punkte zu diesem Ding" icon={<ShieldCheck size={19} />} />
+            <SectionTitle eyebrow="Care" title="Offene Punkte zu diesem Objekt" icon={<ShieldCheck size={19} />} />
             <p className="mt-3 text-sm font-semibold leading-6 text-muted">
               Starte hier eine produktgebundene Erinnerung. Beleg, Garantie und Produktkontext bleiben mit dem Care-Punkt verbunden.
             </p>
@@ -1082,14 +1175,14 @@ export function ItemDetail() {
                 value={reminderTitle}
                 onChange={(event) => setReminderTitle(event.target.value)}
                 className="min-w-0 flex-1 rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
-                placeholder="z.B. Garantie prüfen"
+                placeholder="z.B. Garantie prÃ¼fen"
               />
               <Button disabled={!reminderTitle.trim() || busy === "care-create"} onClick={addReminder} icon={<Plus size={18} />}>
                 Care anlegen
               </Button>
             </div>
             <div className="mt-4 grid gap-3">
-              {loops.length ? loops.map((loop) => <LoopCard key={loop.id} loop={loop} />) : <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">Noch keine Care-Punkte für dieses Produkt.</div>}
+              {loops.length ? loops.map((loop) => <LoopCard key={loop.id} loop={loop} />) : <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">Noch keine Care-Punkte fÃ¼r dieses Produkt.</div>}
             </div>
           </section>
         </aside>
@@ -1104,9 +1197,9 @@ function warrantyDaysLeft(value?: string | null): number | null {
 }
 
 function warrantyCountdownLabel(daysLeft: number) {
-  if (daysLeft <= 0) return "läuft heute aus";
-  if (daysLeft === 1) return "läuft morgen aus";
-  return `läuft in ${daysLeft} Tagen aus`;
+  if (daysLeft <= 0) return "lÃ¤uft heute aus";
+  if (daysLeft === 1) return "lÃ¤uft morgen aus";
+  return `lÃ¤uft in ${daysLeft} Tagen aus`;
 }
 
 function warrantyElapsedPct(purchase?: string | null, end?: string | null): number {
@@ -1127,6 +1220,39 @@ function formatDate(value?: string | null) {
   return isoDate(value);
 }
 
+function nullableText(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function powerStateLabel(device: SmartHomeDevice) {
+  if (device.powerState === "on") return "an";
+  if (device.powerState === "off") return "aus";
+  return device.powerState ?? "bereit";
+}
+
+function isTvLikeDevice(device: SmartHomeDevice) {
+  const text = `${device.name} ${device.deviceType}`.toLowerCase();
+  return text.includes("tv") || text.includes("samsung") || text.includes("fernseher");
+}
+
+function canControlSmartDevice(device: SmartHomeDevice) {
+  const capabilities = device.capabilities.map((capability) => capability.toLowerCase());
+  return isTvLikeDevice(device) || capabilities.includes("switch") || capabilities.includes("audiovolume") || capabilities.includes("audiomute");
+}
+
+function smartCommandLabel(command: string) {
+  const labels: Record<string, string> = {
+    power_on: "Einschalten gesendet",
+    power_off: "Ausschalten gesendet",
+    volume_up: "Lauter gesendet",
+    volume_down: "Leiser gesendet",
+    mute_toggle: "Stumm umschalten gesendet",
+    source_menu: "Quellenmenü geöffnet"
+  };
+  return labels[command] ?? `Smart-Home-Befehl gesendet: ${command.replace(/_/g, " ")}`;
+}
+
 function visibilityLabel(value?: string | null) {
   const labels: Record<string, string> = {
     PRIVATE: "Privat",
@@ -1137,14 +1263,14 @@ function visibilityLabel(value?: string | null) {
 
 function itemTypeLabel(value?: string | null) {
   const labels: Record<string, string> = {
-    THING: "Ding",
+    THING: "Objekt",
     ELECTRONIC: "Elektronik",
-    FURNITURE: "Möbel",
+    FURNITURE: "MÃ¶bel",
     INFRASTRUCTURE: "Infrastruktur",
     VEHICLE: "Fahrzeug",
     COLLECTIBLE: "Sammlung"
   };
-  return value ? labels[value] ?? value : "Ding";
+  return value ? labels[value] ?? value : "Objekt";
 }
 
 function PassportLink({ icon, label, saved = false, url }: { icon: ReactNode; label: string; saved?: boolean; url?: string | null }) {
@@ -1212,16 +1338,16 @@ function ProductRecommendationPanel({
   const activeRecommendations = recommendations.filter((recommendation) => recommendation.tab === tab);
   const tabItems: { id: RecommendationTab; label: string; helper: string }[] = [
     { id: "spare", label: "Ersatzteile", helper: "Teile und Reparatur" },
-    { id: "buy", label: "Zubehör", helper: "Kaufen oder nachbestellen" },
+    { id: "buy", label: "ZubehÃ¶r", helper: "Kaufen oder nachbestellen" },
     { id: "print", label: "Druckdateien", helper: "Nur einfache, nicht kritische Teile" },
-    { id: "check", label: "Prüfen", helper: "Unsichere Treffer" }
+    { id: "check", label: "PrÃ¼fen", helper: "Unsichere Treffer" }
   ];
 
   return (
     <section className="object-panel rounded-lg p-4 md:p-5">
-      <SectionTitle eyebrow="Empfehlungen" title="Passendes für dieses Ding" icon={<Package size={19} />} />
+      <SectionTitle eyebrow="Empfehlungen" title="Passendes fÃ¼r dieses Objekt" icon={<Package size={19} />} />
       <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-muted">
-        Avareno zeigt hier nur einfache Vorschläge zum aktuellen Produkt. Was nicht eindeutig zum Modell passt, bleibt in „Prüfen“.
+        Avareno zeigt hier kuratierte Beispiel-Links zu erkannten Produkten â€“ noch keine automatische Teilesuche. PrÃ¼fe jeden Treffer vor dem Kauf; was nicht eindeutig zum Modell passt, bleibt in â€žPrÃ¼fenâ€œ.
       </p>
 
       <div className="item-rec-tabs" role="tablist" aria-label="Empfehlungen">
@@ -1244,7 +1370,7 @@ function ProductRecommendationPanel({
           <div className="item-rec-empty">
             <ShieldAlert size={19} />
             <strong>Noch nichts Sicheres gefunden</strong>
-            <p>Für dieses Produkt braucht Avareno zuerst ein eindeutiges Modell, eine Seriennummer oder eine verlässliche Quelle.</p>
+            <p>FÃ¼r dieses Produkt braucht Avareno zuerst ein eindeutiges Modell, eine Seriennummer oder eine verlÃ¤ssliche Quelle.</p>
           </div>
         )}
       </div>
@@ -1255,7 +1381,7 @@ function ProductRecommendationPanel({
 function ProductRecommendationCard({ recommendation }: { recommendation: ProductRecommendation }) {
   return (
     <article className="item-rec-card">
-      <a className="item-rec-image" href={recommendation.sourceUrl} target="_blank" rel="noreferrer" aria-label={`${recommendation.title} öffnen`}>
+      <a className="item-rec-image" href={recommendation.sourceUrl} target="_blank" rel="noreferrer" aria-label={`${recommendation.title} Ã¶ffnen`}>
         <img src={recommendation.imageUrl} alt="" loading="lazy" />
       </a>
       <div className="item-rec-body">
@@ -1265,7 +1391,7 @@ function ProductRecommendationCard({ recommendation }: { recommendation: Product
             <h3>{recommendation.title}</h3>
           </div>
           <small className={recommendation.verification === "exact" ? "is-exact" : "is-check"}>
-            {recommendation.verification === "exact" ? "passt zum Modell" : "bitte prüfen"}
+            {recommendation.verification === "exact" ? "passt zum Modell" : "bitte prÃ¼fen"}
           </small>
         </div>
         <p>{recommendation.note}</p>
@@ -1327,10 +1453,10 @@ function ProductQrPanel({ item }: { item: Item }) {
       <SectionTitle eyebrow="Produkt-QR" title="Label zum Scannen" icon={<QrCode size={19} />} />
       <div className="product-qr-body">
         <div className="product-qr-code">
-          {qrDataUrl ? <img src={qrDataUrl} alt={`QR-Code für ${item.name}`} /> : <QrCode size={56} />}
+          {qrDataUrl ? <img src={qrDataUrl} alt={`QR-Code fÃ¼r ${item.name}`} /> : <QrCode size={56} />}
         </div>
         <div className="product-qr-copy">
-          <p>Der Code öffnet diesen Produktpass in Avareno. Er enthält keine Seriennummer, keinen Preis und keine Dokumentdaten.</p>
+          <p>Der Code Ã¶ffnet diesen Produktpass in Avareno. Er enthÃ¤lt keine Seriennummer, keinen Preis und keine Dokumentdaten.</p>
           <span>{qrUrl}</span>
         </div>
       </div>
@@ -1438,57 +1564,57 @@ function productRecommendationsFor(item: Item): ProductRecommendation[] {
     {
       id: "lg-c3-parts-search",
       tab: "spare",
-      title: "LG Ersatzteile für OLED65C3 suchen",
+      title: "LG Ersatzteile fÃ¼r OLED65C3 suchen",
       subtitle: "Ersatzteile",
       imageUrl,
       sourceName: "LG Parts",
       sourceUrl: "https://lgparts.com/search?q=OLED65C3",
       actionLabel: "Teile suchen",
-      availabilityLabel: "Modellsuche geöffnet",
+      availabilityLabel: "Modellsuche geÃ¶ffnet",
       confidenceLabel: "Quelle: Teilekatalog",
-      note: "Direkte Suche nach deinem Modell. Avareno empfiehlt noch kein einzelnes Teil als final passend, bevor Seriennummer und Teilenummer bestätigt sind.",
+      note: "Direkte Suche nach deinem Modell. Avareno empfiehlt noch kein einzelnes Teil als final passend, bevor Seriennummer und Teilenummer bestÃ¤tigt sind.",
       verification: "check"
     },
     {
       id: "lg-c3-power-board-check",
       tab: "check",
-      title: "Power Supply Board EAY65689424 prüfen",
+      title: "Power Supply Board EAY65689424 prÃ¼fen",
       subtitle: "Unsicheres Ersatzteil",
       imageUrl: "https://www.lg.com/content/dam/channel/wcms/mx/images/accesorios/eay65689424_awmxlat_ecom_s_ecom_s_1100x730.jpg",
-      sourceName: "LG Zubehörseite",
+      sourceName: "LG ZubehÃ¶rseite",
       sourceUrl: "https://www.lg.com/mx/accesorios-para-tv/eay65689424/",
-      actionLabel: "Quelle prüfen",
+      actionLabel: "Quelle prÃ¼fen",
       availabilityLabel: "Nicht final empfohlen",
-      confidenceLabel: "Modellprüfung nötig",
-      note: "Reales LG-Ersatzteil mit Produktbild, aber nicht als sicherer Match für OLED65C3 markiert. Vor Kauf muss die exakte Modell-/Seriennummer passen.",
+      confidenceLabel: "ModellprÃ¼fung nÃ¶tig",
+      note: "Reales LG-Ersatzteil mit Produktbild, aber nicht als sicherer Match fÃ¼r OLED65C3 markiert. Vor Kauf muss die exakte Modell-/Seriennummer passen.",
       verification: "check"
     },
     {
       id: "lg-c3-magic-remote",
       tab: "buy",
       title: "LG Magic Remote",
-      subtitle: "Zubehör",
+      subtitle: "ZubehÃ¶r",
       imageUrl: "https://www.lg.com/us/images/tv-audio-video-accessories/md08003585/gallery/medium01.jpg",
       sourceName: "LG",
       sourceUrl: "https://www.lg.com/us/magic-remote",
       actionLabel: "Ansehen",
-      availabilityLabel: "Offizielle Zubehörseite",
-      confidenceLabel: "Kompatibilität im Shop prüfen",
-      note: "Sinnvolles Zubehör für LG TVs. Avareno zeigt es hier als Kaufvorschlag, aber finaler Kauf erst nach Modellprüfung im LG-Shop.",
+      availabilityLabel: "Offizielle ZubehÃ¶rseite",
+      confidenceLabel: "KompatibilitÃ¤t im Shop prÃ¼fen",
+      note: "Sinnvolles ZubehÃ¶r fÃ¼r LG TVs. Avareno zeigt es hier als Kaufvorschlag, aber finaler Kauf erst nach ModellprÃ¼fung im LG-Shop.",
       verification: "check"
     },
     {
       id: "lg-c3-remote-holder-print",
       tab: "print",
-      title: "LG C3 Wandhalter für Magic Remote",
+      title: "LG C3 Wandhalter fÃ¼r Magic Remote",
       subtitle: "Druckdatei",
       imageUrl: "https://www.lg.com/us/images/tv-audio-video-accessories/md08003585/gallery/medium01.jpg",
       sourceName: "MakerWorld",
       sourceUrl: "https://makerworld.com/en/models/448222-lg-c3-wall-mounted-magic-remote-holder",
-      actionLabel: "Druckdatei öffnen",
+      actionLabel: "Druckdatei Ã¶ffnen",
       availabilityLabel: "3D-Datei",
       confidenceLabel: "Nicht sicherheitskritisch",
-      note: "Ein einfacher Halter für die Fernbedienung ist ein gutes Beispiel für Druckdateien: praktisch, niedriges Risiko, kein sicherheitskritisches Ersatzteil.",
+      note: "Ein einfacher Halter fÃ¼r die Fernbedienung ist ein gutes Beispiel fÃ¼r Druckdateien: praktisch, niedriges Risiko, kein sicherheitskritisches Ersatzteil.",
       verification: "exact"
     },
     {
@@ -1499,10 +1625,10 @@ function productRecommendationsFor(item: Item): ProductRecommendation[] {
       imageUrl,
       sourceName: "LG Support",
       sourceUrl: item.supportUrl || "https://www.lg.com/support/product/lg-OLED65C3",
-      actionLabel: "Support öffnen",
+      actionLabel: "Support Ã¶ffnen",
       availabilityLabel: "Offizielle Quelle",
       confidenceLabel: "Modellquelle gespeichert",
-      note: "Handbuch, Firmware und Support bleiben direkt am Ding. Das ist oft hilfreicher als sofort ein Kaufteil vorzuschlagen.",
+      note: "Handbuch, Firmware und Support bleiben direkt am Objekt. Das ist oft hilfreicher als sofort ein Kaufteil vorzuschlagen.",
       verification: "exact"
     }
   ];
@@ -1688,6 +1814,37 @@ function SectionTitle({ eyebrow, title, icon }: { eyebrow: string; title: string
   );
 }
 
+function EditableDetailField({
+  icon,
+  label,
+  onChange,
+  placeholder,
+  type = "text",
+  value
+}: {
+  icon: ReactNode;
+  label: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: "date" | "number" | "text";
+  value: string;
+}) {
+  return (
+    <label className="grid gap-3 rounded-lg border border-line bg-white p-3 sm:grid-cols-[2.5rem_11rem_1fr] sm:items-center">
+      <span className="grid h-10 w-10 place-items-center rounded-md bg-[#eef2f0] text-leaf">{icon}</span>
+      <span className="text-xs font-black uppercase text-muted">{label}</span>
+      <input
+        className="min-h-10 min-w-0 rounded-md border border-line bg-[#f8faf9] px-3 text-sm font-black text-ink outline-none transition focus:border-leaf focus:bg-white"
+        onChange={(event) => onChange(event.currentTarget.value)}
+        placeholder={placeholder}
+        step={type === "number" ? "0.01" : undefined}
+        type={type}
+        value={value}
+      />
+    </label>
+  );
+}
+
 function DetailRow({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="grid gap-3 p-4 sm:grid-cols-[2.5rem_11rem_1fr] sm:items-center">
@@ -1746,5 +1903,5 @@ function warrantyState(value?: string | null): { label: string; tone: "green" | 
   const days = Math.ceil((new Date(value).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   if (days < 0) return { label: "Garantie abgelaufen", tone: "red" };
   if (days < 60) return { label: `${days} Tage`, tone: "amber" };
-  return { label: "Geschützt", tone: "green" };
+  return { label: "GeschÃ¼tzt", tone: "green" };
 }

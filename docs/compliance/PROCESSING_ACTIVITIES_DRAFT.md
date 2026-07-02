@@ -163,12 +163,12 @@ Provider-specific draft entries live in `SUBPROCESSORS_DRAFT.md`. Implementation
 
 ### Billing And Subscriptions
 
-- Purpose: sell and manage Free, Personal and Family subscription states.
-- Data categories: Avareno user id, provider customer id, provider subscription id, plan key, subscription status, current period dates, cancel-at-period-end flag, safe webhook event id/type/status/error. Paddle may process customer email, invoices, VAT/tax metadata and payment details in its own systems.
-- Recipients: Avareno backend/database for subscription state; Paddle as preferred first Merchant-of-Record billing provider direction after review.
+- Purpose: sell and manage Free, Personal, Pro and Family subscription states.
+- Data categories: Avareno user id, provider customer id, provider subscription id, provider price id, plan key, billing interval, subscription status, current period dates, cancel-at-period-end flag, safe webhook event id/type/status/error. Stripe may process customer email, invoices, VAT/tax metadata and payment details in its own systems.
+- Recipients: Avareno backend/database for subscription state; Stripe as planned subscription billing provider after review.
 - Retention: local subscription state until account deletion or legally required billing retention is defined; provider retention/deletion behavior TODO.
-- Security: Paddle API key and webhook secret server-side only; webhook signature required; idempotent event ids; no card/payment method details stored by Avareno; no raw provider payload logging.
-- Open: MoR scope, VAT/tax handling, invoice handling, DPA/AVV, region/transfers, subprocessors, cancellation/customer portal, refund/support process, privacy policy and terms wording.
+- Security: Stripe secret key and webhook secret server-side only; Checkout and portal are created server-side; webhook signature required; idempotent event ids; no card/payment method details stored by Avareno; no raw provider payload logging.
+- Open: Stripe Tax/VAT handling, invoice handling, DPA/AVV, region/transfers, subprocessors, cancellation/customer portal, refund/support process, privacy policy and terms wording.
 
 ### Documents, Receipts And Files
 

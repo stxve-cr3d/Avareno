@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import os
 import socket
+import ssl
 import sqlite3
 import subprocess
+import time
 import urllib.error
+import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -15,10 +21,65 @@ from app.db import row_to_dict, rows_to_dicts
 from app.utils import make_id, now_iso
 
 SMARTTHINGS_PROVIDER = "SAMSUNG_SMARTTHINGS"
+AVARENO_BRIDGE_PROVIDER = "AVARENO_BRIDGE"
+HOME_ASSISTANT_PROVIDER = "HOME_ASSISTANT"
 LOCAL_DISCOVERY_PROVIDER = "LOCAL_DISCOVERY"
 BAMBU_LAB_PROVIDER = "BAMBU_LAB"
 SMARTTHINGS_API = "https://api.smartthings.com/v1"
-LAN_DISCOVERY_PORTS = [80, 443, 554, 631, 8008, 8009, 8060, 8080, 8123, 8883, 9100, 990, 5000, 5001]
+LAN_DISCOVERY_PORTS = [80, 443, 554, 631, 8001, 8002, 8008, 8009, 8060, 8080, 8123, 8883, 9100, 9197, 990, 5000, 5001]
+HOME_GRAPH_SAFE_CAPABILITIES = {"power", "brightness"}
+HOME_GRAPH_CONNECT_PROVIDERS = {
+    "philips_hue": {
+        "provider": "HOME_GRAPH_PHILIPS_HUE",
+        "name": "Philips Hue",
+        "appName": "Hue",
+        "devicePrefix": "Hue",
+        "sampleDevices": [
+            {"id": "hue-living-room-light", "label": "Wohnzimmer Hue Lampe", "roomName": "Wohnzimmer", "type": "light", "capabilities": ["switch", "switchLevel"], "powerState": "off"},
+            {"id": "hue-reading-light", "label": "Leselampe", "roomName": "Wohnzimmer", "type": "light", "capabilities": ["switch", "switchLevel"], "powerState": "on"},
+        ],
+    },
+    "smartthings": {
+        "provider": "HOME_GRAPH_SMARTTHINGS",
+        "name": "SmartThings",
+        "appName": "SmartThings",
+        "devicePrefix": "SmartThings",
+        "sampleDevices": [
+            {"id": "smartthings-lamp", "label": "SmartThings Lampe", "roomName": "Wohnzimmer", "type": "light", "capabilities": ["switch", "switchLevel"], "powerState": "off"},
+            {"id": "smartthings-plug", "label": "SmartThings Steckdose", "roomName": "Buero", "type": "switch", "capabilities": ["switch"], "powerState": "on"},
+        ],
+    },
+    "shelly": {
+        "provider": "HOME_GRAPH_SHELLY",
+        "name": "Shelly",
+        "appName": "Shelly Smart Control",
+        "devicePrefix": "Shelly",
+        "sampleDevices": [
+            {"id": "shelly-plug", "label": "Shelly Steckdose", "roomName": "Waschkeller", "type": "switch", "capabilities": ["switch"], "powerState": "off"},
+            {"id": "shelly-dimmer", "label": "Shelly Dimmer", "roomName": "Flur", "type": "light", "capabilities": ["switch", "switchLevel"], "powerState": "on"},
+        ],
+    },
+    "tp_link_tapo": {
+        "provider": "HOME_GRAPH_TAPO",
+        "name": "TP-Link Tapo",
+        "appName": "Tapo",
+        "devicePrefix": "Tapo",
+        "sampleDevices": [
+            {"id": "tapo-desk-light", "label": "Tapo Schreibtischlampe", "roomName": "Buero", "type": "light", "capabilities": ["switch", "switchLevel"], "powerState": "off"},
+            {"id": "tapo-plug", "label": "Tapo Steckdose", "roomName": "Kueche", "type": "switch", "capabilities": ["switch"], "powerState": "off"},
+        ],
+    },
+    "home_assistant": {
+        "provider": "HOME_GRAPH_HOME_ASSISTANT",
+        "name": "Home Assistant",
+        "appName": "Home Assistant",
+        "devicePrefix": "Home Assistant",
+        "sampleDevices": [
+            {"id": "ha-living-room-light", "label": "Home Assistant Lampe", "roomName": "Wohnzimmer", "type": "light", "capabilities": ["switch", "switchLevel"], "powerState": "off"},
+            {"id": "ha-office-plug", "label": "Home Assistant Steckdose", "roomName": "Buero", "type": "switch", "capabilities": ["switch"], "powerState": "on"},
+        ],
+    },
+}
 
 
 COMMANDS = {
@@ -26,10 +87,20 @@ COMMANDS = {
     "power_off": [{"component": "main", "capability": "switch", "command": "off", "arguments": []}],
     "mute": [{"component": "main", "capability": "audioMute", "command": "mute", "arguments": []}],
     "unmute": [{"component": "main", "capability": "audioMute", "command": "unmute", "arguments": []}],
+    "mute_toggle": [{"component": "main", "capability": "audioMute", "command": "toggle", "arguments": []}],
     "volume_up": [{"component": "main", "capability": "audioVolume", "command": "volumeUp", "arguments": []}],
     "volume_down": [{"component": "main", "capability": "audioVolume", "command": "volumeDown", "arguments": []}],
+    "source_menu": [{"component": "main", "capability": "mediaInputSource", "command": "openSourceMenu", "arguments": []}],
     "printer_pause": [{"component": "print", "capability": "printerJob", "command": "pause", "arguments": []}],
     "printer_resume": [{"component": "print", "capability": "printerJob", "command": "resume", "arguments": []}],
+}
+
+LOCAL_TV_COMMANDS = {"power_on", "power_off", "volume_up", "volume_down", "mute_toggle", "source_menu"}
+LOCAL_SAMSUNG_REMOTE_KEYS = {
+    "volume_up": "KEY_VOLUP",
+    "volume_down": "KEY_VOLDOWN",
+    "mute_toggle": "KEY_MUTE",
+    "source_menu": "KEY_SOURCE",
 }
 
 
@@ -38,7 +109,7 @@ def smartthings_token() -> str | None:
 
 
 def provider_mode() -> str:
-    return "LIVE" if smartthings_token() else "DEMO"
+    return "LIVE" if smartthings_token() else "CONFIG_REQUIRED"
 
 
 def bambu_lab_config() -> dict:
@@ -57,6 +128,14 @@ def bambu_lab_configured() -> bool:
 
 def local_discovery_enabled() -> bool:
     return os.environ.get("AVARENO_ENABLE_LAN_DISCOVERY") == "1"
+
+
+def avareno_bridge_enabled() -> bool:
+    return os.environ.get("AVARENO_ENABLE_LOCAL_BRIDGE") == "1" and bool(avareno_bridge_url())
+
+
+def avareno_bridge_url() -> str:
+    return os.environ.get("AVARENO_BRIDGE_URL", "").strip().rstrip("/")
 
 
 def smart_home_payload(conn: sqlite3.Connection, user_id: str) -> dict:
@@ -91,10 +170,20 @@ def smart_home_payload(conn: sqlite3.Connection, user_id: str) -> dict:
             device["rawJson"] = _json_or_empty_dict(device["rawJson"])
 
     insights = _smart_home_insights(conn, user_id, devices)
+    bridge_status = _avareno_bridge_runtime_status()
+    home_assistant_ready = bool(bridge_status["homeAssistantUrlConfigured"] and bridge_status["homeAssistantTokenConfigured"])
 
     return {
         "mode": provider_mode(),
         "providers": [
+            {
+                "id": AVARENO_BRIDGE_PROVIDER,
+                "name": "Avareno Bridge",
+                "mode": "LOCAL" if avareno_bridge_enabled() else "PLANNED",
+                "status": _provider_status(connections, AVARENO_BRIDGE_PROVIDER),
+                "tokenConfigured": bridge_status["reachable"],
+                "authNote": "Local helper for Home Assistant and later LAN bridges. Runs on the user's machine; no provider secret is sent to the browser.",
+            },
             {
                 "id": SMARTTHINGS_PROVIDER,
                 "name": "Samsung SmartThings",
@@ -106,18 +195,18 @@ def smart_home_payload(conn: sqlite3.Connection, user_id: str) -> dict:
             {
                 "id": BAMBU_LAB_PROVIDER,
                 "name": "Bambu Lab",
-                "mode": "LAN" if bambu_lab_configured() else "DEMO",
+                "mode": "LAN" if bambu_lab_configured() else "CONFIG_REQUIRED",
                 "status": _provider_status(connections, BAMBU_LAB_PROVIDER),
                 "tokenConfigured": bambu_lab_configured(),
-                "authNote": "Bambu works best through LAN/dev mode with printer IP, serial number and access code. Demo is safe until configured.",
+                "authNote": "Bambu works best through LAN/dev mode with printer IP, serial number and access code.",
             },
             {
-                "id": "HOME_ASSISTANT",
+                "id": HOME_ASSISTANT_PROVIDER,
                 "name": "Home Assistant",
-                "mode": "PLANNED",
-                "status": _provider_status(connections, "HOME_ASSISTANT"),
-                "tokenConfigured": False,
-                "authNote": "Local-first bridge planned.",
+                "mode": "BRIDGED" if avareno_bridge_enabled() else "PLANNED",
+                "status": _provider_status(connections, HOME_ASSISTANT_PROVIDER),
+                "tokenConfigured": home_assistant_ready,
+                "authNote": "Best used through Avareno Bridge so one Home Assistant setup can represent many brands.",
             },
             {
                 "id": "ALEXA",
@@ -154,10 +243,10 @@ def smart_home_payload(conn: sqlite3.Connection, user_id: str) -> dict:
             {
                 "id": LOCAL_DISCOVERY_PROVIDER,
                 "name": "Local Discovery",
-                "mode": "LAN" if local_discovery_enabled() else "DEMO",
+                "mode": "LAN" if local_discovery_enabled() else "DISABLED",
                 "status": _provider_status(connections, LOCAL_DISCOVERY_PROVIDER),
                 "tokenConfigured": local_discovery_enabled(),
-                "authNote": "Opt-in local search. Demo by default; set AVARENO_ENABLE_LAN_DISCOVERY=1 for limited LAN probes.",
+                "authNote": "Opt-in local search. Set AVARENO_ENABLE_LAN_DISCOVERY=1 for limited private-LAN probes. Demo devices are not used for local discovery.",
             },
         ],
         "devices": devices,
@@ -176,9 +265,9 @@ def smart_home_payload(conn: sqlite3.Connection, user_id: str) -> dict:
             "promise": "Smart devices become real Avareno objects with proof, warranty, room, state, and safe controls in one place.",
         },
         "localDiscovery": {
-            "mode": "LAN" if local_discovery_enabled() else "DEMO",
+            "mode": "LAN" if local_discovery_enabled() else "DISABLED",
             "enabled": local_discovery_enabled(),
-            "note": "Local search only runs when the user starts it.",
+            "note": "Local search only runs when the user starts it. No demo devices are returned.",
         },
     }
 
@@ -192,7 +281,7 @@ def connect_provider(conn: sqlite3.Connection, user_id: str, household_id: str, 
             (user_id, household_id, provider),
         ).fetchone()
     )
-    status = "CONNECTED" if provider in {SMARTTHINGS_PROVIDER, "HOME_ASSISTANT", LOCAL_DISCOVERY_PROVIDER, BAMBU_LAB_PROVIDER} else "PLANNED"
+    status = "CONNECTED" if provider in {SMARTTHINGS_PROVIDER, AVARENO_BRIDGE_PROVIDER, HOME_ASSISTANT_PROVIDER, LOCAL_DISCOVERY_PROVIDER, BAMBU_LAB_PROVIDER} else "PLANNED"
     if existing:
         conn.execute(
             'UPDATE "SmartHomeConnection" SET status = ?, lastSyncAt = ?, updatedAt = ? WHERE id = ?',
@@ -213,15 +302,21 @@ def connect_provider(conn: sqlite3.Connection, user_id: str, household_id: str, 
 def sync_provider(conn: sqlite3.Connection, user_id: str, household_id: str, provider: str) -> dict:
     provider = provider.upper()
     connection = connect_provider(conn, user_id, household_id, provider)
-    if provider == SMARTTHINGS_PROVIDER and smartthings_token():
+    if provider == AVARENO_BRIDGE_PROVIDER:
+        source_devices = _fetch_avareno_bridge_devices()
+        source = "BRIDGE"
+    elif provider == HOME_ASSISTANT_PROVIDER and avareno_bridge_enabled():
+        source_devices = _fetch_avareno_bridge_devices()
+        source = "BRIDGED_HOME_ASSISTANT"
+    elif provider == SMARTTHINGS_PROVIDER and smartthings_token():
         source_devices = _fetch_smartthings_devices()
         source = "LIVE"
-    elif provider == BAMBU_LAB_PROVIDER:
+    elif provider == BAMBU_LAB_PROVIDER and bambu_lab_configured():
         source_devices = _bambu_lab_devices(conn, user_id)
-        source = "LAN" if bambu_lab_configured() else "DEMO"
+        source = "LAN"
     else:
-        source_devices = _demo_devices(conn, user_id)
-        source = "DEMO"
+        source_devices = []
+        source = "NOT_CONFIGURED"
 
     synced = []
     for source_device in source_devices:
@@ -235,6 +330,93 @@ def sync_provider(conn: sqlite3.Connection, user_id: str, household_id: str, pro
     return {"provider": provider, "source": source, "synced": len(synced), "devices": synced}
 
 
+def home_graph_connect_preview(provider_id: str) -> dict:
+    provider = _home_graph_provider_config(provider_id)
+    if not provider:
+        return {
+            "providerId": provider_id,
+            "available": False,
+            "mode": "PLANNED",
+            "title": "Steuerung geplant",
+            "message": "Dieser Anbieter ist im Home Graph vorgesehen, aber noch nicht fuer den sicheren Connect-Flow freigeschaltet.",
+            "safeCapabilities": [],
+            "devices": [],
+            "privacyNotes": [
+                "Keine Verbindung wurde gestartet.",
+                "Keine Zugangsdaten werden gespeichert.",
+            ],
+        }
+    devices = [_home_graph_preview_device(provider, device) for device in provider["sampleDevices"]]
+    return {
+        "providerId": provider_id,
+        "provider": provider["provider"],
+        "providerName": provider["name"],
+        "appName": provider["appName"],
+        "available": True,
+        "mode": "MOCK_CONNECT",
+        "title": f"{provider['name']} sicher vormerken",
+        "message": "Dieser Flow importiert nur Demo-Geraete mit ungefaehrlichen Funktionen. Echte Provider-Logins kommen erst nach Security Review.",
+        "safeCapabilities": sorted(HOME_GRAPH_SAFE_CAPABILITIES),
+        "devices": devices,
+        "privacyNotes": [
+            "Es werden keine echten Provider-Zugangsdaten abgefragt.",
+            "Es werden nur Name, Raum, Typ und ungefaehrliche Capabilities vorgemerkt.",
+            "Keine Locks, Kameras, Alarmanlagen, Heizungen oder sicherheitskritischen Befehle.",
+        ],
+    }
+
+
+def confirm_home_graph_connect(conn: sqlite3.Connection, user_id: str, household_id: str, provider_id: str, accepted_capabilities: list[str]) -> dict:
+    provider = _home_graph_provider_config(provider_id)
+    if not provider:
+        raise ValueError("Provider is not available for Home Graph Connect yet")
+    accepted = {capability for capability in accepted_capabilities if capability in HOME_GRAPH_SAFE_CAPABILITIES}
+    if not accepted:
+        raise ValueError("At least one safe capability must be accepted")
+
+    now = now_iso()
+    provider_code = provider["provider"]
+    existing = row_to_dict(
+        conn.execute(
+            'SELECT * FROM "SmartHomeConnection" WHERE userId = ? AND householdId = ? AND provider = ?',
+            (user_id, household_id, provider_code),
+        ).fetchone()
+    )
+    if existing:
+        connection_id = existing["id"]
+        conn.execute(
+            'UPDATE "SmartHomeConnection" SET status = ?, lastSyncAt = ?, updatedAt = ? WHERE id = ?',
+            ("CONNECTED", now, now, connection_id),
+        )
+    else:
+        connection_id = make_id()
+        conn.execute(
+            """INSERT INTO "SmartHomeConnection"
+               (id, userId, householdId, provider, status, lastSyncAt, createdAt, updatedAt)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (connection_id, user_id, household_id, provider_code, "CONNECTED", now, now, now),
+        )
+
+    source_devices = [
+        _home_graph_source_device(provider, device, accepted)
+        for device in provider["sampleDevices"]
+    ]
+    devices = [
+        _upsert_device(conn, user_id, household_id, connection_id, provider_code, source_device, "HOME_GRAPH_MOCK")
+        for source_device in source_devices
+    ]
+    return {
+        "providerId": provider_id,
+        "provider": provider_code,
+        "mode": "MOCK_CONNECT",
+        "connected": True,
+        "synced": len(devices),
+        "safeCapabilities": sorted(accepted),
+        "devices": devices,
+        "message": "Provider wurde als Home-Graph-Quelle vorgemerkt. Echte Steuerung ist noch nicht aktiv.",
+    }
+
+
 def execute_command(conn: sqlite3.Connection, user_id: str, device_id: str, command: str, value: Any = None) -> dict:
     device = row_to_dict(
         conn.execute('SELECT * FROM "SmartHomeDevice" WHERE id = ? AND userId = ?', (device_id, user_id)).fetchone()
@@ -242,19 +424,55 @@ def execute_command(conn: sqlite3.Connection, user_id: str, device_id: str, comm
     if not device:
         raise ValueError("Smart home device not found")
 
+    _assert_command_allowed_for_device(device, command)
     commands = _command_payload(command, value)
     if device["provider"] == SMARTTHINGS_PROVIDER and smartthings_token() and not str(device["providerDeviceId"]).startswith("demo-"):
         status = "SENT"
         result = _send_smartthings_command(device["providerDeviceId"], commands)
+    elif device["provider"] == LOCAL_DISCOVERY_PROVIDER and command in LOCAL_TV_COMMANDS:
+        status = "SENT"
+        result = _send_local_tv_command(device, command)
     else:
-        status = "SIMULATED"
-        result = {"ok": True, "mode": "demo", "commands": commands}
+        status = "RECORDED"
+        result = {"ok": False, "mode": "record_only", "commands": commands}
 
     now = now_iso()
     if command in {"power_on", "power_off"}:
+        raw_json = _json_or_empty_dict(device.get("rawJson"))
+        token = _samsung_token_from_result(result)
+        if token:
+            raw_json["samsungRemoteToken"] = token
+        mac = _samsung_mac_from_info(result.get("device") if isinstance(result, dict) else None)
+        if mac:
+            raw_json["wifiMac"] = mac
+        # Trust the real state the command layer reported over the optimistic target,
+        # so the UI never shows "off" for a TV we couldn't actually switch.
+        result_state = result.get("powerState") if isinstance(result, dict) else None
+        if result_state == "on":
+            db_power = "on"
+        elif result_state in ("off", "standby"):
+            db_power = "off"
+        elif result_state == "unknown":
+            db_power = str(device.get("powerState") or "unknown")
+        else:
+            db_power = "on" if command == "power_on" else "off"
         conn.execute(
-            'UPDATE "SmartHomeDevice" SET powerState = ?, status = ?, updatedAt = ?, lastSeenAt = ? WHERE id = ?',
-            ("on" if command == "power_on" else "off", "ONLINE", now, now, device_id),
+            'UPDATE "SmartHomeDevice" SET powerState = ?, status = ?, rawJson = ?, updatedAt = ?, lastSeenAt = ? WHERE id = ?',
+            (db_power, "ONLINE", json.dumps(raw_json), now, now, device_id),
+        )
+    elif command == "set_brightness":
+        raw_json = _json_or_empty_dict(device.get("rawJson"))
+        raw_json["brightness"] = max(0, min(100, int(value or 0)))
+        conn.execute(
+            'UPDATE "SmartHomeDevice" SET status = ?, rawJson = ?, updatedAt = ?, lastSeenAt = ? WHERE id = ?',
+            ("ONLINE", json.dumps(raw_json), now, now, device_id),
+        )
+    elif command in {"volume_up", "volume_down", "mute_toggle", "source_menu"}:
+        raw_json = _json_or_empty_dict(device.get("rawJson"))
+        raw_json["lastMediaCommand"] = command
+        conn.execute(
+            'UPDATE "SmartHomeDevice" SET status = ?, rawJson = ?, updatedAt = ?, lastSeenAt = ? WHERE id = ?',
+            ("ONLINE", json.dumps(raw_json), now, now, device_id),
         )
     else:
         conn.execute('UPDATE "SmartHomeDevice" SET status = ?, updatedAt = ?, lastSeenAt = ? WHERE id = ?', ("ONLINE", now, now, device_id))
@@ -288,19 +506,60 @@ def link_device_to_item(conn: sqlite3.Connection, user_id: str, device_id: str, 
     return row_to_dict(conn.execute('SELECT * FROM "SmartHomeDevice" WHERE id = ?', (device_id,)).fetchone()) or {}
 
 
+def delete_device(conn: sqlite3.Connection, user_id: str, device_id: str) -> dict:
+    device = row_to_dict(
+        conn.execute('SELECT * FROM "SmartHomeDevice" WHERE id = ? AND userId = ?', (device_id, user_id)).fetchone()
+    )
+    if not device:
+        raise ValueError("Smart home device not found")
+    conn.execute('DELETE FROM "SmartHomeCommand" WHERE deviceId = ?', (device_id,))
+    conn.execute('DELETE FROM "SmartHomeDevice" WHERE id = ?', (device_id,))
+    return {"removed": True, "id": device_id}
+
+
+def pair_local_device(conn: sqlite3.Connection, user_id: str, device_id: str) -> dict:
+    device = row_to_dict(
+        conn.execute('SELECT * FROM "SmartHomeDevice" WHERE id = ? AND userId = ?', (device_id, user_id)).fetchone()
+    )
+    if not device:
+        raise ValueError("Smart home device not found")
+    raw_json = _json_or_empty_dict(device.get("rawJson"))
+    host = _host_without_port(str(raw_json.get("host") or "").strip())
+    text = f"{device.get('name') or ''} {device.get('deviceType') or ''} {json.dumps(raw_json)}".lower()
+    if device.get("provider") != LOCAL_DISCOVERY_PROVIDER or ("samsung" not in text and "tv" not in text):
+        raise ValueError("Only local Samsung TV pairing is supported")
+    result = _pair_samsung_tv(host, str(raw_json.get("samsungRemoteToken") or "").strip() or None)
+    token = result.get("token")
+    device_info = result.get("device")
+    if token:
+        raw_json["samsungRemoteToken"] = token
+    mac = _samsung_mac_from_info(device_info if isinstance(device_info, dict) else None)
+    if mac:
+        raw_json["wifiMac"] = mac
+    if device_info and isinstance(device_info, dict):
+        name = device_info.get("name") or (device_info.get("device") or {}).get("name")
+        if name:
+            raw_json["friendlyName"] = str(name)
+    conn.execute(
+        'UPDATE "SmartHomeDevice" SET name = ?, rawJson = ?, updatedAt = ?, lastSeenAt = ? WHERE id = ?',
+        (str(raw_json.get("friendlyName") or device.get("name") or "Samsung TV"), json.dumps(raw_json), now_iso(), now_iso(), device_id),
+    )
+    return {"paired": bool(token), "deviceId": device_id, "result": result}
+
+
 def discover_local_candidates(conn: sqlite3.Connection, user_id: str) -> dict:
     if local_discovery_enabled():
         candidates = _lan_candidates()
         mode = "LAN"
     else:
-        candidates = _demo_local_candidates(conn, user_id)
-        mode = "DEMO"
+        candidates = []
+        mode = "DISABLED"
     _attach_local_matches(conn, user_id, candidates)
     return {
         "mode": mode,
         "enabled": local_discovery_enabled(),
         "scannedAt": now_iso(),
-        "scope": "Demo candidates" if mode == "DEMO" else "Parallel private-subnet probes",
+        "scope": "Parallel private-subnet probes" if mode == "LAN" else "LAN discovery disabled",
         "candidates": candidates,
     }
 
@@ -375,6 +634,8 @@ def import_local_candidate(
                 candidate = _candidate_from_probe(conn, user_id, inferred_host)
     if not candidate:
         raise ValueError("Local discovery candidate not found")
+    if not _is_user_controllable_candidate(candidate):
+        raise ValueError("This local device is not a smart-home capable device")
     connection = connect_provider(conn, user_id, household_id, LOCAL_DISCOVERY_PROVIDER)
     source_device = {
         "id": candidate["id"],
@@ -393,7 +654,7 @@ def import_local_candidate(
         "confidence": candidate.get("confidence", 0.5),
         "confidenceLabel": candidate.get("confidenceLabel"),
     }
-    device = _upsert_device(conn, user_id, household_id, connection["id"], LOCAL_DISCOVERY_PROVIDER, source_device, "LOCAL_DEMO" if not local_discovery_enabled() else "LOCAL_LAN")
+    device = _upsert_device(conn, user_id, household_id, connection["id"], LOCAL_DISCOVERY_PROVIDER, source_device, "LOCAL_LAN" if local_discovery_enabled() else "LOCAL_MANUAL")
     if candidate.get("matchedItemId"):
         conn.execute('UPDATE "SmartHomeDevice" SET itemId = ?, updatedAt = ? WHERE id = ?', (candidate["matchedItemId"], now_iso(), device["id"]))
         device["itemId"] = candidate["matchedItemId"]
@@ -632,7 +893,7 @@ def _provider_status(connections: list[dict], provider: str) -> str:
     for connection in connections:
         if connection["provider"] == provider:
             return connection["status"]
-    return "AVAILABLE" if provider in {SMARTTHINGS_PROVIDER, LOCAL_DISCOVERY_PROVIDER, BAMBU_LAB_PROVIDER} else "PLANNED"
+    return "AVAILABLE" if provider in {SMARTTHINGS_PROVIDER, AVARENO_BRIDGE_PROVIDER, LOCAL_DISCOVERY_PROVIDER, BAMBU_LAB_PROVIDER} else "PLANNED"
 
 
 def _create_or_find_bambu_item(conn: sqlite3.Connection, user_id: str, household_id: str, payload) -> str:
@@ -955,7 +1216,7 @@ def _smart_home_insights(conn: sqlite3.Connection, user_id: str, devices: list[d
             }
         )
 
-    has_home_assistant = any(device.get("deviceType") == "hub" or device.get("provider") == "HOME_ASSISTANT" for device in devices)
+    has_home_assistant = any(device.get("provider") in {AVARENO_BRIDGE_PROVIDER, HOME_ASSISTANT_PROVIDER} for device in devices)
     if not has_home_assistant:
         insights.append(
             {
@@ -963,9 +1224,9 @@ def _smart_home_insights(conn: sqlite3.Connection, user_id: str, devices: list[d
                 "type": "BRIDGE",
                 "deviceId": None,
                 "itemId": None,
-                "title": "Home Assistant bridge",
-                "subtitle": "One local bridge can make Samsung, Alexa, Matter and LAN devices feel like one Avareno layer later.",
-                "signal": "Future local-first control",
+                "title": "Avareno Bridge",
+                "subtitle": "A local bridge can turn one Home Assistant setup into a central Avareno device layer.",
+                "signal": "Local bridge foundation",
                 "priority": "MEDIUM",
                 "actionType": "DISCOVER_LOCAL",
                 "cta": "Search local",
@@ -1045,8 +1306,509 @@ def _fetch_smartthings_devices() -> list[dict]:
     return data.get("items", []) if isinstance(data, dict) else []
 
 
+def _fetch_avareno_bridge_devices() -> list[dict]:
+    if not avareno_bridge_enabled():
+        raise RuntimeError("AVARENO_ENABLE_LOCAL_BRIDGE and AVARENO_BRIDGE_URL are required for local bridge sync")
+    if os.environ.get("AVARENO_ENV", os.environ.get("ENV", "")).lower() in {"production", "prod"}:
+        raise RuntimeError("Direct local bridge polling is disabled in production; use a paired outbound bridge later")
+    data = _bridge_request("/home-assistant/entities")
+    entities = data.get("entities") if isinstance(data, dict) else None
+    if not isinstance(entities, list):
+        raise RuntimeError("Avareno Bridge returned an unexpected entity payload")
+    return [entity for entity in entities if isinstance(entity, dict)]
+
+
+def _avareno_bridge_runtime_status() -> dict:
+    status = {
+        "reachable": False,
+        "homeAssistantUrlConfigured": False,
+        "homeAssistantTokenConfigured": False,
+    }
+    if not avareno_bridge_enabled():
+        return status
+    try:
+        payload = _bridge_request("/home-assistant/status", timeout=2)
+    except RuntimeError:
+        return status
+    status["reachable"] = True
+    status["homeAssistantUrlConfigured"] = bool(payload.get("urlConfigured"))
+    status["homeAssistantTokenConfigured"] = bool(payload.get("tokenConfigured"))
+    return status
+
+
+def _home_graph_provider_config(provider_id: str) -> dict | None:
+    return HOME_GRAPH_CONNECT_PROVIDERS.get(provider_id.strip().lower())
+
+
+def _home_graph_preview_device(provider: dict, source_device: dict) -> dict:
+    capabilities = _extract_capabilities(source_device)
+    safe_capabilities = _safe_home_graph_capabilities(capabilities)
+    return {
+        "id": source_device["id"],
+        "name": source_device["label"],
+        "roomName": source_device.get("roomName"),
+        "deviceType": source_device.get("type", "device"),
+        "providerName": provider["name"],
+        "connectionLevel": 3 if safe_capabilities else 1,
+        "isControllable": bool(safe_capabilities),
+        "capabilities": safe_capabilities,
+    }
+
+
+def _home_graph_source_device(provider: dict, source_device: dict, accepted_capabilities: set[str]) -> dict:
+    source_capabilities = _extract_capabilities(source_device)
+    safe_capabilities = [capability for capability in _safe_home_graph_capabilities(source_capabilities) if capability in accepted_capabilities]
+    provider_device_id = f"{provider['provider'].lower()}-{source_device['id']}"
+    return {
+        **source_device,
+        "id": provider_device_id,
+        "deviceId": provider_device_id,
+        "capabilities": _smartthings_capabilities_from_home_graph(safe_capabilities),
+        "homeGraphCapabilities": safe_capabilities,
+        "connectionLevel": 3 if safe_capabilities else 1,
+        "isControllable": bool(safe_capabilities),
+        "providerApp": provider["appName"],
+    }
+
+
+def _safe_home_graph_capabilities(source_capabilities: list[str]) -> list[str]:
+    normalized = {capability.lower() for capability in source_capabilities}
+    safe: list[str] = []
+    if "switch" in normalized:
+        safe.append("power")
+    if "switchlevel" in normalized or "brightness" in normalized:
+        safe.append("brightness")
+    return [capability for capability in safe if capability in HOME_GRAPH_SAFE_CAPABILITIES]
+
+
+def _smartthings_capabilities_from_home_graph(capabilities: list[str]) -> list[str]:
+    translated: list[str] = []
+    if "power" in capabilities:
+        translated.append("switch")
+    if "brightness" in capabilities:
+        translated.append("switchLevel")
+    return translated
+
+
+def _bridge_request(path: str, timeout: int = 8) -> dict:
+    base_url = avareno_bridge_url()
+    if not base_url.startswith(("http://127.0.0.1:", "http://localhost:")):
+        raise RuntimeError("Local bridge URL must point to localhost in the MVP")
+    request = urllib.request.Request(
+        f"{base_url}{path}",
+        headers={"Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            raw = response.read().decode("utf-8")
+            payload = json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"Avareno Bridge error {exc.code}: provider request failed") from exc
+    except (urllib.error.URLError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise RuntimeError("Avareno Bridge is not reachable") from exc
+    if isinstance(payload, dict) and payload.get("error"):
+        raise RuntimeError("Avareno Bridge could not read Home Assistant")
+    return payload if isinstance(payload, dict) else {}
+
+
 def _send_smartthings_command(provider_device_id: str, commands: list[dict]) -> dict:
     return _smartthings_request(f"/devices/{provider_device_id}/commands", method="POST", body={"commands": commands})
+
+
+def _send_local_tv_command(device: dict, command: str) -> dict:
+    raw_json = _json_or_empty_dict(device.get("rawJson"))
+    host = _host_without_port(str(raw_json.get("host") or "").strip())
+    token = str(raw_json.get("samsungRemoteToken") or "").strip() or None
+    device_info = _samsung_device_info(host) if host else None
+    text = " ".join(
+        [
+            str(device.get("name") or ""),
+            str(device.get("deviceType") or ""),
+            json.dumps(raw_json),
+        ]
+    ).lower()
+    if not host:
+        raise RuntimeError("Local device has no host address for direct control")
+    if "samsung" not in text and "tv" not in text:
+        raise RuntimeError("Direct local control is only enabled for detected TV devices")
+    _resolve_private_host(host)
+
+    if command in LOCAL_SAMSUNG_REMOTE_KEYS:
+        result = _send_samsung_tv_key(host, LOCAL_SAMSUNG_REMOTE_KEYS[command], token)
+        result["mode"] = result.get("mode") or "samsung_local"
+        result["device"] = device_info
+        result["powerState"] = _samsung_power_state(device_info) or str(device.get("powerState") or "unknown")
+        if not result.get("token") and device_info and _samsung_token_auth_supported(device_info):
+            result["pairingHint"] = "Approve Avareno as a remote control on the Samsung TV if the command has no visible effect."
+        return result
+
+    # Samsung's KEY_POWER is a TOGGLE. Never send it blindly — first read the real
+    # power state and only act when it actually changes the state the user asked for.
+    power_state = _samsung_power_state(device_info)
+
+    if command == "power_on":
+        # KEY_POWERON is discrete (never toggles off). Wake-on-LAN wakes a fully-off panel.
+        if power_state == "on":
+            return {"ok": True, "mode": "already_on", "host": host, "powerState": "on", "skipped": True, "device": device_info}
+        wol_result = _send_wake_on_lan_for_host(host, _samsung_mac_from_info(device_info) or str(raw_json.get("wifiMac") or ""))
+        try:
+            ws_result = _send_samsung_tv_key(host, "KEY_POWERON", token)
+            return {"ok": True, "mode": "samsung_local", "powerState": "on", "wakeOnLan": wol_result, "remote": ws_result, "device": device_info}
+        except RuntimeError:
+            if wol_result.get("sent"):
+                return {"ok": True, "mode": "wake_on_lan", "host": host, "powerState": "on", "wakeOnLan": wol_result, "device": device_info}
+            raise
+
+    # command == "power_off"
+    if power_state in ("standby", "off"):
+        # Already off — sending the KEY_POWER toggle here would turn the TV back ON.
+        return {"ok": True, "mode": "already_off", "host": host, "powerState": "standby", "skipped": True, "device": device_info}
+    if power_state is None:
+        # We can't confirm the TV is on. Refuse to toggle blindly (risk: turning it on).
+        return {
+            "ok": False,
+            "mode": "unknown_state",
+            "host": host,
+            "powerState": "unknown",
+            "device": device_info,
+            "pairingHint": "TV-Status nicht erreichbar. Ausschalten wurde nicht gesendet, um kein versehentliches Einschalten auszulösen.",
+        }
+
+    # power_state == "on" -> KEY_POWER now safely toggles the TV OFF.
+    result = _send_samsung_tv_key(host, "KEY_POWER", token)
+    result["mode"] = result.get("mode") or "samsung_local"
+    result["powerState"] = "off"
+    result["device"] = device_info
+    if not result.get("token") and device_info and _samsung_token_auth_supported(device_info):
+        result["pairingHint"] = "Approve Avareno as a remote control on the Samsung TV if the command has no visible effect."
+    return result
+
+
+def _samsung_power_state(info: dict | None) -> str | None:
+    """Return 'on' / 'standby' from the Samsung /api/v2/ device info, or None if unknown."""
+    if not info:
+        return None
+    device = info.get("device")
+    if isinstance(device, dict):
+        raw = device.get("PowerState") or device.get("powerState")
+        if raw:
+            state = str(raw).strip().lower()
+            if state == "on":
+                return "on"
+            if state in ("standby", "off", "sleep"):
+                return "standby"
+            return state
+    return None
+
+
+def _host_without_port(host: str) -> str:
+    if host.count(":") == 1:
+        name, maybe_port = host.rsplit(":", 1)
+        if maybe_port.isdigit():
+            return name
+    return host
+
+
+def _samsung_device_info(host: str) -> dict | None:
+    try:
+        with urllib.request.urlopen(f"http://{host}:8001/api/v2/", timeout=2.5) as response:
+            data = json.loads(response.read().decode("utf-8"))
+            return data if isinstance(data, dict) else None
+    except (OSError, urllib.error.URLError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+
+def _samsung_mac_from_info(info: dict | None) -> str | None:
+    if not info:
+        return None
+    device = info.get("device")
+    if isinstance(device, dict):
+        raw = device.get("wifiMac") or device.get("mac")
+        if raw:
+            return str(raw).lower()
+    return None
+
+
+def _samsung_token_auth_supported(info: dict | None) -> bool:
+    if not info:
+        return False
+    device = info.get("device")
+    if isinstance(device, dict) and str(device.get("TokenAuthSupport")).lower() == "true":
+        return True
+    return "TokenAuthSupport" in str(info.get("isSupport") or "")
+
+
+def _send_samsung_tv_key(host: str, key: str, token: str | None = None) -> dict:
+    errors: list[str] = []
+    for port, secure in ((8002, True), (8001, False)):
+        try:
+            return _send_samsung_ws_remote_key(host, port, secure, key, token)
+        except OSError as exc:
+            errors.append(f"{port}: {type(exc).__name__}")
+    raise RuntimeError(
+        "Samsung TV did not accept the local command. Turn the TV on, approve the Avareno remote prompt on the TV, "
+        "or connect SmartThings for cloud control."
+    )
+
+
+def _pair_samsung_tv(host: str, token: str | None = None) -> dict:
+    _resolve_private_host(host)
+    device_info = _samsung_device_info(host)
+    errors: list[str] = []
+    for port, secure in ((8002, True), (8001, False)):
+        sock = None
+        try:
+            app_name = base64.b64encode(b"Avareno").decode("ascii")
+            path = f"/api/v2/channels/samsung.remote.control?name={urllib.parse.quote(app_name)}"
+            if token:
+                path += f"&token={urllib.parse.quote(token)}"
+            ws_key = base64.b64encode(os.urandom(16)).decode("ascii")
+            expected_accept = base64.b64encode(
+                hashlib.sha1((ws_key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode("ascii")).digest()
+            ).decode("ascii")
+            sock = socket.create_connection((host, port), timeout=2.2)
+            if secure:
+                sock = ssl._create_unverified_context().wrap_socket(sock, server_hostname=host)
+            request = (
+                f"GET {path} HTTP/1.1\r\n"
+                f"Host: {host}:{port}\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                f"Sec-WebSocket-Key: {ws_key}\r\n"
+                "Sec-WebSocket-Version: 13\r\n"
+                "Origin: http://localhost\r\n"
+                "\r\n"
+            )
+            sock.sendall(request.encode("ascii"))
+            response = _read_websocket_handshake(sock)
+            if b" 101 " not in response.split(b"\r\n", 1)[0]:
+                raise OSError("websocket upgrade rejected")
+            if expected_accept.encode("ascii") not in response:
+                raise OSError("websocket accept mismatch")
+            messages = _read_websocket_json_messages(sock, 8.0 if not token else 1.0)
+            paired_token = token or _samsung_token_from_messages(messages)
+            result = {"ok": True, "mode": "samsung_pair", "host": host, "port": port, "device": device_info}
+            if paired_token:
+                result["token"] = paired_token
+            elif device_info and _samsung_token_auth_supported(device_info):
+                result["pairingHint"] = "Approve Avareno as a remote control on the Samsung TV."
+            return result
+        except OSError as exc:
+            errors.append(f"{port}: {type(exc).__name__}")
+        finally:
+            if sock is not None:
+                try:
+                    sock.close()
+                except OSError:
+                    pass
+    raise RuntimeError("Samsung TV pairing did not open. Make sure the TV is on and in the same network.")
+
+
+def _send_samsung_ws_remote_key(host: str, port: int, secure: bool, key: str, token: str | None = None) -> dict:
+    app_name = base64.b64encode(b"Avareno").decode("ascii")
+    path = f"/api/v2/channels/samsung.remote.control?name={urllib.parse.quote(app_name)}"
+    if token:
+        path += f"&token={urllib.parse.quote(token)}"
+    ws_key = base64.b64encode(os.urandom(16)).decode("ascii")
+    expected_accept = base64.b64encode(
+        hashlib.sha1((ws_key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode("ascii")).digest()
+    ).decode("ascii")
+    sock = socket.create_connection((host, port), timeout=2.2)
+    if secure:
+        context = ssl._create_unverified_context()
+        sock = context.wrap_socket(sock, server_hostname=host)
+    try:
+        request = (
+            f"GET {path} HTTP/1.1\r\n"
+            f"Host: {host}:{port}\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            f"Sec-WebSocket-Key: {ws_key}\r\n"
+            "Sec-WebSocket-Version: 13\r\n"
+            "Origin: http://localhost\r\n"
+            "\r\n"
+        )
+        sock.sendall(request.encode("ascii"))
+        response = _read_websocket_handshake(sock)
+        if b" 101 " not in response.split(b"\r\n", 1)[0]:
+            raise OSError("websocket upgrade rejected")
+        if expected_accept.encode("ascii") not in response:
+            raise OSError("websocket accept mismatch")
+
+        messages = _read_websocket_json_messages(sock, 5.5 if not token else 0.8)
+        paired_token = _samsung_token_from_messages(messages)
+        time.sleep(0.18)
+        payload = json.dumps(
+            {
+                "method": "ms.remote.control",
+                "params": {
+                    "Cmd": "Click",
+                    "DataOfCmd": key,
+                    "Option": "false",
+                    "TypeOfRemote": "SendRemoteKey",
+                },
+            }
+        ).encode("utf-8")
+        sock.sendall(_masked_websocket_text_frame(payload))
+        messages.extend(_read_websocket_json_messages(sock, 0.7))
+        time.sleep(0.25)
+        paired_token = paired_token or _samsung_token_from_messages(messages)
+        result = {"ok": True, "mode": "samsung_local", "host": host, "port": port, "key": key}
+        if paired_token:
+            result["token"] = paired_token
+        return result
+    finally:
+        try:
+            sock.close()
+        except OSError:
+            pass
+
+
+def _read_websocket_handshake(sock: socket.socket) -> bytes:
+    chunks: list[bytes] = []
+    sock.settimeout(2.2)
+    while b"\r\n\r\n" not in b"".join(chunks):
+        chunk = sock.recv(1024)
+        if not chunk:
+            break
+        chunks.append(chunk)
+        if sum(len(part) for part in chunks) > 8192:
+            break
+    return b"".join(chunks)
+
+
+def _read_websocket_json_messages(sock: socket.socket, seconds: float) -> list[dict]:
+    deadline = time.monotonic() + seconds
+    messages: list[dict] = []
+    sock.settimeout(0.22)
+    while time.monotonic() < deadline:
+        try:
+            frame = _read_websocket_frame(sock)
+        except TimeoutError:
+            continue
+        except (OSError, ValueError):
+            break
+        if not frame:
+            break
+        opcode, payload = frame
+        if opcode != 1:
+            continue
+        try:
+            data = json.loads(payload.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            continue
+        if isinstance(data, dict):
+            messages.append(data)
+    return messages
+
+
+def _read_websocket_frame(sock: socket.socket) -> tuple[int, bytes] | None:
+    header = _recv_exact(sock, 2)
+    if not header:
+        return None
+    first, second = header
+    opcode = first & 0x0F
+    masked = bool(second & 0x80)
+    length = second & 0x7F
+    if length == 126:
+        length = int.from_bytes(_recv_exact(sock, 2), "big")
+    elif length == 127:
+        length = int.from_bytes(_recv_exact(sock, 8), "big")
+    mask = _recv_exact(sock, 4) if masked else b""
+    payload = _recv_exact(sock, length) if length else b""
+    if masked and mask:
+        payload = bytes(byte ^ mask[index % 4] for index, byte in enumerate(payload))
+    return opcode, payload
+
+
+def _recv_exact(sock: socket.socket, size: int) -> bytes:
+    chunks: list[bytes] = []
+    remaining = size
+    while remaining > 0:
+        chunk = sock.recv(remaining)
+        if not chunk:
+            raise OSError("websocket closed")
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
+def _samsung_token_from_messages(messages: list[dict]) -> str | None:
+    for message in messages:
+        data = message.get("data")
+        if isinstance(data, dict) and data.get("token"):
+            return str(data["token"])
+    return None
+
+
+def _samsung_token_from_result(result: Any) -> str | None:
+    if not isinstance(result, dict):
+        return None
+    if result.get("token"):
+        return str(result["token"])
+    remote = result.get("remote")
+    if isinstance(remote, dict) and remote.get("token"):
+        return str(remote["token"])
+    return None
+
+
+def _masked_websocket_text_frame(payload: bytes) -> bytes:
+    first = bytes([0x81])
+    length = len(payload)
+    if length <= 125:
+        header = first + bytes([0x80 | length])
+    elif length <= 65535:
+        header = first + bytes([0x80 | 126]) + length.to_bytes(2, "big")
+    else:
+        header = first + bytes([0x80 | 127]) + length.to_bytes(8, "big")
+    mask = os.urandom(4)
+    masked = bytes(byte ^ mask[index % 4] for index, byte in enumerate(payload))
+    return header + mask + masked
+
+
+def _send_wake_on_lan_for_host(host: str, preferred_mac: str | None = None) -> dict:
+    mac = _normalize_mac(preferred_mac) or _mac_for_host(host)
+    if not mac:
+        return {"sent": False, "reason": "mac_not_found"}
+    packet = bytes.fromhex("ff" * 6 + mac.replace(":", "").replace("-", "") * 16)
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.sendto(packet, ("255.255.255.255", 9))
+        sock.sendto(packet, (_broadcast_for_host(host), 9))
+    return {"sent": True, "mac": mac}
+
+
+def _normalize_mac(value: str | None) -> str | None:
+    if not value:
+        return None
+    normalized = value.strip().lower().replace("-", ":")
+    if len(normalized) == 17 and normalized.count(":") == 5:
+        return normalized
+    return None
+
+
+def _broadcast_for_host(host: str) -> str:
+    try:
+        parts = host.split(".")
+        if len(parts) == 4:
+            return ".".join([parts[0], parts[1], parts[2], "255"])
+    except (IndexError, TypeError):
+        pass
+    return "255.255.255.255"
+
+
+def _mac_for_host(host: str) -> str | None:
+    try:
+        output = subprocess.check_output(["arp", "-a", host], stderr=subprocess.DEVNULL, timeout=2, text=True)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for token in output.replace("\r", " ").replace("\n", " ").split():
+        normalized = token.strip().lower()
+        if len(normalized) == 17 and normalized.count("-") == 5:
+            return normalized.replace("-", ":")
+        if len(normalized) == 17 and normalized.count(":") == 5:
+            return normalized
+    return None
 
 
 def _smartthings_request(path: str, method: str = "GET", body: dict | None = None) -> dict:
@@ -1084,12 +1846,29 @@ def _upsert_device(
     now = now_iso()
     provider_device_id = str(source_device.get("deviceId") or source_device.get("id") or make_id())
     capabilities = _extract_capabilities(source_device)
-    existing = row_to_dict(
+    dedupe_host = _host_without_port(str(source_device.get("host") or "").strip()).lower()
+    provider_rows = rows_to_dicts(
         conn.execute(
-            'SELECT * FROM "SmartHomeDevice" WHERE userId = ? AND provider = ? AND providerDeviceId = ?',
-            (user_id, provider, provider_device_id),
-        ).fetchone()
+            'SELECT * FROM "SmartHomeDevice" WHERE userId = ? AND provider = ? ORDER BY itemId IS NULL ASC, updatedAt DESC',
+            (user_id, provider),
+        ).fetchall()
     )
+
+    def _same_physical_device(row: dict) -> bool:
+        # Same device if the provider id matches OR it lives at the same host/IP —
+        # so a device imported twice (or via discover + probe) collapses into one row.
+        if str(row.get("providerDeviceId") or "") == provider_device_id:
+            return True
+        if dedupe_host:
+            row_host = _host_without_port(str(_json_or_empty_dict(row.get("rawJson")).get("host") or "").strip()).lower()
+            return bool(row_host) and row_host == dedupe_host
+        return False
+
+    existing_rows = [row for row in provider_rows if _same_physical_device(row)]
+    existing = existing_rows[0] if existing_rows else None
+    for duplicate in existing_rows[1:]:
+        conn.execute('DELETE FROM "SmartHomeCommand" WHERE deviceId = ?', (duplicate["id"],))
+        conn.execute('DELETE FROM "SmartHomeDevice" WHERE id = ?', (duplicate["id"],))
     values = {
         "name": source_device.get("label") or source_device.get("name") or "Smart device",
         "roomName": source_device.get("roomName") or source_device.get("room") or _infer_room(source_device),
@@ -1154,21 +1933,13 @@ def _demo_devices(conn: sqlite3.Connection, user_id: str) -> list[dict]:
     item = row_to_dict(
         conn.execute(
             """SELECT * FROM "Item"
-               WHERE userId = ? AND (lower(name) LIKE '%tv%' OR lower(category) LIKE '%tv%')
+               WHERE userId = ?
                ORDER BY updatedAt DESC LIMIT 1""",
             (user_id,),
         ).fetchone()
     )
     room = item["location"] if item and item.get("location") else "Wohnzimmer"
     return [
-        {
-            "id": "demo-living-room-tv",
-            "label": "Living Room TV",
-            "roomName": room,
-            "type": "tv",
-            "capabilities": ["switch", "audioVolume", "audioMute", "mediaInputSource"],
-            "powerState": "off",
-        },
         {
             "id": "demo-evening-light",
             "label": "Evening Light",
@@ -1229,7 +2000,7 @@ def _demo_local_candidates(conn: sqlite3.Connection, user_id: str) -> list[dict]
     return [
         {
             "id": "local-demo-tv",
-            "name": "Living Room TV",
+            "name": "Samsung OLED TV",
             "host": "192.168.1.42",
             "provider": LOCAL_DISCOVERY_PROVIDER,
             "deviceType": "tv",
@@ -1237,13 +2008,13 @@ def _demo_local_candidates(conn: sqlite3.Connection, user_id: str) -> list[dict]
             "roomName": room,
             "confidence": 0.91,
             "confidenceLabel": "high",
-            "signals": ["DLNA/UPnP name", "TV-like hostname", "same room match"],
+            "signals": ["DLNA/UPnP name", "Samsung/OLED-like device name", "same room match"],
             "capabilities": ["networkPresence", "wakeOnLan", "mediaRenderer"],
-            "identity": {"label": "Likely a TV or media renderer", "evidence": ["Demo UPnP name", "Existing TV product match"]},
+            "identity": {"label": "Likely a Samsung OLED TV or media renderer", "evidence": ["Demo UPnP name", "Samsung/OLED signal"]},
             "connectHint": "Import and link this to the real TV product record.",
             "recommendedAction": "Import media device",
             "manualCheck": "Confirm the TV network name or IP in the TV settings.",
-            "filterTags": ["media", "tv"],
+            "filterTags": ["media", "tv", "samsung", "oled"],
         },
         {
             "id": "local-demo-home-assistant",
@@ -1303,7 +2074,8 @@ def _lan_candidates() -> list[dict]:
                 continue
             candidates.append(_candidate_from_open_ports(host_text, open_ports))
 
-    candidates.sort(key=lambda candidate: (candidate["deviceType"] != "3d_printer", candidate["host"]))
+    candidates = _merge_discovery_candidates(candidates, _ssdp_candidates())
+    candidates.sort(key=lambda candidate: (candidate["deviceType"] not in {"media", "tv", "3d_printer"}, candidate["host"]))
     return candidates[:18]
 
 
@@ -1353,8 +2125,47 @@ def _candidate_from_open_ports(host: str, open_ports: list[int]) -> dict:
     }
 
 
+def _merge_discovery_candidates(port_candidates: list[dict], ssdp_candidates: list[dict]) -> list[dict]:
+    by_host = {_candidate_host_ip(candidate): candidate for candidate in port_candidates}
+    for ssdp_candidate in ssdp_candidates:
+        host_ip = _candidate_host_ip(ssdp_candidate)
+        existing = by_host.get(host_ip)
+        if not existing:
+            by_host[host_ip] = ssdp_candidate
+            continue
+        existing["name"] = ssdp_candidate["name"] if ssdp_candidate["confidence"] >= existing.get("confidence", 0) else existing["name"]
+        existing["deviceType"] = ssdp_candidate.get("deviceType") or existing.get("deviceType")
+        existing["category"] = ssdp_candidate.get("category") or existing.get("category")
+        existing["confidence"] = max(existing.get("confidence", 0.5), ssdp_candidate.get("confidence", 0.5))
+        existing["confidenceLabel"] = "high" if existing["confidence"] >= 0.82 else "medium"
+        existing["signals"] = _unique([*existing.get("signals", []), *ssdp_candidate.get("signals", [])])
+        existing["capabilities"] = _unique([*existing.get("capabilities", []), *ssdp_candidate.get("capabilities", [])])
+        existing["filterTags"] = _unique([*existing.get("filterTags", []), *ssdp_candidate.get("filterTags", [])])
+        existing["identity"] = ssdp_candidate.get("identity") or existing.get("identity")
+        existing["connectHint"] = ssdp_candidate.get("connectHint") or existing.get("connectHint")
+        existing["recommendedAction"] = ssdp_candidate.get("recommendedAction") or existing.get("recommendedAction")
+        existing["manualCheck"] = ssdp_candidate.get("manualCheck") or existing.get("manualCheck")
+    return list(by_host.values())
+
+
+def _candidate_host_ip(candidate: dict) -> str:
+    return str(candidate.get("host") or "").split(":", 1)[0]
+
+
+def _unique(values: list[Any]) -> list:
+    seen = set()
+    result = []
+    for value in values:
+        key = json.dumps(value, sort_keys=True) if isinstance(value, (dict, list)) else str(value)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(value)
+    return result
+
+
 def _primary_candidate_port(open_ports: list[int]) -> int:
-    for port in [8883, 990, 8123, 8008, 8009, 8060, 9100, 631, 554, 5001, 5000, 8080, 443, 80]:
+    for port in [8883, 990, 8123, 8001, 8002, 9197, 8008, 8009, 8060, 9100, 631, 554, 5001, 5000, 8080, 443, 80]:
         if port in open_ports:
             return port
     return open_ports[0]
@@ -1429,6 +2240,112 @@ def _resolve_private_host(host: str) -> str:
     if not address.is_private or address.is_loopback or address.is_link_local:
         raise ValueError("Only private LAN hosts can be probed")
     return str(address)
+
+
+def _ssdp_candidates() -> list[dict]:
+    message = (
+        "M-SEARCH * HTTP/1.1\r\n"
+        "HOST: 239.255.255.250:1900\r\n"
+        "MAN: \"ssdp:discover\"\r\n"
+        "MX: 1\r\n"
+        "ST: ssdp:all\r\n"
+        "\r\n"
+    ).encode("ascii")
+    responses: dict[str, dict] = {}
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as sock:
+            sock.settimeout(2.0)
+            sock.sendto(message, ("239.255.255.250", 1900))
+            while True:
+                try:
+                    data, address = sock.recvfrom(8192)
+                except socket.timeout:
+                    break
+                host = address[0]
+                candidate = _candidate_from_ssdp(host, _parse_ssdp_headers(data))
+                if not candidate:
+                    continue
+                existing = responses.get(host)
+                if not existing or candidate["confidence"] > existing["confidence"]:
+                    responses[host] = candidate
+    except OSError:
+        return []
+    return list(responses.values())
+
+
+def _parse_ssdp_headers(data: bytes) -> dict[str, str]:
+    text = data.decode("utf-8", errors="ignore")
+    headers: dict[str, str] = {}
+    for line in text.splitlines():
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        headers[key.strip().lower()] = value.strip()
+    return headers
+
+
+def _candidate_from_ssdp(host: str, headers: dict[str, str]) -> dict | None:
+    location = headers.get("location", "")
+    server = headers.get("server", "")
+    st = headers.get("st", "")
+    usn = headers.get("usn", "")
+    friendly_name = _friendly_name_from_location(location)
+    text = " ".join([friendly_name or "", server, st, usn]).lower()
+    if not any(term in text for term in ["samsung", "tv", "television", "mediarenderer", "dial", "dlna", "roku", "cast"]):
+        return None
+
+    is_samsung = "samsung" in text
+    is_media = any(term in text for term in ["tv", "television", "mediarenderer", "dial", "dlna", "cast"])
+    name = friendly_name or ("Samsung TV candidate" if is_samsung else f"Media device {host}")
+    signals = ["SSDP/UPnP response"]
+    if friendly_name:
+        signals.append(f"Friendly name: {friendly_name}")
+    if is_samsung:
+        signals.append("Samsung device signature")
+    if "mediarenderer" in text or "dlna" in text:
+        signals.append("DLNA media renderer")
+
+    return {
+        "id": f"local-{host.replace('.', '-')}",
+        "name": name,
+        "host": host,
+        "provider": LOCAL_DISCOVERY_PROVIDER,
+        "deviceType": "tv" if is_samsung or "tv" in text or "television" in text else "media",
+        "category": "media",
+        "roomName": None,
+        "confidence": 0.88 if is_samsung else 0.78 if is_media else 0.64,
+        "confidenceLabel": "high" if is_samsung else "medium",
+        "signals": signals,
+        "capabilities": ["networkPresence", "mediaRenderer"],
+        "identity": {
+            "label": "Likely a Samsung TV" if is_samsung else "Likely a TV or media renderer",
+            "evidence": signals,
+        },
+        "connectHint": "Import it, then link it to the real TV product record.",
+        "recommendedAction": "Import media device",
+        "manualCheck": "Compare this IP/name with the TV network settings or your router client list.",
+        "filterTags": ["media", "tv", *([] if not is_samsung else ["samsung"])],
+    }
+
+
+def _friendly_name_from_location(location: str) -> str | None:
+    if not location:
+        return None
+    try:
+        parsed = urllib.parse.urlparse(location)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            return None
+        _resolve_private_host(parsed.hostname)
+        with urllib.request.urlopen(location, timeout=1.5) as response:
+            body = response.read(65536)
+        root = ET.fromstring(body)
+    except (OSError, ValueError, ET.ParseError, urllib.error.URLError):
+        return None
+
+    for element in root.iter():
+        if element.tag.lower().endswith("friendlyname") and element.text:
+            return element.text.strip()[:80]
+    return None
 
 
 def _private_subnet():
@@ -1559,6 +2476,24 @@ def _candidate_fingerprint(host: str, open_ports: list[int]) -> dict:
             "recommendedAction": "Prepare bridge",
             "manualCheck": "Open Home Assistant and create a long-lived token when the bridge is implemented.",
             "filterTags": ["hub", "bridge", "home_assistant"],
+        }
+    if 8001 in ports or 8002 in ports or 9197 in ports:
+        return {
+            "name": "Samsung TV candidate",
+            "deviceType": "tv",
+            "category": "media",
+            "confidence": 0.82,
+            "confidenceLabel": "high",
+            "signals": ["Samsung/TV local control port", *open_port_signals],
+            "capabilities": ["networkPresence", "mediaRenderer", "switch"],
+            "identity": {
+                "label": "Likely a Samsung smart TV",
+                "evidence": ["Samsung/Tizen-style local TV ports are visible"],
+            },
+            "connectHint": "Import it, then link it to the Samsung OLED product record.",
+            "recommendedAction": "Import media device",
+            "manualCheck": "Compare the IP with the Samsung TV network settings or your router client list.",
+            "filterTags": ["media", "tv", "samsung"],
         }
     if 8008 in ports or 8009 in ports:
         return {
@@ -1732,6 +2667,33 @@ def _candidate_capabilities(open_ports: list[int]) -> list[str]:
     return capabilities
 
 
+def _is_user_controllable_candidate(candidate: dict) -> bool:
+    text = " ".join(
+        [
+            str(candidate.get("name") or ""),
+            str(candidate.get("deviceType") or ""),
+            str(candidate.get("category") or ""),
+        ]
+    ).lower()
+    capabilities = {str(capability).lower() for capability in candidate.get("capabilities", []) or []}
+    return (
+        "samsung" in text
+        or "tv" in text
+        or "cast" in text
+        or "media" in text
+        or "printer" in text
+        or "bambu" in text
+        or "hub" in text
+        or "assistant" in text
+        or "switch" in capabilities
+        or "switchlevel" in capabilities
+        or "mediarenderer" in capabilities
+        or "printerjob" in capabilities
+        or "bridge" in capabilities
+        or "deviceimport" in capabilities
+    )
+
+
 def _bambu_diagnostic_status(open_ports: set[int]) -> str:
     if 8883 in open_ports:
         return "LAN_READY"
@@ -1799,8 +2761,10 @@ def _infer_device_type(source_device: dict, capabilities: list[str]) -> str:
     text = " ".join(str(source_device.get(key, "")) for key in ["label", "name", "type", "deviceTypeName"]).lower()
     if "3d_printer" in text or "3d printer" in text or "bambu" in text or "printerJob" in capabilities:
         return "3d_printer"
-    if "tv" in text or "television" in text or "mediaInputSource" in capabilities:
+    if "tv" in text or "television" in text or "samsung" in text or "mediaInputSource" in capabilities:
         return "tv"
+    if "cast" in text or "media" in text or "mediaRenderer" in capabilities:
+        return "media"
     if "light" in text or "switchLevel" in capabilities:
         return "light"
     if "thermostat" in text or "temperatureMeasurement" in capabilities:
@@ -1820,12 +2784,15 @@ def _infer_room(source_device: dict) -> str | None:
 
 def _best_item_match(conn: sqlite3.Connection, user_id: str, name: str, room: str | None, device_type: str) -> str | None:
     terms = [part for part in name.lower().replace("-", " ").split() if len(part) > 2]
+    source_brand = _known_device_brand(name)
     rows = rows_to_dicts(conn.execute('SELECT * FROM "Item" WHERE userId = ?', (user_id,)).fetchall())
     best: tuple[int, str | None] = (0, None)
     for item in rows:
         haystack = " ".join(
             str(item.get(key) or "").lower() for key in ["name", "category", "manufacturer", "model", "location", "itemType"]
         )
+        if source_brand and source_brand not in haystack:
+            continue
         score = sum(2 for term in terms if term in haystack)
         if room and str(item.get("location") or "").lower() == room.lower():
             score += 2
@@ -1840,13 +2807,52 @@ def _best_item_match(conn: sqlite3.Connection, user_id: str, name: str, room: st
     return best[1] if best[0] >= 3 else None
 
 
+def _known_device_brand(value: str) -> str | None:
+    text = value.lower()
+    for brand in [
+        "samsung",
+        "lg",
+        "philips",
+        "sony",
+        "panasonic",
+        "hisense",
+        "tcl",
+        "xiaomi",
+        "apple",
+        "google",
+        "amazon",
+        "bambu",
+    ]:
+        if brand in text:
+            return brand
+    return None
+
+
 def _command_payload(command: str, value: Any = None) -> list[dict]:
+    if command == "set_brightness":
+        brightness = max(0, min(100, int(value or 0)))
+        return [{"component": "main", "capability": "switchLevel", "command": "setLevel", "arguments": [brightness]}]
     if command == "set_volume":
         volume = max(0, min(100, int(value or 0)))
         return [{"component": "main", "capability": "audioVolume", "command": "setVolume", "arguments": [volume]}]
     if command not in COMMANDS:
         raise ValueError("Unsupported smart home command")
     return COMMANDS[command]
+
+
+def _assert_command_allowed_for_device(device: dict, command: str) -> None:
+    capabilities = _json_or_empty_list(device.get("capabilities"))
+    normalized = {str(capability).lower() for capability in capabilities}
+    provider = str(device.get("provider") or "")
+    if provider.startswith("HOME_GRAPH_"):
+        if command in {"power_on", "power_off"} and "switch" in normalized:
+            return
+        if command == "set_brightness" and "switchlevel" in normalized:
+            return
+        raise ValueError("This Home Graph device only allows safe power/brightness commands")
+
+    if command == "set_brightness" and "switchlevel" not in normalized:
+        raise ValueError("Brightness is not supported by this device")
 
 
 def _json_or_empty_list(value: str | None) -> list:

@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from app.db import db, row_to_dict, rows_to_dicts
 from app.dependencies import get_default_user
 from app.schemas import AffiliateClickCreate, HouseholdInviteCreate, ItemActivityCreate, PlanTierUpdate, SmartHomeConnectRequest, SpaceCreate
+from app.services.billing import BillingValidationError, plan_by_key
 from app.services.smart_home import connect_provider
 from app.services.structure import structure_payload
 from app.utils import make_id, now_iso
@@ -87,18 +88,15 @@ def invite_household_member(payload: HouseholdInviteCreate) -> dict:
 
 @router.patch("/plan")
 def update_plan(payload: PlanTierUpdate) -> dict:
-    limits = {
-        "FREE": {"planKey": "free", "itemLimit": 10, "storageLimitMb": 100},
-        "PERSONAL": {"planKey": "personal", "itemLimit": 1000, "storageLimitMb": 5000},
-        "FAMILY": {"planKey": "family", "itemLimit": 2500, "storageLimitMb": 15000},
-    }
     tier = payload.tier.upper()
     if tier in {"HOME", "PREMIUM"}:
         tier = "PERSONAL"
-    if tier == "PRO":
-        tier = "FAMILY"
-    if tier not in limits:
+    try:
+        selected_plan = plan_by_key(tier.lower())
+    except BillingValidationError as exc:
         raise HTTPException(status_code=400, detail="Unknown plan tier")
+    if selected_plan.key != "free":
+        raise HTTPException(status_code=409, detail="Paid plan changes require Stripe billing integration")
 
     with db() as conn:
         user = get_default_user(conn)
@@ -110,9 +108,9 @@ def update_plan(payload: PlanTierUpdate) -> dict:
         if existing:
             conn.execute(
                 """UPDATE "PlanSubscription"
-                   SET planKey = ?, tier = ?, status = ?, itemLimit = ?, storageLimitMb = ?, updatedAt = ?
+                   SET provider = ?, planKey = ?, tier = ?, status = ?, itemLimit = ?, storageLimitMb = ?, updatedAt = ?
                    WHERE id = ?""",
-                (limits[tier]["planKey"], tier, "ACTIVE", limits[tier]["itemLimit"], limits[tier]["storageLimitMb"], now, existing["id"]),
+                ("internal" if selected_plan.key == "free" else "stripe", selected_plan.key, selected_plan.key.upper(), "ACTIVE", selected_plan.item_limit, selected_plan.storage_limit_mb, now, existing["id"]),
             )
             plan_id = existing["id"]
         else:
@@ -121,7 +119,7 @@ def update_plan(payload: PlanTierUpdate) -> dict:
                 """INSERT INTO "PlanSubscription"
                    (id, userId, householdId, provider, planKey, tier, status, itemLimit, storageLimitMb, createdAt, updatedAt)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (plan_id, user["id"], household["id"], "paddle", limits[tier]["planKey"], tier, "ACTIVE", limits[tier]["itemLimit"], limits[tier]["storageLimitMb"], now, now),
+                (plan_id, user["id"], household["id"], "internal" if selected_plan.key == "free" else "stripe", selected_plan.key, selected_plan.key.upper(), "ACTIVE", selected_plan.item_limit, selected_plan.storage_limit_mb, now, now),
             )
         return row_to_dict(conn.execute('SELECT * FROM "PlanSubscription" WHERE id = ?', (plan_id,)).fetchone()) or {}
 

@@ -24,10 +24,15 @@ const CaptureLoop = lazy(() => import("./pages/CaptureLoop").then((m) => ({ defa
 const CaptureItem = lazy(() => import("./pages/CaptureItem").then((m) => ({ default: m.CaptureItem })));
 const HomeBinder = lazy(() => import("./pages/HomeBinder").then((m) => ({ default: m.HomeBinder })));
 const AskAvareno = lazy(() => import("./pages/AskAvareno").then((m) => ({ default: m.AskAvareno })));
+const SearchPage = lazy(() => import("./pages/Search").then((m) => ({ default: m.Search })));
 const SmartHome = lazy(() => import("./pages/SmartHome").then((m) => ({ default: m.SmartHome })));
+const HomeDeviceDetailPage = lazy(() => import("./pages/HomeDeviceDetail").then((m) => ({ default: m.HomeDeviceDetailPage })));
+const MemoryHome = lazy(() => import("./pages/MemoryHome").then((m) => ({ default: m.MemoryHome })));
+const HomeGraphConnect = lazy(() => import("./pages/HomeGraphConnect").then((m) => ({ default: m.HomeGraphConnect })));
 const Resolve = lazy(() => import("./pages/Resolve").then((m) => ({ default: m.Resolve })));
 const Care = lazy(() => import("./pages/Care").then((m) => ({ default: m.Care })));
 const PricingPage = lazy(() => import("./pages/MarketingPages").then((m) => ({ default: m.PricingPage })));
+const CheckoutPage = lazy(() => import("./pages/CheckoutPage").then((m) => ({ default: m.CheckoutPage })));
 const ImpressumPage = lazy(() => import("./pages/MarketingPages").then((m) => ({ default: m.ImpressumPage })));
 const DatenschutzPage = lazy(() => import("./pages/MarketingPages").then((m) => ({ default: m.DatenschutzPage })));
 const CookiesPage = lazy(() => import("./pages/MarketingPages").then((m) => ({ default: m.CookiesPage })));
@@ -48,6 +53,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Home /> },
       { path: "pricing", element: <PricingPage /> },
+      { path: "checkout/:planId", element: <CheckoutPage /> },
       { path: "impressum", element: <ImpressumPage /> },
       { path: "datenschutz", element: <DatenschutzPage /> },
       { path: "cookies", element: <CookiesPage /> },
@@ -67,7 +73,12 @@ const router = createBrowserRouter([
       { path: "items", element: <Items /> },
       { path: "items/:id", element: <ItemDetail /> },
       { path: "ask", element: <AskAvareno /> },
+      { path: "search", element: <SearchPage /> },
       { path: "smart-home", element: <SmartHome /> },
+      { path: "smart-home/devices/:deviceId", element: <HomeDeviceDetailPage /> },
+      { path: "home-graph", element: <HomeGraphConnect /> },
+      { path: "home-graph/devices/:deviceId", element: <HomeDeviceDetailPage /> },
+      { path: "home-graph/connect", element: <HomeGraphConnect /> },
       { path: "resolve", element: <Resolve /> },
       { path: "resolve/tickets", element: <Resolve /> },
       { path: "resolve/tickets/:ticketId", element: <Resolve /> },
@@ -87,7 +98,7 @@ const router = createBrowserRouter([
       { path: "ich/friends", element: <Rewards /> },
       { path: "ich/friends/:friendId", element: <Rewards /> },
       { path: "ich/datenschutz", element: <Rewards /> },
-      { path: "app", element: <SmartHome /> },
+      { path: "app", element: <MemoryHome /> },
       { path: "app/capture", element: <UniversalCapture /> },
       { path: "app/capture/receipt", element: <CaptureReceipt /> },
       { path: "app/capture/message", element: <CaptureMessage /> },
@@ -98,7 +109,15 @@ const router = createBrowserRouter([
       { path: "app/items", element: <Items /> },
       { path: "app/items/:id", element: <ItemDetail /> },
       { path: "app/ask", element: <AskAvareno /> },
+      { path: "app/search", element: <SearchPage /> },
       { path: "app/smart-home", element: <SmartHome /> },
+      { path: "app/smart-home/devices/:deviceId", element: <HomeDeviceDetailPage /> },
+      { path: "app/home", element: <HomeGraphConnect /> },
+      { path: "app/home/devices/:deviceId", element: <HomeDeviceDetailPage /> },
+      { path: "app/home/connect", element: <HomeGraphConnect /> },
+      { path: "app/home-graph", element: <HomeGraphConnect /> },
+      { path: "app/home-graph/devices/:deviceId", element: <HomeDeviceDetailPage /> },
+      { path: "app/home-graph/connect", element: <HomeGraphConnect /> },
       { path: "app/resolve", element: <Resolve /> },
       { path: "app/resolve/tickets", element: <Resolve /> },
       { path: "app/resolve/tickets/:ticketId", element: <Resolve /> },

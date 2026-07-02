@@ -592,9 +592,11 @@ export type PlanSubscription = {
   currentPeriodStart?: string | null;
   currentPeriodEnd?: string | null;
   cancelAtPeriodEnd?: boolean | number;
+  stripePriceId?: string | null;
+  billingInterval?: "monthly" | "yearly" | string | null;
 };
 
-export type BillingProvider = "paddle" | "lemon_squeezy" | "stripe";
+export type BillingProvider = "internal" | "paddle" | "lemon_squeezy" | "stripe";
 
 export type PlanKey = "free" | "personal" | "pro" | "family";
 
@@ -605,6 +607,7 @@ export type BillingPlan = {
   name: string;
   priceLabel: string;
   monthlyPriceEur: number;
+  yearlyPriceEur?: number;
   recommended: boolean;
   available: boolean;
   checkoutEnabled: boolean;
@@ -613,6 +616,10 @@ export type BillingPlan = {
   features: string[];
   itemLimit: number;
   storageLimitMb: number;
+  stripeLookupKeys?: {
+    monthly?: string | null;
+    yearly?: string | null;
+  };
 };
 
 export type BillingSubscriptionState = {
@@ -625,6 +632,8 @@ export type BillingSubscriptionState = {
   cancelAtPeriodEnd?: boolean;
   itemLimit?: number;
   storageLimitMb?: number;
+  stripePriceId?: string | null;
+  billingInterval?: "monthly" | "yearly" | string | null;
 };
 
 export type BillingStatus = {
@@ -639,8 +648,28 @@ export type BillingStatus = {
   message: string;
 };
 
+export type BillingInvoice = {
+  id: string;
+  provider: BillingProvider | string;
+  providerInvoiceId: string;
+  invoiceNumber?: string | null;
+  status: string;
+  currency: string;
+  amountDue: number;
+  amountPaid: number;
+  amountRemaining: number;
+  periodStart?: string | null;
+  periodEnd?: string | null;
+  hostedInvoiceUrl?: string | null;
+  invoicePdfUrl?: string | null;
+  invoiceCreatedAt?: string | null;
+  finalizedAt?: string | null;
+  paidAt?: string | null;
+};
+
 export type CheckoutRequest = {
   planKey: PlanKey;
+  billingInterval?: "monthly" | "yearly";
 };
 
 export type BillingPortalRequest = {

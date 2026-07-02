@@ -63,7 +63,7 @@ Detailed privacy release blockers live in `docs/compliance/PRIVACY_RELEASE_BLOCK
 - [x] DPIA/DSFA screening draft exists.
 - [x] New provider inventory exists.
 - [x] New data processing map exists.
-- [ ] Paddle Merchant-of-Record scope, VAT/tax handling, invoice handling, DPA/AVV, region/transfers, subprocessors and retention reviewed before paid launch.
+- [ ] Stripe Tax/VAT handling, invoice handling, DPA/AVV, region/transfers, subprocessors and retention reviewed before paid launch.
 - [ ] Billing/customer portal, cancellation path, refund/support process and privacy policy disclosure finalized before accepting payments.
 - [ ] DPAs/AVVs checked and stored outside repo.
 - [ ] Retention plan finalized.

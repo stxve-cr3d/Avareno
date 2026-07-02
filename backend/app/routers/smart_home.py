@@ -8,6 +8,8 @@ from app.schemas import (
     BambuHostDiagnosticRequest,
     BambuLabSetupRequest,
     BambuPrintEventRequest,
+    HomeGraphConnectConfirmRequest,
+    HomeGraphConnectPreviewRequest,
     LocalDiscoveryImportRequest,
     LocalDiscoveryProbeRequest,
     SmartHomeCommandRequest,
@@ -17,11 +19,15 @@ from app.schemas import (
 from app.services.smart_home import (
     activate_smart_home_insight,
     connect_provider,
+    confirm_home_graph_connect,
+    delete_device,
     discover_local_candidates,
     diagnose_bambu_host,
     execute_command,
+    home_graph_connect_preview,
     import_local_candidate,
     link_device_to_item,
+    pair_local_device,
     probe_local_host,
     record_bambu_print_event,
     setup_bambu_lab_printer,
@@ -68,6 +74,22 @@ def sync(provider: str) -> dict:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
+@router.post("/home-graph/connect/preview")
+def home_graph_preview(payload: HomeGraphConnectPreviewRequest) -> dict:
+    return home_graph_connect_preview(payload.providerId)
+
+
+@router.post("/home-graph/connect/confirm", status_code=201)
+def home_graph_confirm(payload: HomeGraphConnectConfirmRequest) -> dict:
+    with db() as conn:
+        user = get_default_user(conn)
+        household = _default_household(conn, user["id"])
+        try:
+            return confirm_home_graph_connect(conn, user["id"], household["id"], payload.providerId, payload.acceptedCapabilities)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.post("/devices/{device_id}/commands", status_code=201)
 def command(device_id: str, payload: SmartHomeCommandRequest) -> dict:
     with db() as conn:
@@ -88,6 +110,28 @@ def link_item(device_id: str, payload: SmartHomeLinkItemRequest) -> dict:
             return link_device_to_item(conn, user["id"], device_id, payload.itemId)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/devices/{device_id}")
+def delete_smart_home_device(device_id: str) -> dict:
+    with db() as conn:
+        user = get_default_user(conn)
+        try:
+            return delete_device(conn, user["id"], device_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/devices/{device_id}/pair", status_code=201)
+def pair_device(device_id: str) -> dict:
+    with db() as conn:
+        user = get_default_user(conn)
+        try:
+            return pair_local_device(conn, user["id"], device_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.post("/local/discover")

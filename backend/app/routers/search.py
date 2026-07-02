@@ -48,7 +48,7 @@ def search(q: str = Query("", min_length=0)) -> dict:
                         "id": item["id"],
                         "type": "ITEM",
                         "title": item["name"],
-                        "subtitle": f"{item.get('category') or 'Ding'} - {item.get('model') or 'ohne Model'}",
+                        "subtitle": f"{item.get('category') or 'Objekt'} - {item.get('model') or 'ohne Model'}",
                         "meta": f"{item.get('completenessScore', 0)}% komplett",
                         "route": f"/items/{item['id']}",
                         "status": " - ".join(fields[:2]) if fields else "vollstaendig",

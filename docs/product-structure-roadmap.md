@@ -8,7 +8,7 @@ The product should feel less like an inventory spreadsheet and more like: "my ho
 
 Key product sentence:
 
-> Avareno macht aus deinen echten Dingen ein intelligentes Gedächtnis.
+> Avareno macht aus deinen echten Objekten ein intelligentes Gedächtnis.
 
 Stronger English version:
 
@@ -432,6 +432,59 @@ Use cases:
 
 This is probably not MVP, but it is a strong V2/V3 "wow" path.
 
+#### Avareno Home Graph Device Detail
+
+Smart Home must not become a generic remote-control dashboard. The product direction is the **Avareno Home Graph**: a private device memory layer that connects a real device with its app/provider, room, receipt, warranty, manual, support steps, reminders, care tasks, related devices, and optional control.
+
+First target experience:
+
+- Route direction: `/app/home-graph/devices/:deviceId` or `/app/home/devices/:deviceId`
+- First device: living-room TV
+- Main feeling: "Avareno understands this as a real object in my life, not just as an on/off button."
+- Existing real control: local Samsung TV power on/off plus basic TV remote commands for volume up/down, mute toggle and source menu, if the current Samsung/local integration supports it
+- Planned controls must be clearly marked as `Geplant`, `Demo`, `Bald verfuegbar`, or `Nicht verbunden`
+- Never claim discrete HDMI selection, scenes, soundbar, Hue, Alexa, Smart Life, Meross or other provider control works until it is implemented and reviewed
+
+Core device detail content:
+
+- Device identity: name, type, room, provider/app, connection level, status
+- Controls: only real safe controls are clickable; planned controls are visible but disabled/labelled
+- Knowledge: provider, room, type, controllable state, linked receipt, warranty, manual, support, optional serial number
+- Home Graph visual: central device node connected to provider, room, receipt, warranty, manual, related devices and care tasks
+- Resolve: structured troubleshooting topics like no signal, offline, no sound, wrong HDMI source, remote not responding
+- Care: firmware check, display cleaning, warranty check, receipt/manual linking
+- Timeline: added, connected, controlled, missing receipt, warranty state
+- Moments preview: e.g. "Filmabend vorbereiten", marked as planned/partially available until all controls exist
+
+Suggested TypeScript foundations:
+
+- `HomeConnectionLevel = 0 | 1 | 2 | 3 | 4`
+- `HomeCapability`: power, brightness, color, temperature, humidity, lock, scene, motion, contact, battery, energy, media playback, volume, source, cleaning, camera, alarm, presence
+- `HomeDeviceRelation`: linked document, receipt, warranty, manual, provider, room, device or task
+- `HomeDeviceTimelineItem`: created, connected, controlled, document, warranty, issue or care event
+- `HomeDeviceCareTask`: open, done or upcoming care tasks
+- `HomeDeviceResolveTopic`: structured support topics with clear steps
+
+UX requirements:
+
+- German UI copy
+- Premium dark Avareno style: calm, sparse, thin borders, restrained green accent
+- One strong hero moment and one strong Home Graph visual moment
+- Fewer but stronger sections; no wall of equal grey cards
+- Missing receipt/warranty/manual states must have useful CTAs
+- Responsive layout
+- No broken images
+- No fake claims
+
+Privacy and security rules:
+
+- Provider controls must be explicit and user-triggered
+- No real provider credentials or tokens in frontend code
+- No raw provider payloads or device secrets in logs
+- Real provider connections must be explicit, revocable and transparent
+- No unsafe control for locks, cameras, alarms, ovens, heaters, garages or security-critical devices without a separate safety/security review
+- Mock/demo data must stay clearly separated from real integration data
+
 ### 9. Optional Chatter
 
 Chatter is interesting, but we need to be careful.
@@ -532,6 +585,7 @@ User asks:
 ### Version 2: Shared And Connected
 
 - Compatibility Graph
+- Home Graph device detail, starting with the TV
 - Family Vault
 - Accessories and replacement parts
 - 3D model references
@@ -554,5 +608,7 @@ User asks:
 3. Build Support-Autopilot basic: generate a support request draft from passport data.
 4. Keep Universal Capture focused on creating or updating Product Passports.
 5. Add first manual/driver/software link fields before building broader compatibility features.
-6. Add Family Vault only after the single-user Product Passport feels useful.
-7. Add Quests/Streaks after the core care actions are already meaningful.
+6. Build the first Home Graph device detail page for the TV: real power control only, all other controls marked planned/demo.
+7. Link the Home Graph detail page from the existing Smart Home/Home Graph area without overcrowding the overview.
+8. Add Family Vault only after the single-user Product Passport feels useful.
+9. Add Quests/Streaks after the core care actions are already meaningful.

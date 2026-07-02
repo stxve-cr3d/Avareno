@@ -8,8 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.auth import auth_middleware
-from app.db import PROJECT_ROOT
-from app.routers import assistant, billing, capture, dashboard, documents, extract, items, loops, me, mobile, notifications, planner, privacy, reports, rewards, search, smart_home, structure, webhooks
+from app.services.document_storage import UPLOAD_ROOT
+from app.routers import assistant, billing, capture, dashboard, documents, extract, friends, items, loops, me, mobile, notifications, planner, privacy, reports, rewards, search, smart_home, structure, webhooks
 
 app = FastAPI(title="Avareno API")
 
@@ -36,12 +36,11 @@ app.add_middleware(
 
 app.middleware("http")(auth_middleware)
 
-uploads = PROJECT_ROOT / "uploads"
 if os.environ.get("AVARENO_ENABLE_STATIC_UPLOADS", "").strip().lower() in {"1", "true", "yes", "on"}:
-    uploads.mkdir(parents=True, exist_ok=True)
+    UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
     # Development escape hatch only. Private documents should use
     # short-lived signed API downloads or private object storage.
-    app.mount("/uploads", StaticFiles(directory=Path(uploads)), name="uploads")
+    app.mount("/uploads", StaticFiles(directory=Path(UPLOAD_ROOT)), name="uploads")
 
 app.include_router(me.router, prefix="/api/me", tags=["me"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
@@ -51,6 +50,7 @@ app.include_router(items.router, prefix="/api/items", tags=["items"])
 app.include_router(loops.router, prefix="/api/loops", tags=["loops"])
 app.include_router(capture.router, prefix="/api/capture", tags=["capture"])
 app.include_router(rewards.router, prefix="/api/rewards", tags=["rewards"])
+app.include_router(friends.router, prefix="/api/friends", tags=["friends"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(planner.router, prefix="/api/planner", tags=["planner"])
 app.include_router(privacy.router, prefix="/api/privacy", tags=["privacy"])
