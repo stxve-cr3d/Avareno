@@ -11,19 +11,19 @@
   --avareno-font-tight: "Helvetica Neue", "SF Pro Display", "Aptos Display", Inter, var(--avareno-font);
 
   /* /app design tokens — do not use on public website */
-  --av-bg-base:       #060808;
-  --av-bg-shell:      #0A0D0D;
-  --av-bg-panel:      #0E1313;
-  --av-bg-panel-soft: #121818;
-  --av-surface-1:     rgba(255,255,255,0.035);
-  --av-surface-2:     rgba(255,255,255,0.055);
-  --av-surface-3:     rgba(255,255,255,0.080);
-  --av-border-subtle: rgba(255,255,255,0.07);
-  --av-border-medium: rgba(255,255,255,0.12);
-  --av-border-accent: rgba(62,207,142,0.22);
-  --av-text-primary:  #F4F7F7;
-  --av-text-secondary:#A8B0B0;
-  --av-text-muted:    #737D7D;
+  --av-bg-base:       #141414;
+  --av-bg-shell:      #191919;
+  --av-bg-panel:      #1D1D1D;
+  --av-bg-panel-soft: #232323;
+  --av-surface-1:     rgba(255,255,255,0.04);
+  --av-surface-2:     rgba(255,255,255,0.06);
+  --av-surface-3:     rgba(255,255,255,0.09);
+  --av-border-subtle: rgba(255,255,255,0.08);
+  --av-border-medium: rgba(255,255,255,0.14);
+  --av-border-accent: rgba(62,207,142,0.24);
+  --av-text-primary:  #F5F5F4;
+  --av-text-secondary:#A6A6A2;
+  --av-text-muted:    #7A7A76;
   --av-accent:        #3ECF8E;
   --av-accent-bg:     rgba(62,207,142,0.075);
   --av-warning:       #E8C56E;
@@ -32,7 +32,7 @@
   --av-danger:        #EF7D7D;
   --av-danger-bg:     rgba(239,125,125,0.10);
   color: #1b1c1c;
-  background: #eef2f0;
+  background: var(--av-bg-base);
   font-family: var(--avareno-font);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -50,7 +50,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: linear-gradient(180deg, #fbfcfb 0%, #f3f6f4 52%, #e8eeeb 100%);
+  background: var(--av-bg-base);
   background-size: auto;
 }
 
@@ -4607,7 +4607,7 @@ select {
   gap: 0.75rem;
   margin-top: 0.9rem;
   border-radius: 0.75rem;
-  background: #eef2f0;
+  background: var(--av-surface-1);
   padding: 0.75rem;
 }
 
@@ -4619,7 +4619,7 @@ select {
 }
 
 .smart-local-match p {
-  color: #64736e;
+  color: var(--av-text-muted);
   font-size: 0.7rem;
   font-weight: 900;
   text-transform: uppercase;
@@ -4628,7 +4628,7 @@ select {
 .smart-local-match strong {
   display: block;
   margin-top: 0.2rem;
-  color: #1b1c1c;
+  color: var(--av-text-primary);
   font-size: 0.92rem;
   font-weight: 950;
 }
@@ -4640,9 +4640,9 @@ select {
   justify-content: center;
   gap: 0.45rem;
   border-radius: 999px;
-  background: #1b1c1c;
+  background: var(--av-accent);
   padding: 0 0.9rem;
-  color: white;
+  color: #04201E;
   font-size: 0.82rem;
   font-weight: 900;
 }
@@ -4653,9 +4653,9 @@ select {
 }
 
 .smart-mini-action-light {
-  border: 1px solid rgba(27, 28, 28, 0.12);
-  background: white;
-  color: #1b1c1c;
+  border: 1px solid var(--av-border-subtle);
+  background: var(--av-surface-1);
+  color: var(--av-text-secondary);
 }
 
 .smart-local-action-note {
@@ -4663,11 +4663,11 @@ select {
   min-height: 2.85rem;
   align-items: center;
   justify-content: center;
-  border: 1px dashed rgba(27, 28, 28, 0.18);
+  border: 1px dashed var(--av-border-medium);
   border-radius: 999px;
-  background: rgba(238, 242, 240, 0.5);
+  background: var(--av-surface-1);
   padding: 0 0.9rem;
-  color: #64736e;
+  color: var(--av-text-muted);
   font-size: 0.78rem;
   font-weight: 950;
   text-align: center;
@@ -4677,11 +4677,11 @@ select {
   display: flex;
   min-width: 0;
   gap: 1rem;
-  border: 1px solid rgba(27, 28, 28, 0.12);
+  border: 1px solid var(--av-border-subtle);
   border-radius: 1rem;
-  background: rgba(248, 250, 249, 0.96);
+  background: var(--av-bg-panel-soft);
   padding: 1rem;
-  box-shadow: 0 18px 52px rgba(27, 28, 28, 0.08);
+  box-shadow: none;
 }
 
 .smart-device-media {
@@ -4693,9 +4693,9 @@ select {
   overflow: hidden;
   border-radius: 0.8rem;
   background:
-    radial-gradient(circle at 70% 20%, rgba(62, 207, 142, 0.075), transparent 8rem),
-    #e8eeeb;
-  color: #3ECF8E;
+    radial-gradient(circle at 70% 20%, rgba(62, 207, 142, 0.1), transparent 8rem),
+    var(--av-bg-panel);
+  color: var(--av-accent);
 }
 
 .smart-device-media img {
@@ -4711,26 +4711,26 @@ select {
   align-items: center;
   gap: 0.35rem;
   border-radius: 999px;
-  background: rgba(255, 166, 0, 0.12);
+  background: var(--av-warning-bg);
   padding: 0 0.7rem;
-  color: #9a6500;
+  color: var(--av-warning);
   font-size: 0.72rem;
   font-weight: 900;
   text-transform: uppercase;
 }
 
 .smart-link-badge-on {
-  background: rgba(62, 207, 142, 0.12);
-  color: #3ECF8E;
+  background: var(--av-accent-bg);
+  color: var(--av-accent);
 }
 
 .smart-device-object,
 .smart-device-controls,
 .smart-object-card,
 .smart-command-row {
-  border: 1px solid rgba(27, 28, 28, 0.1);
+  border: 1px solid var(--av-border-subtle);
   border-radius: 0.8rem;
-  background: #ffffff;
+  background: var(--av-bg-panel-soft);
 }
 
 .smart-device-object {
@@ -4739,7 +4739,7 @@ select {
 }
 
 .smart-device-object p {
-  color: #64736e;
+  color: var(--av-text-muted);
   font-size: 0.72rem;
   font-weight: 900;
   text-transform: uppercase;
@@ -4748,7 +4748,7 @@ select {
 .smart-device-object strong {
   display: block;
   margin-top: 0.25rem;
-  color: #1b1c1c;
+  color: var(--av-text-primary);
   font-weight: 900;
 }
 
@@ -4757,10 +4757,10 @@ select {
   min-height: 2.75rem;
   width: 100%;
   border-radius: 999px;
-  border: 1px solid rgba(27, 28, 28, 0.12);
-  background: #f8faf9;
+  border: 1px solid var(--av-border-subtle);
+  background: var(--av-surface-1);
   padding: 0 0.85rem;
-  color: #1b1c1c;
+  color: var(--av-text-primary);
   font-size: 0.82rem;
   font-weight: 850;
 }
@@ -4779,16 +4779,16 @@ select {
   justify-content: center;
   gap: 0.4rem;
   border-radius: 999px;
-  background: #1b1c1c;
-  color: white;
+  background: var(--av-accent);
+  color: #04201E;
   font-size: 0.8rem;
   font-weight: 900;
 }
 
 .smart-device-controls button:nth-child(even) {
-  border: 1px solid rgba(27, 28, 28, 0.12);
-  background: #f8faf9;
-  color: #1b1c1c;
+  border: 1px solid var(--av-border-subtle);
+  background: var(--av-surface-1);
+  color: var(--av-text-primary);
 }
 
 .smart-printer-metric {
@@ -4797,10 +4797,10 @@ select {
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  border: 1px solid rgba(27, 28, 28, 0.12);
+  border: 1px solid var(--av-border-subtle);
   border-radius: 999px;
-  background: #f8faf9;
-  color: #1b1c1c;
+  background: var(--av-surface-1);
+  color: var(--av-text-primary);
   font-size: 0.78rem;
   font-weight: 900;
 }
@@ -4814,16 +4814,16 @@ select {
 
 .smart-printer-stat {
   min-width: 0;
-  border: 1px solid rgba(27, 28, 28, 0.1);
+  border: 1px solid var(--av-border-subtle);
   border-radius: 0.75rem;
   background:
     linear-gradient(135deg, rgba(62, 207, 142, 0.08), transparent),
-    #ffffff;
+    var(--av-bg-panel-soft);
   padding: 0.75rem;
 }
 
 .smart-printer-stat p {
-  color: #64736e;
+  color: var(--av-text-muted);
   font-size: 0.68rem;
   font-weight: 950;
   text-transform: uppercase;
@@ -4832,7 +4832,7 @@ select {
 .smart-printer-stat strong {
   display: block;
   margin-top: 0.25rem;
-  color: #1b1c1c;
+  color: var(--av-text-primary);
   font-size: 0.95rem;
   font-weight: 950;
 }
@@ -4850,32 +4850,32 @@ select {
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  border: 1px solid rgba(27, 28, 28, 0.1);
+  border: 1px solid var(--av-border-subtle);
   border-radius: 999px;
-  background: #ffffff;
-  color: #1b1c1c;
+  background: var(--av-surface-1);
+  color: var(--av-text-primary);
   font-size: 0.76rem;
   font-weight: 950;
-  box-shadow: 0 0.6rem 1.4rem rgba(27, 28, 28, 0.06);
+  box-shadow: none;
 }
 
 .smart-printer-events button:first-child {
-  border-color: rgba(62, 207, 142, 0.24);
-  background: #3ECF8E;
-  color: #ffffff;
+  border-color: rgba(62, 207, 142, 0.28);
+  background: var(--av-accent);
+  color: #04201E;
 }
 
 .smart-printer-events .smart-printer-event-alert {
-  border-color: rgba(255, 92, 66, 0.32);
-  background: #fff4ef;
-  color: #b33a28;
+  border-color: rgba(239, 125, 125, 0.32);
+  background: var(--av-danger-bg);
+  color: var(--av-danger);
 }
 
 .smart-capability {
   border-radius: 999px;
-  background: rgba(62, 207, 142, 0.09);
+  background: var(--av-accent-bg);
   padding: 0.45rem 0.65rem;
-  color: #3ECF8E;
+  color: var(--av-accent);
   font-size: 0.72rem;
   font-weight: 900;
 }
@@ -4885,7 +4885,7 @@ select {
 }
 
 .smart-command-row p {
-  color: #64736e;
+  color: var(--av-text-muted);
   font-size: 0.72rem;
   font-weight: 900;
   text-transform: uppercase;
@@ -4894,14 +4894,14 @@ select {
 .smart-command-row strong {
   display: block;
   margin-top: 0.2rem;
-  color: #1b1c1c;
+  color: var(--av-text-primary);
   font-weight: 900;
 }
 
 .smart-command-row span {
   display: block;
   margin-top: 0.4rem;
-  color: #64736e;
+  color: var(--av-text-muted);
   font-size: 0.78rem;
   font-weight: 700;
 }
@@ -4925,15 +4925,15 @@ select {
 .object-printer-metric {
   min-width: 0;
   border-radius: 0.75rem;
-  border: 1px solid rgba(27, 28, 28, 0.1);
+  border: 1px solid var(--av-border-subtle);
   background:
     linear-gradient(135deg, rgba(62, 207, 142, 0.08), transparent),
-    #f8faf9;
+    var(--av-bg-panel-soft);
   padding: 0.72rem;
 }
 
 .object-printer-metric p {
-  color: #64736e;
+  color: var(--av-text-muted);
   font-size: 0.66rem;
   font-weight: 950;
   text-transform: uppercase;
@@ -4945,7 +4945,7 @@ select {
   align-items: center;
   gap: 0.3rem;
   margin-top: 0.18rem;
-  color: #1b1c1c;
+  color: var(--av-text-primary);
   font-size: 0.92rem;
   font-weight: 950;
 }
@@ -4971,21 +4971,21 @@ select {
 
 .object-printer-actions button:first-child,
 .object-printer-events button:first-child {
-  background: #1b1c1c;
-  color: #ffffff;
+  background: var(--av-accent);
+  color: #04201E;
 }
 
 .object-printer-actions button:not(:first-child),
 .object-printer-events button:not(:first-child) {
-  border: 1px solid rgba(27, 28, 28, 0.12);
-  background: #ffffff;
-  color: #1b1c1c;
+  border: 1px solid var(--av-border-subtle);
+  background: var(--av-surface-1);
+  color: var(--av-text-primary);
 }
 
 .object-printer-events .object-printer-event-alert {
-  border-color: rgba(255, 92, 66, 0.32);
-  background: #fff4ef;
-  color: #b33a28;
+  border-color: rgba(239, 125, 125, 0.32);
+  background: var(--av-danger-bg);
+  color: var(--av-danger);
 }
 
 .object-printer-actions button:disabled,
@@ -4997,13 +4997,13 @@ select {
 .object-device-note {
   margin-top: 1rem;
   border-radius: 0.8rem;
-  border: 1px solid rgba(27, 28, 28, 0.1);
-  background: #f8faf9;
+  border: 1px solid var(--av-border-subtle);
+  background: var(--av-bg-panel-soft);
   padding: 0.85rem;
 }
 
 .object-device-note p {
-  color: #64736e;
+  color: var(--av-text-muted);
   font-size: 0.68rem;
   font-weight: 950;
   text-transform: uppercase;
@@ -5012,7 +5012,7 @@ select {
 .object-device-note strong {
   display: block;
   margin-top: 0.2rem;
-  color: #1b1c1c;
+  color: var(--av-text-primary);
   font-size: 0.92rem;
   font-weight: 950;
 }
@@ -5026,9 +5026,9 @@ select {
 
 .object-device-note span {
   border-radius: 999px;
-  background: rgba(62, 207, 142, 0.09);
+  background: var(--av-accent-bg);
   padding: 0.35rem 0.5rem;
-  color: #3ECF8E;
+  color: var(--av-accent);
   font-size: 0.68rem;
   font-weight: 900;
 }
@@ -8730,8 +8730,6 @@ select {
 }
 
 .avareno-app-shell {
-  min-height: 100vh;
-  background: var(--av-bg-base);
   color: var(--av-text-primary);
 }
 
@@ -17293,28 +17291,6 @@ a:focus-visible {
 .avareno-app-shell {
   position: relative;
   isolation: isolate;
-  background: var(--av-bg-base);
-}
-
-.avareno-app-shell::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  opacity: 0.42;
-  background-image:
-    radial-gradient(circle, rgba(255, 255, 255, 0.105) 0.7px, transparent 0.8px),
-    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.016) 1px, transparent 1px);
-  background-position: center top;
-  background-size: 22px 22px, 88px 88px, 88px 88px;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.26) 44%, transparent 88%);
-}
-
-.avareno-app-topbar {
-  background: rgba(6, 8, 8, 0.84);
-  border-bottom-color: rgba(255, 255, 255, 0.065);
 }
 
 .avareno-app-topbar-inner,
@@ -17838,6 +17814,10 @@ a:focus-visible {
   padding: 0.55rem 0.95rem;
 }
 .av-btn-secondary:hover { background: var(--av-surface-2); color: var(--av-text-primary); }
+.av-btn-ghost { background: transparent; color: var(--av-text-secondary); padding: 0.55rem 0.85rem; }
+.av-btn-ghost:hover { background: var(--av-surface-1); color: var(--av-text-primary); }
+.av-btn-danger { background: var(--av-danger-bg); color: var(--av-danger); border-color: rgba(239,125,125,0.28); padding: 0.62rem 1.15rem; }
+.av-btn-danger:hover { background: rgba(239,125,125,0.16); }
 .av-action-ic { display: inline-flex; color: var(--av-text-muted); }
 
 /* ── Metadata row ── */
@@ -18436,40 +18416,10 @@ a:focus-visible {
    AVARENO /app final precision clamp
    Kept at EOF so shared AppKit definitions cannot soften the
    authenticated home refinement above.
+   (.avareno-app-shell base, ::before and .avareno-app-topbar
+   are already declared identically in the v5 precision pass
+   above — not repeated here.)
    ============================================================ */
-
-.avareno-app-shell {
-  position: relative;
-  isolation: isolate;
-  background: var(--av-bg-base);
-}
-
-.avareno-app-shell::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  opacity: 0.42;
-  background-image:
-    radial-gradient(circle, rgba(255, 255, 255, 0.105) 0.7px, transparent 0.8px),
-    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.016) 1px, transparent 1px);
-  background-position: center top;
-  background-size: 22px 22px, 88px 88px, 88px 88px;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.26) 44%, transparent 88%);
-}
-
-.avareno-app-topbar {
-  background: rgba(6, 8, 8, 0.84);
-  border-bottom-color: rgba(255, 255, 255, 0.065);
-}
-
-.avareno-app-topbar-inner,
-.av-home,
-.av-page {
-  max-width: 1504px;
-}
 
 .av-home {
   position: relative;
@@ -18532,17 +18482,6 @@ a:focus-visible {
   .av-section {
     border-radius: 0.76rem;
   }
-}
-
-/* Visible Memory Build refinement: stronger, still calm. */
-.avareno-app-shell {
-  background:
-    radial-gradient(circle at 50% -16rem, rgba(62, 207, 142, 0.075), transparent 32rem),
-    radial-gradient(circle at 88% 7rem, rgba(232, 197, 110, 0.045), transparent 21rem),
-    radial-gradient(circle, rgba(255, 255, 255, 0.065) 0.65px, transparent 0.8px) 0 0 / 22px 22px,
-    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px) 0 0 / 88px 88px,
-    linear-gradient(90deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px) 0 0 / 88px 88px,
-    #060808;
 }
 
 .av-hero {
@@ -18682,18 +18621,18 @@ a:focus-visible {
    ============================================================ */
 
 .avareno-app-shell {
-  --av-bg-base: #0b0f0e;
-  --av-bg-shell: #111312;
-  --av-bg-panel: #181b1a;
-  --av-bg-panel-soft: #1f2321;
-  --av-surface-1: rgba(255, 255, 255, 0.035);
-  --av-surface-2: rgba(255, 255, 255, 0.055);
-  --av-surface-3: rgba(255, 255, 255, 0.075);
+  --av-bg-base: #141414;
+  --av-bg-shell: #191919;
+  --av-bg-panel: #1D1D1D;
+  --av-bg-panel-soft: #232323;
+  --av-surface-1: rgba(255, 255, 255, 0.04);
+  --av-surface-2: rgba(255, 255, 255, 0.06);
+  --av-surface-3: rgba(255, 255, 255, 0.09);
   --av-border-subtle: rgba(255, 255, 255, 0.08);
   --av-border-medium: rgba(255, 255, 255, 0.14);
-  --av-text-primary: #f2f4f3;
-  --av-text-secondary: #a8aeac;
-  --av-text-muted: #737b78;
+  --av-text-primary: #F5F5F4;
+  --av-text-secondary: #A6A6A2;
+  --av-text-muted: #7A7A76;
   --av-accent: #3ECF8E;
   --av-accent-muted: #2FAA76;
   --av-warning: #e8c56e;
@@ -18787,6 +18726,10 @@ a:focus-visible {
   grid-template-columns: minmax(0, 1.18fr) minmax(26rem, 0.82fr);
   gap: 1rem;
   align-items: stretch;
+}
+
+.av-library .av-console-top {
+  grid-template-columns: 1fr;
 }
 
 .av-dashboard-header,
@@ -19412,7 +19355,6 @@ a:focus-visible {
 }
 
 .avareno-app-shell .av-page-kicker,
-.avareno-app-shell .resolve-hero span,
 .avareno-app-shell .resolve-hero p:first-child,
 .avareno-app-shell .profile-hero span,
 .avareno-app-shell .profile-focus span,
@@ -23805,4 +23747,164 @@ a:focus-visible {
 
 .product-qr-actions > button {
   width: 100%;
+}
+
+/* ============================================================
+   Route error fallback (router errorElement)
+   Self-contained, uses :root av-* tokens so it renders
+   correctly even outside the .avareno-app-shell context.
+   ============================================================ */
+.av-route-error {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 1.5rem;
+  background: var(--av-bg-base);
+}
+
+.av-route-error-card {
+  width: 100%;
+  max-width: 28rem;
+  border: 1px solid var(--av-border-subtle);
+  border-radius: 0.9rem;
+  background: var(--av-bg-panel);
+  padding: 2rem 1.75rem;
+  text-align: center;
+}
+
+.av-route-error-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-bottom: 1.1rem;
+  border: 1px solid var(--av-border-subtle);
+  border-radius: 0.7rem;
+  background: var(--av-warning-bg);
+  color: var(--av-warning);
+}
+
+.av-route-error-kicker {
+  margin: 0;
+  color: var(--av-text-muted);
+  font-size: 0.72rem;
+  font-weight: 560;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.av-route-error-card h1 {
+  margin: 0.5rem 0 0;
+  color: var(--av-text-primary);
+  font-size: 1.4rem;
+  font-weight: 560;
+  line-height: 1.2;
+}
+
+.av-route-error-detail {
+  margin: 0.6rem 0 0;
+  color: var(--av-text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.av-route-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 1.5rem;
+}
+
+.av-route-error-note {
+  margin: 1.5rem 0 0;
+  color: var(--av-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+/* ============================================================
+   Skeleton loading primitives
+   Calm shimmer over neutral surfaces; honors reduced-motion.
+   ============================================================ */
+.av-skeleton {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: var(--av-surface-1);
+}
+
+.av-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  animation: av-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes av-shimmer {
+  100% { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .av-skeleton::after { animation: none; }
+}
+
+.av-skel-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+@media (max-width: 720px) {
+  .av-skel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ============================================================
+   Route suspense fallback (lazy chunk loading)
+   Thin indeterminate bar centered in the content area.
+   ============================================================ */
+.av-route-fallback {
+  display: grid;
+  place-items: center;
+  min-height: 50vh;
+  padding: 2rem;
+}
+
+.av-route-fallback-bar {
+  position: relative;
+  display: block;
+  width: min(14rem, 60%);
+  height: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--av-border-subtle);
+}
+
+.av-route-fallback-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: 999px;
+  background: var(--av-accent);
+  opacity: 0.85;
+  transform: translateX(-100%);
+  animation: av-route-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes av-route-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .av-route-fallback-bar::after {
+    animation: none;
+    width: 100%;
+    transform: none;
+    opacity: 0.5;
+  }
 }

@@ -110,7 +110,7 @@ def main() -> None:
                 warranty_loop_id,
                 user_id,
                 item_id,
-                "Garantie vom LG TV pruefen",
+                "Garantie vom LG TV prüfen",
                 "Warranty is stored. Serial number is still missing.",
                 "RECEIPT",
                 "MEDIUM",

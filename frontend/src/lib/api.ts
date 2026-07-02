@@ -27,9 +27,9 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   return response.json() as Promise<T>;
 }
 
-export function isoDate(value?: string | null) {
-  if (!value) return "No date";
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+export function isoDate(value?: string | null, locale = "de-DE") {
+  if (!value) return "Kein Datum";
+  return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
 }
 
 export function dateInputValue(value?: string | null) {

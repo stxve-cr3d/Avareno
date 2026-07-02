@@ -6,7 +6,6 @@ import {
   BellRing,
   ChevronRight,
   FileText,
-  Flame,
   LifeBuoy,
   Monitor,
   Package,
@@ -19,8 +18,8 @@ import { Link } from "react-router-dom";
 import { api, isoDate } from "../lib/api";
 import { formatUiText } from "../lib/uiText";
 import {
+  ConsoleSkeleton,
   DottedGridPanel,
-  MetricCard,
   ObjectMemoryMap,
   ObjectMemoryCard,
   QuickActionCard,
@@ -31,7 +30,6 @@ import type {
   Item,
   LocalDiscoveryCandidate,
   LocalDiscoveryPayload,
-  MotivationSummary,
   SmartHomeDevice,
   SmartHomeInsight,
   SmartHomePayload
@@ -163,31 +161,7 @@ const smartFallbackPayload: SmartHomePayload = {
   wow: { label: "objektbewusste Steuerung", promise: "Verbinde Geräte mit den echten Dingen, zu denen sie gehören." }
 };
 
-const fallbackHomeMotivation: MotivationSummary = {
-  motivationEnabled: true,
-  streakTrackingEnabled: true,
-  gentleNudgesEnabled: true,
-  currentStreakDays: 6,
-  longestStreakDays: 14,
-  freezeDaysAvailable: 2,
-  weeklyXP: 180,
-  totalXP: 1240,
-  levelName: "Organisiert",
-  levelProgress: 40,
-  statusText: "6 Tage gut gepflegt",
-  nudgeText: "Heute reicht schon eine kleine Aktion.",
-  pauseText: "Kein Stress — Avareno belohnt Fortschritt, nicht Perfektion.",
-  freezeState: { active: true, title: "Pausentag verfügbar", body: "Pausentage schützen deine Serie." },
-  recentXPEvents: [
-    { id: "mock-receipt", label: "Rechnung für MacBook hinzugefügt", points: 25, createdAt: new Date().toISOString() },
-    { id: "mock-warranty", label: "Garantie für Sony Kopfhörer erkannt", points: 15, createdAt: new Date().toISOString() }
-  ],
-  xpRules: []
-};
-
 /* ── types ──────────────────────────────────────────────────── */
-
-type HomeRewardsPayload = { motivation: MotivationSummary };
 
 type ImportantHomeItem = {
   action: string;
@@ -216,34 +190,26 @@ type RecentHomeThing = {
 export function SmartHome() {
   const [payload, setPayload] = useState<SmartHomePayload | null>(null);
   const [items, setItems] = useState<Item[]>([]);
-  const [motivation, setMotivation] = useState<MotivationSummary | null>(null);
 
   async function load() {
     try {
-      const [smartHome, allItems, rewards] = await Promise.all([
+      const [smartHome, allItems] = await Promise.all([
         api<SmartHomePayload>("/api/smart-home"),
-        api<Item[]>("/api/items"),
-        api<HomeRewardsPayload>("/api/rewards").catch(() => ({ motivation: fallbackHomeMotivation }))
+        api<Item[]>("/api/items")
       ]);
       setPayload(smartHome);
       setItems(allItems);
-      setMotivation(rewards.motivation);
     } catch (error) {
       console.warn("Smart home API unavailable; using demo fallback.", error);
       setPayload(smartFallbackPayload);
       setItems([]);
-      setMotivation(fallbackHomeMotivation);
     }
   }
 
   useEffect(() => { void load(); }, []);
 
   if (!payload) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", color: "var(--av-text-muted)", fontSize: "0.85rem" }}>
-        Privater Speicher wird geladen…
-      </div>
-    );
+    return <ConsoleSkeleton />;
   }
 
   const insights = payload.insights ?? [];
@@ -370,12 +336,7 @@ export function SmartHome() {
         </div>
 
         <aside className="av-console-side">
-          <MetricCard label="Belege im Speicher" value={dashboardDocumentCount} progress={74} tone="teal" />
-          <MetricCard label="Object Loops offen" value={openInsightCount || 3} progress={42} tone="warning" />
-          <MetricCard label="Garantie-Risiken" value="1" progress={28} tone="warning" />
-          <MetricCard label="Care-Streak" value={motivation?.currentStreakDays ?? 6} progress={motivation?.levelProgress ?? 40} tone="teal" />
           <ModuleNav appPath={appPath} itemCount={itemCount} openCount={openInsightCount} />
-          {motivation ? <StreakBar motivation={motivation} /> : null}
         </aside>
       </div>
     </main>
@@ -512,21 +473,6 @@ function ModuleNav({ appPath, itemCount, openCount }: {
         <ChevronRight size={13} />
       </Link>
     </div>
-  );
-}
-
-function StreakBar({ motivation }: { motivation: MotivationSummary }) {
-  return (
-    <Link className="av-streak" to="/app/rewards">
-      <span className="av-streak-icon"><Flame size={14} /></span>
-      <div className="av-streak-copy">
-        <strong>{motivation.statusText}</strong>
-        <small>{motivation.weeklyXP} XP · {motivation.freezeDaysAvailable} Pausentage</small>
-      </div>
-      <div className="av-streak-track">
-        <div className="av-streak-fill" style={{ width: `${motivation.levelProgress}%` }} />
-      </div>
-    </Link>
   );
 }
 
@@ -671,8 +617,7 @@ function buildRecentThings(items: Item[], matchName: string): RecentHomeThing[] 
 }
 
 function displayHomeDate(value?: string | null) {
-  const formatted = isoDate(value);
-  return formatted === "No date" ? "kein Datum" : formatted;
+  return isoDate(value);
 }
 
 function displayHomeItemName(name: string) {

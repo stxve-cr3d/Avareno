@@ -1,6 +1,6 @@
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Archive, ChevronDown, FileText, Home, LifeBuoy, LogOut, MessageSquareText, Package, PenLine, Plus, ReceiptText, ShieldCheck, UserRound, UsersRound, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import avarenoMark from "../assets/avareno-test-logo.png";
 import { useAuth } from "../lib/authProvider";
 
@@ -25,6 +25,7 @@ export function AppShell() {
   const [open, setOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const captureModalRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const auth = useAuth();
@@ -36,32 +37,112 @@ export function AppShell() {
     setProfileMenuOpen(false);
   }, [location.pathname]);
 
+  // Profile menu: roving arrow-key navigation, Escape/Tab close, focus restore.
   useEffect(() => {
     if (!profileMenuOpen) return;
+    const container = profileMenuRef.current;
+    const trigger = container?.querySelector<HTMLElement>(".avareno-profile-trigger");
+    const getItems = () => Array.from(container?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+
+    getItems()[0]?.focus();
 
     function closeOnOutsideClick(event: MouseEvent) {
-      if (profileMenuRef.current?.contains(event.target as Node)) return;
+      if (container?.contains(event.target as Node)) return;
       setProfileMenuOpen(false);
     }
 
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setProfileMenuOpen(false);
+    function onKeyDown(event: KeyboardEvent) {
+      const items = getItems();
+      if (items.length === 0) return;
+      const index = items.indexOf(document.activeElement as HTMLElement);
+      switch (event.key) {
+        case "Escape":
+          event.preventDefault();
+          setProfileMenuOpen(false);
+          trigger?.focus();
+          break;
+        case "Tab":
+          setProfileMenuOpen(false);
+          break;
+        case "ArrowDown":
+          event.preventDefault();
+          items[(index + 1) % items.length].focus();
+          break;
+        case "ArrowUp":
+          event.preventDefault();
+          items[(index - 1 + items.length) % items.length].focus();
+          break;
+        case "Home":
+          event.preventDefault();
+          items[0].focus();
+          break;
+        case "End":
+          event.preventDefault();
+          items[items.length - 1].focus();
+          break;
       }
     }
 
     document.addEventListener("mousedown", closeOnOutsideClick);
-    document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("mousedown", closeOnOutsideClick);
-      document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("keydown", onKeyDown);
     };
   }, [profileMenuOpen]);
+
+  // Capture dialog: focus trap, Escape-to-close, focus restore, scroll lock.
+  useEffect(() => {
+    if (!open) return;
+    const modal = captureModalRef.current;
+    if (!modal) return;
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const getFocusable = () =>
+      Array.from(
+        modal.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      );
+
+    modal.focus();
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = getFocusable();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus?.();
+    };
+  }, [open]);
 
   if (isMarketingSurface || isAuthSurface) {
     return (
       <main className={isAuthSurface ? "auth-shell" : "avareno-landing-main"}>
-        <Outlet />
+        <Suspense fallback={<RouteFallback />}>
+          <Outlet />
+        </Suspense>
       </main>
     );
   }
@@ -100,6 +181,7 @@ export function AppShell() {
                   to={item.to}
                   end={item.to === "/app"}
                   className={() => (isNavActive ? "is-active" : "")}
+                  aria-label={item.label}
                 >
                   <Icon size={17} />
                   <span>{item.label}</span>
@@ -120,6 +202,7 @@ export function AppShell() {
                 type="button"
                 aria-expanded={profileMenuOpen}
                 aria-haspopup="menu"
+                aria-label={`Konto: ${auth.profile?.displayName ?? "Avareno"}`}
               >
                 <ProfileAvatar name={auth.profile?.displayName ?? "Avareno"} src={auth.profile?.avatarUrl} />
                 <ChevronDown size={13} />
@@ -133,19 +216,19 @@ export function AppShell() {
                       <span>{auth.profile?.email ?? "Privater Workspace"}</span>
                     </div>
                   </div>
-                  <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" to="/app/ich/settings">
+                  <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" tabIndex={-1} to="/app/ich/settings">
                     <UserRound size={15} />
                     Profil bearbeiten
                   </Link>
-                  <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" to="/app/ich/friends">
+                  <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" tabIndex={-1} to="/app/ich/friends">
                     <UsersRound size={15} />
                     Freunde
                   </Link>
-                  <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" to="/app/ich/privacy">
+                  <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" tabIndex={-1} to="/app/ich/privacy">
                     <ShieldCheck size={15} />
                     Privatsphäre
                   </Link>
-                  <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" to="/">
+                  <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" tabIndex={-1} to="/">
                     <Home size={15} />
                     Website
                   </Link>
@@ -156,6 +239,7 @@ export function AppShell() {
                       navigate("/login", { replace: true });
                     }}
                     role="menuitem"
+                    tabIndex={-1}
                     type="button"
                   >
                     <LogOut size={15} />
@@ -169,19 +253,29 @@ export function AppShell() {
       </header>
 
       <main className={isSmartSurface ? "avareno-app-content is-smart-surface" : "avareno-app-content"}>
-        <Outlet />
+        <Suspense fallback={<RouteFallback />}>
+          <Outlet />
+        </Suspense>
       </main>
 
       {open ? (
         <div className="fixed inset-0 z-40 bg-ink/58 p-4 backdrop-blur-sm" onClick={() => setOpen(false)}>
-          <div className="ozma-modal mx-auto mt-8 max-w-2xl rounded-lg p-4 md:mt-24" onClick={(event) => event.stopPropagation()}>
+          <div
+            ref={captureModalRef}
+            className="ozma-modal mx-auto mt-8 max-w-2xl rounded-lg p-4 md:mt-24"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="capture-modal-title"
+            tabIndex={-1}
+          >
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-black uppercase text-muted">Erfassen</p>
-                <h2 className="mt-1 text-3xl font-black text-ink">Etwas Echtes hinzufügen.</h2>
+                <h2 id="capture-modal-title" className="mt-1 text-3xl font-black text-ink">Etwas Echtes hinzufügen.</h2>
                 <p className="mt-2 max-w-lg text-sm font-semibold leading-6 text-muted">Wähle eine Quelle. Avareno macht daraus ein Ding, einen Nachweis oder eine Care-Erinnerung.</p>
               </div>
-              <button className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted hover:bg-wash hover:text-ink" onClick={() => setOpen(false)}>
+              <button className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted hover:bg-wash hover:text-ink" onClick={() => setOpen(false)} type="button" aria-label="Schließen">
                 <X size={18} />
               </button>
             </div>
@@ -235,5 +329,15 @@ function AuthRouteLoading() {
         <p>Session und Speicher werden geprüft.</p>
       </div>
     </main>
+  );
+}
+
+/* Suspense fallback while a lazily code-split route chunk loads.
+   Calm indeterminate bar; the shell/nav stay in place around it. */
+function RouteFallback() {
+  return (
+    <div className="av-route-fallback" role="status" aria-live="polite" aria-label="Wird geladen">
+      <span className="av-route-fallback-bar" aria-hidden="true" />
+    </div>
   );
 }

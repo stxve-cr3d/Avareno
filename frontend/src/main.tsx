@@ -1,32 +1,49 @@
-import React from "react";
+import React, { lazy } from "react";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, Navigate, RouterProvider, useParams } from "react-router-dom";
 import { App } from "./App";
-import { Home } from "./pages/Home";
-import { CaptureReceipt } from "./pages/CaptureReceipt";
-import { CaptureMessage } from "./pages/CaptureMessage";
-import { UniversalCapture } from "./pages/UniversalCapture";
-import { Items } from "./pages/Items";
-import { ItemDetail } from "./pages/ItemDetail";
-import { Rewards } from "./pages/Rewards";
-import { FriendProfilePage, FriendsListPage } from "./pages/Friends";
-import { CaptureLoop } from "./pages/CaptureLoop";
-import { CaptureItem } from "./pages/CaptureItem";
-import { HomeBinder } from "./pages/HomeBinder";
-import { AskAvareno } from "./pages/AskAvareno";
-import { SmartHome } from "./pages/SmartHome";
-import { Resolve } from "./pages/Resolve";
-import { Care } from "./pages/Care";
-import { CookiesPage, DatenschutzPage, ImpressumPage, PricingPage } from "./pages/MarketingPages";
-import { AccountSettingsPage, AuthCallbackPage, EmailVerifyPage, ForgotPasswordPage, LoginPage, OnboardingPage, ResetPasswordPage, SignupPage } from "./pages/AuthPages";
 import { AuthProvider } from "./lib/authProvider";
 import { LanguageProvider } from "./lib/language";
+import { RouteError } from "./components/RouteError";
 import "./styles.css";
+
+/* Route components are code-split: each page loads on demand so the
+   initial bundle only carries the app shell, providers and error
+   fallback. Suspense boundaries live in AppShell around the Outlet. */
+const Home = lazy(() => import("./pages/Home").then((m) => ({ default: m.Home })));
+const CaptureReceipt = lazy(() => import("./pages/CaptureReceipt").then((m) => ({ default: m.CaptureReceipt })));
+const CaptureMessage = lazy(() => import("./pages/CaptureMessage").then((m) => ({ default: m.CaptureMessage })));
+const UniversalCapture = lazy(() => import("./pages/UniversalCapture").then((m) => ({ default: m.UniversalCapture })));
+const Items = lazy(() => import("./pages/Items").then((m) => ({ default: m.Items })));
+const ItemDetail = lazy(() => import("./pages/ItemDetail").then((m) => ({ default: m.ItemDetail })));
+const Rewards = lazy(() => import("./pages/Rewards").then((m) => ({ default: m.Rewards })));
+const FriendsListPage = lazy(() => import("./pages/Friends").then((m) => ({ default: m.FriendsListPage })));
+const FriendProfilePage = lazy(() => import("./pages/Friends").then((m) => ({ default: m.FriendProfilePage })));
+const CaptureLoop = lazy(() => import("./pages/CaptureLoop").then((m) => ({ default: m.CaptureLoop })));
+const CaptureItem = lazy(() => import("./pages/CaptureItem").then((m) => ({ default: m.CaptureItem })));
+const HomeBinder = lazy(() => import("./pages/HomeBinder").then((m) => ({ default: m.HomeBinder })));
+const AskAvareno = lazy(() => import("./pages/AskAvareno").then((m) => ({ default: m.AskAvareno })));
+const SmartHome = lazy(() => import("./pages/SmartHome").then((m) => ({ default: m.SmartHome })));
+const Resolve = lazy(() => import("./pages/Resolve").then((m) => ({ default: m.Resolve })));
+const Care = lazy(() => import("./pages/Care").then((m) => ({ default: m.Care })));
+const PricingPage = lazy(() => import("./pages/MarketingPages").then((m) => ({ default: m.PricingPage })));
+const ImpressumPage = lazy(() => import("./pages/MarketingPages").then((m) => ({ default: m.ImpressumPage })));
+const DatenschutzPage = lazy(() => import("./pages/MarketingPages").then((m) => ({ default: m.DatenschutzPage })));
+const CookiesPage = lazy(() => import("./pages/MarketingPages").then((m) => ({ default: m.CookiesPage })));
+const LoginPage = lazy(() => import("./pages/AuthPages").then((m) => ({ default: m.LoginPage })));
+const SignupPage = lazy(() => import("./pages/AuthPages").then((m) => ({ default: m.SignupPage })));
+const ForgotPasswordPage = lazy(() => import("./pages/AuthPages").then((m) => ({ default: m.ForgotPasswordPage })));
+const ResetPasswordPage = lazy(() => import("./pages/AuthPages").then((m) => ({ default: m.ResetPasswordPage })));
+const AuthCallbackPage = lazy(() => import("./pages/AuthPages").then((m) => ({ default: m.AuthCallbackPage })));
+const EmailVerifyPage = lazy(() => import("./pages/AuthPages").then((m) => ({ default: m.EmailVerifyPage })));
+const OnboardingPage = lazy(() => import("./pages/AuthPages").then((m) => ({ default: m.OnboardingPage })));
+const AccountSettingsPage = lazy(() => import("./pages/AuthPages").then((m) => ({ default: m.AccountSettingsPage })));
 
 const router = createBrowserRouter([
   {
     path: "/",
     element: <App />,
+    errorElement: <RouteError />,
     children: [
       { index: true, element: <Home /> },
       { path: "pricing", element: <PricingPage /> },

@@ -187,6 +187,5 @@ function MotivationStat({ icon, label, value }: { icon: ReactNode; label: string
 }
 
 function formatMotivationDate(value: string) {
-  const formatted = isoDate(value);
-  return formatted === "No date" ? "Kein Datum" : formatted;
+  return isoDate(value);
 }

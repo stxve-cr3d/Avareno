@@ -11,12 +11,52 @@
  *   amber = warranty/deadline · red = missing/incomplete
  *   no teal fog, no decorative glow.
  */
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, BellRing, ChevronRight, FileText, ShieldCheck } from "lucide-react";
 import { formatUiText } from "../../lib/uiText";
 
 export { EmptyState } from "../EmptyState";
+
+/* ── Loading skeletons ──────────────────────────────────────── */
+
+export function Skeleton({ className = "", style }: { className?: string; style?: CSSProperties }) {
+  return <span className={`av-skeleton ${className}`.trim()} style={style} aria-hidden="true" />;
+}
+
+/**
+ * Approximate placeholder for the two-column console pages
+ * (SmartHome, Items) shown while the first data load resolves.
+ * Occupies the same rhythm as the real layout to avoid a jump.
+ */
+export function ConsoleSkeleton({ label = "Privater Speicher wird geladen…" }: { label?: string }) {
+  return (
+    <main className="av-console" aria-busy="true" aria-label={label}>
+      <section className="av-console-top">
+        <div className="av-dashboard-header">
+          <Skeleton style={{ width: "8rem", height: "0.7rem" }} />
+          <Skeleton style={{ width: "14rem", height: "2rem", marginTop: "0.9rem" }} />
+          <Skeleton style={{ width: "min(100%, 26rem)", height: "0.95rem", marginTop: "0.75rem" }} />
+          <div className="av-skel-grid" style={{ marginTop: "1.25rem" }}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} style={{ height: "3.6rem" }} />
+            ))}
+          </div>
+        </div>
+        <Skeleton style={{ minHeight: "16rem", borderRadius: "0.82rem" }} />
+      </section>
+      <div className="av-console-grid">
+        <div className="av-console-main">
+          <Skeleton style={{ height: "12rem", borderRadius: "0.82rem" }} />
+          <Skeleton style={{ height: "9rem", borderRadius: "0.82rem" }} />
+        </div>
+        <aside className="av-console-side">
+          <Skeleton style={{ height: "8rem", borderRadius: "0.82rem" }} />
+        </aside>
+      </div>
+    </main>
+  );
+}
 
 /* ── Status vocabulary ──────────────────────────────────────── */
 
@@ -226,11 +266,6 @@ export function MetricCard({
       <div className="av-metric-head">
         <span>{formatUiText(label)}</span>
         <strong>{normalizeText(value)}</strong>
-      </div>
-      <div className="av-metric-bars" aria-hidden="true">
-        {[28, 48, 36, 68, progress, 44, 58].map((bar, index) => (
-          <i key={index} style={{ height: `${Math.max(16, Math.min(96, bar))}%` }} />
-        ))}
       </div>
       <div className="av-metric-line">
         <span style={{ width: `${Math.max(0, Math.min(100, progress))}%` }} />

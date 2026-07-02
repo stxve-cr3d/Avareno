@@ -23,13 +23,13 @@ def _load_items(conn, user_id: str) -> list[dict]:
 
 
 def _card(item: dict, note: str | None = None) -> dict:
-    identity = " / ".join([value for value in [item.get("manufacturer"), item.get("model")] if value]) or item.get("category") or "Thing"
-    location = (item.get("space") or {}).get("name") or item.get("location") or "No room"
+    identity = " / ".join([value for value in [item.get("manufacturer"), item.get("model")] if value]) or item.get("category") or "Ding"
+    location = (item.get("space") or {}).get("name") or item.get("location") or "Kein Raum"
     return {
         "kind": "item",
         "title": item["name"],
-        "subtitle": f"{identity} - {location}",
-        "meta": note or f"{item.get('completenessScore', 0)}% saved",
+        "subtitle": f"{identity} · {location}",
+        "meta": note or f"{item.get('completenessScore', 0)}% gespeichert",
         "href": f"/items/{item['id']}",
         "imageUrl": item.get("imageUrl"),
     }
@@ -69,22 +69,22 @@ def ask_avareno(payload: AssistantAskRequest) -> dict:
             soon_count = len([item for item in warranty_items if (parse_iso(item.get("warrantyUntil")) or soon) <= soon])
             return {
                 "intent": "warranty",
-                "answer": f"{len(warranty_items)} Dinge haben eine aktive Garantie. {soon_count} davon laufen in den naechsten 90 Tagen aus.",
-                "cards": [_card(item, f"Warranty until {item.get('warrantyUntil', '')[:10]}") for item in warranty_items[:5]],
-                "actions": ["Open Home Binder", "Add missing receipts", "Create reminder"],
+                "answer": f"{len(warranty_items)} Dinge haben eine aktive Garantie. {soon_count} davon laufen in den nächsten 90 Tagen aus.",
+                "cards": [_card(item, f"Garantie bis {item.get('warrantyUntil', '')[:10]}") for item in warranty_items[:5]],
+                "actions": ["Home-Übersicht öffnen", "Fehlende Belege ergänzen", "Erinnerung anlegen"],
                 "confidence": 0.88,
             }
 
         if any(word in question for word in ["rechnung", "beleg", "receipt", "proof", "dokument"]):
             with_docs = [item for item in items if item.get("documents")]
             without_docs = [item for item in items if not item.get("documents")]
-            cards = [_card(item, f"{len(item.get('documents', []))} proof file(s)") for item in with_docs[:4]]
-            cards.extend(_card(item, "Missing receipt") for item in without_docs[:2])
+            cards = [_card(item, f"{len(item.get('documents', []))} Beleg(e)") for item in with_docs[:4]]
+            cards.extend(_card(item, "Beleg fehlt") for item in without_docs[:2])
             return {
                 "intent": "proof",
                 "answer": f"{len(with_docs)} Dinge haben Belege. {len(without_docs)} brauchen noch einen Beleg.",
                 "cards": cards[:6],
-                "actions": ["Upload receipt", "Open missing list", "Ask family member"],
+                "actions": ["Beleg hochladen", "Fehlende Belege ansehen", "Familie fragen"],
                 "confidence": 0.86,
             }
 
@@ -92,9 +92,9 @@ def ask_avareno(payload: AssistantAskRequest) -> dict:
             incomplete = [item for item in items if item.get("missingFields")]
             return {
                 "intent": "missing",
-                "answer": f"{len(incomplete)} Dinge brauchen noch Daten. Am haeufigsten fehlen Beleg, Seriennummer oder Garantie.",
-                "cards": [_card(item, "Missing: " + ", ".join(item.get("missingFields", [])[:3])) for item in incomplete[:6]],
-                "actions": ["Add serial number", "Attach receipt", "Open capture"],
+                "answer": f"{len(incomplete)} Dinge brauchen noch Daten. Am häufigsten fehlen Beleg, Seriennummer oder Garantie.",
+                "cards": [_card(item, "Fehlt: " + ", ".join(item.get("missingFields", [])[:3])) for item in incomplete[:6]],
+                "actions": ["Seriennummer ergänzen", "Beleg anhängen", "Erfassen öffnen"],
                 "confidence": 0.84,
             }
 
@@ -107,9 +107,9 @@ def ask_avareno(payload: AssistantAskRequest) -> dict:
             ]
             return {
                 "intent": "binder",
-                "answer": f"Deine gespeicherten Dinge haben aktuell {total_value} EUR dokumentierten Wert. {len(ready)} von {len(items)} sind insurance-ready.",
+                "answer": f"Deine gespeicherten Dinge haben aktuell {total_value} EUR dokumentierten Wert. {len(ready)} von {len(items)} sind versicherungsbereit.",
                 "cards": [_card(item, f"{item.get('price') or 0} {item.get('currency', 'EUR')}") for item in items[:6]],
-                "actions": ["Open Home Binder", "Complete missing data", "Export later"],
+                "actions": ["Home-Übersicht öffnen", "Fehlende Daten ergänzen", "Später exportieren"],
                 "confidence": 0.9,
             }
 
@@ -118,9 +118,9 @@ def ask_avareno(payload: AssistantAskRequest) -> dict:
             missing_links = [item for item in items if not item.get("reorderUrl") and not item.get("affiliateUrl")]
             return {
                 "intent": "reorder",
-                "answer": f"{len(reorderable)} Dinge haben schon einen Shop-Link. {len(missing_links)} koennen spaeter fuer Affiliate/Reorder vorbereitet werden.",
-                "cards": [_card(item, "Shop link ready") for item in reorderable[:4]] + [_card(item, "No shop link yet") for item in missing_links[:2]],
-                "actions": ["Add affiliate link", "Track click", "Suggest replacement"],
+                "answer": f"{len(reorderable)} Dinge haben schon einen Shop-Link. {len(missing_links)} können später für Affiliate/Nachkauf vorbereitet werden.",
+                "cards": [_card(item, "Shop-Link vorhanden") for item in reorderable[:4]] + [_card(item, "Noch kein Shop-Link") for item in missing_links[:2]],
+                "actions": ["Nachkauf-Link ergänzen", "Klick verfolgen", "Ersatz vorschlagen"],
                 "confidence": 0.82,
             }
 
@@ -132,7 +132,7 @@ def ask_avareno(payload: AssistantAskRequest) -> dict:
                 "intent": "space",
                 "answer": f"In {matching_space['name']} sind {len(space_items)} Dinge gespeichert.",
                 "cards": [_card(item) for item in space_items[:6]],
-                "actions": ["Open room filter", "Add item to this room", "Create room task"],
+                "actions": ["Raum-Filter öffnen", "Ding zu diesem Raum hinzufügen", "Aufgabe für den Raum anlegen"],
                 "confidence": 0.87,
             }
 
@@ -142,14 +142,14 @@ def ask_avareno(payload: AssistantAskRequest) -> dict:
                 "intent": "search",
                 "answer": f"Ich habe {len(matches)} passende Dinge gefunden.",
                 "cards": [_card(item) for item in matches[:6]],
-                "actions": ["Open item", "Attach proof", "Create reminder"],
+                "actions": ["Ding öffnen", "Nachweis anhängen", "Erinnerung anlegen"],
                 "confidence": 0.76,
             }
 
         return {
             "intent": "fallback",
-            "answer": "Ich kann aktuell nach Dingen, Raeumen, Rechnungen, Garantien, fehlenden Daten, Wert und Nachkaufen suchen.",
+            "answer": "Ich kann aktuell nach Dingen, Räumen, Rechnungen, Garantien, fehlenden Daten, Wert und Nachkaufen suchen.",
             "cards": [_card(item) for item in items[:4]],
-            "actions": ["Show warranties", "Show missing data", "Open Home Binder"],
+            "actions": ["Garantien anzeigen", "Fehlende Daten anzeigen", "Home-Übersicht öffnen"],
             "confidence": 0.55,
         }

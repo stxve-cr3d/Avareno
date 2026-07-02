@@ -15,15 +15,13 @@ import { api, isoDate } from "../lib/api";
 import type { Item, ProductStructure } from "../lib/types";
 import {
   ActionButton,
-  DottedGridPanel,
-  MetricCard,
-  ObjectMemoryMap,
+  ConsoleSkeleton,
   ObjectMemoryCard,
   ObjectMemoryGraph,
   QuickActionCard,
-  SecondaryAction
+  SecondaryAction,
+  StatusSummaryCard
 } from "../components/app/AppKit";
-import { StatusSummaryCard, defaultMemoryMapNodes } from "../components/app/AppKit";
 
 type StatusFilter = "ALL" | "MISSING_RECEIPT" | "WARRANTY_SOON" | "OPEN" | "COMPLETE";
 
@@ -44,6 +42,7 @@ export function Items() {
   const [status, setStatus] = useState<StatusFilter>("ALL");
   const [category, setCategory] = useState<"ALL" | Category>("ALL");
   const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
 
   async function load() {
     const [itemsResult, structureResult] = await Promise.all([api<Item[]>("/api/items"), api<ProductStructure>("/api/structure")]);
@@ -52,7 +51,7 @@ export function Items() {
   }
 
   useEffect(() => {
-    void load().catch(console.error);
+    void load().catch(console.error).finally(() => setLoading(false));
   }, []);
 
   const filtered = useMemo(() => {
@@ -76,8 +75,11 @@ export function Items() {
   const incompleteCount = items.filter((item) => (item.completenessScore ?? 0) < 100).length;
   const warrantyRiskCount = items.filter(warrantySoon).length;
   const completeCount = items.filter((item) => (item.completenessScore ?? 0) >= 100).length;
-  const attentionItem = items.find((item) => !hasReceipt(item)) ?? items.find((item) => (item.completenessScore ?? 0) < 100) ?? items[0];
   const hasItems = items.length > 0;
+
+  if (loading) {
+    return <ConsoleSkeleton label="Objekte werden geladen…" />;
+  }
 
   return (
     <main className="av-console av-library">
@@ -101,10 +103,6 @@ export function Items() {
             <StatusSummaryCard label="Vollständig" value={completeCount} tone="success" />
           </div>
         </div>
-
-        <DottedGridPanel label="Memory Build Vorschau" status="Object graph">
-          <ObjectMemoryMap nodes={defaultMemoryMapNodes(attentionItem?.name ?? "LG OLED C3")} />
-        </DottedGridPanel>
       </section>
 
       <div className="av-console-grid">
@@ -180,9 +178,6 @@ export function Items() {
         </div>
 
         <aside className="av-console-side">
-          <MetricCard label="Belege verbunden" value={documentCount} progress={Math.min(100, documentCount * 6)} />
-          <MetricCard label="Offene Object Loops" value={openTotal} progress={Math.min(100, openTotal * 14)} tone="warning" />
-          <MetricCard label="Garantie bald fällig" value={warrantyRiskCount} progress={Math.min(100, warrantyRiskCount * 24)} tone="warning" />
           <QuickActionCard
             primary
             to="/app/capture/item"

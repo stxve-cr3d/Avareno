@@ -941,8 +941,7 @@ function hasDocumentType(documents: { type: string }[], type: string) {
 }
 
 function formatDate(value?: string | null) {
-  const formatted = isoDate(value);
-  return formatted === "No date" ? "Kein Datum" : formatted;
+  return isoDate(value);
 }
 
 function visibilityLabel(value?: string | null) {

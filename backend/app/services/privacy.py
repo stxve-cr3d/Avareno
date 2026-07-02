@@ -116,7 +116,7 @@ def privacy_summary(conn: sqlite3.Connection, user_id: str) -> dict[str, Any]:
                 "label": "Gespeicherte Dinge",
                 "value": item_count,
                 "status": "Aktiv",
-                "note": "Produktpaesse, Kategorien, Seriennummern, Garantie- und Care-Kontext.",
+                "note": "Produktpässe, Kategorien, Seriennummern, Garantie- und Care-Kontext.",
             },
             {
                 "id": "documents",
@@ -144,7 +144,7 @@ def privacy_summary(conn: sqlite3.Connection, user_id: str) -> dict[str, Any]:
                 "label": "KI-Analyse",
                 "value": extracted_count,
                 "status": "Kontrolliert",
-                "note": "Extraktionen werden als assistiert markiert und muessen spaeter korrigierbar bleiben.",
+                "note": "Extraktionen werden als assistiert markiert und müssen später korrigierbar bleiben.",
             },
             {
                 "id": "private-vault",
