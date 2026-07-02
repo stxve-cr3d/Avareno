@@ -125,6 +125,27 @@ High-risk trigger notes:
 
 Screening outcome: medium risk for foundation; high review requirement before paid launch. Proceed only with no card data stored, no raw webhook payload logging, signature-verified webhooks and no public claims of legal/tax certainty.
 
+## Screening: MVP Privacy Controls Foundation
+
+- Feature name: MVP Privacy Controls Foundation
+- Description: Privacy Center/API controls for local JSON/ZIP export bundle, document deletion, AI-extracted field deletion/correction, local connector disconnect, consent/audit metadata and account deletion request logging.
+- Data categories: account/profile metadata, object memory, uploaded document metadata/files, extracted text/json, connector metadata, consent/audit metadata.
+- Users affected: registered/local MVP users.
+- Third parties: none added by this implementation.
+- Launch state: MVP/internal; not sufficient for public production privacy claims.
+
+High-risk trigger notes:
+
+- Sensitive/highly personal documents: yes, because uploaded documents may include invoices, identity, insurance, payment, legal, tax or health-related records.
+- Large-volume processing: possible as user storage grows; export/delete jobs need production scaling and access-control tests.
+- Connected accounts/imports: local connector metadata only; real provider tokens/revocation remain open.
+- AI analysis/profiling: no real provider added, but extracted facts can exist and can now be corrected/deleted.
+- Exposure to other users: no new exposure intended; production still needs RLS/storage cross-user verification.
+- Third-country transfer/new provider: none added.
+- Breach harm: high if production private files remain in public/static uploads or if account deletion/export is incorrectly authorized.
+
+Screening outcome: medium/high for production because sensitive documents and rights requests are involved. Scoped MVP controls may proceed, but public launch still requires storage/auth isolation, production export job and cross-user tests, account deletion orchestration, provider revocation, backup deletion policy and legal/DSB review.
+
 ## Required Follow-Ups
 
 - Update processing activities draft.

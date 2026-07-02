@@ -5,6 +5,8 @@ DROP TABLE IF EXISTS "BillingEvent";
 DROP TABLE IF EXISTS "ItemActivity";
 DROP TABLE IF EXISTS "SmartHomeCommand";
 DROP TABLE IF EXISTS "SmartHomeDevice";
+DROP TABLE IF EXISTS "ConsentEvent";
+DROP TABLE IF EXISTS "PrivacyAuditEvent";
 DROP TABLE IF EXISTS "XpTransaction";
 DROP TABLE IF EXISTS "Reminder";
 DROP TABLE IF EXISTS "DeviceToken";
@@ -29,6 +31,35 @@ CREATE TABLE "User" (
   "createdAt" TEXT NOT NULL,
   "updatedAt" TEXT NOT NULL
 );
+
+CREATE TABLE "PrivacyAuditEvent" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "eventType" TEXT NOT NULL,
+  "status" TEXT NOT NULL,
+  "message" TEXT NOT NULL,
+  "provider" TEXT,
+  "safeContext" TEXT,
+  "createdAt" TEXT NOT NULL,
+  FOREIGN KEY ("userId") REFERENCES "User" ("id")
+);
+
+CREATE INDEX "PrivacyAuditEvent_userId_createdAt_idx" ON "PrivacyAuditEvent" ("userId", "createdAt");
+
+CREATE TABLE "ConsentEvent" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "scope" TEXT NOT NULL,
+  "label" TEXT NOT NULL,
+  "status" TEXT NOT NULL,
+  "legalBasis" TEXT,
+  "source" TEXT NOT NULL DEFAULT 'app',
+  "createdAt" TEXT NOT NULL,
+  "revokedAt" TEXT,
+  FOREIGN KEY ("userId") REFERENCES "User" ("id")
+);
+
+CREATE INDEX "ConsentEvent_userId_createdAt_idx" ON "ConsentEvent" ("userId", "createdAt");
 
 CREATE TABLE "Household" (
   "id" TEXT NOT NULL PRIMARY KEY,

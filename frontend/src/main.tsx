@@ -4,6 +4,7 @@ import { createBrowserRouter, Navigate, RouterProvider, useParams } from "react-
 import { App } from "./App";
 import { AuthProvider } from "./lib/authProvider";
 import { LanguageProvider } from "./lib/language";
+import { ThemeProvider } from "./lib/theme";
 import { RouteError } from "./components/RouteError";
 import "./styles.css";
 
@@ -138,9 +139,11 @@ function LoopCareRedirect({ app = false }: { app?: boolean }) {
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <LanguageProvider>
-      <AuthProvider>
-        <RouterProvider router={router} />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <RouterProvider router={router} />
+        </AuthProvider>
+      </ThemeProvider>
     </LanguageProvider>
   </React.StrictMode>
 );

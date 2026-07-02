@@ -21,7 +21,7 @@ import {
   UserRound
 } from "lucide-react";
 import { Link, NavLink, useLocation, useParams } from "react-router-dom";
-import { api } from "../lib/api";
+import { api, apiBlob } from "../lib/api";
 import { useAuth } from "../lib/authProvider";
 import {
   buildCurrentUserProgress,
@@ -62,6 +62,13 @@ export function Rewards() {
   const [privacySummary, setPrivacySummary] = useState<PrivacySummary | null>(null);
   const [privacyError, setPrivacyError] = useState<string | null>(null);
 
+  async function reloadPrivacySummary() {
+    const summary = await api<PrivacySummary>("/api/privacy/summary");
+    setPrivacySummary(summary);
+    setPrivacyError(null);
+    return summary;
+  }
+
   useEffect(() => {
     if (section !== "privacy") {
       return;
@@ -69,7 +76,7 @@ export function Rewards() {
 
     let active = true;
     setPrivacyError(null);
-    api<PrivacySummary>("/api/privacy/summary")
+    reloadPrivacySummary()
       .then((summary) => {
         if (active) {
           setPrivacySummary(summary);
@@ -167,6 +174,7 @@ export function Rewards() {
           loadError={privacyError}
           preferences={preferences}
           onChange={updatePreferences}
+          onRefresh={reloadPrivacySummary}
         />
       ) : null}
     </main>
@@ -428,14 +436,64 @@ function PrivacyCenterPanel({
   summary,
   loadError,
   preferences,
-  onChange
+  onChange,
+  onRefresh
 }: {
   summary: PrivacySummary;
   loadError: string | null;
   preferences: MotivationPrivacyPreferences;
   onChange: (next: Partial<MotivationPrivacyPreferences>) => void;
+  onRefresh: () => Promise<PrivacySummary>;
 }) {
   const [deleteState, setDeleteState] = useState<"idle" | "confirm">("idle");
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  async function runAction(actionId: string, action: () => Promise<string>) {
+    setBusyAction(actionId);
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      const message = await action();
+      setActionMessage(message);
+      await onRefresh();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Aktion konnte nicht ausgeführt werden.");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  function handleExport() {
+    void runAction("export", async () => {
+      const result = await apiBlob("/api/privacy/export/bundle", { method: "POST" });
+      downloadBlob(result.fileName ?? `avareno-export-${new Date().toISOString().slice(0, 10)}.zip`, result.blob);
+      return "ZIP-Export mit Datenbankdaten, Manifest und lokalen Dokumentdateien wurde erstellt.";
+    });
+  }
+
+  function handleDisconnect(sourceId: string) {
+    void runAction(`disconnect-${sourceId}`, async () => {
+      await api(`/api/privacy/connected-sources/${encodeURIComponent(sourceId)}/disconnect`, { method: "POST", body: JSON.stringify({}) });
+      return "Quelle wurde lokal getrennt. Provider-Token-Widerruf bleibt für echte OAuth-Provider ein Launch-Blocker.";
+    });
+  }
+
+  function handleDeleteAiData() {
+    void runAction("delete-ai-data", async () => {
+      const result = await api<{ userVisibleMessage: string }>("/api/privacy/ai-data/delete", { method: "POST", body: JSON.stringify({}) });
+      return result.userVisibleMessage;
+    });
+  }
+
+  function handleDeletionRequest() {
+    void runAction("account-deletion-request", async () => {
+      await api("/api/privacy/deletion/request", { method: "POST", body: JSON.stringify({}) });
+      setDeleteState("idle");
+      return "Löschanfrage wurde protokolliert. Vollständige Ausführung bleibt bis Auth-, Storage-, Provider- und Backup-Orchestrierung gesperrt.";
+    });
+  }
 
   return (
     <section className="profile-panel privacy-panel privacy-center-panel">
@@ -455,6 +513,20 @@ function PrivacyCenterPanel({
         </div>
       ) : null}
 
+      {actionMessage ? (
+        <div className="privacy-status-note is-success">
+          <CheckCircle2 size={16} />
+          <span>{actionMessage}</span>
+        </div>
+      ) : null}
+
+      {actionError ? (
+        <div className="privacy-status-note is-error">
+          <AlertTriangle size={16} />
+          <span>{actionError}</span>
+        </div>
+      ) : null}
+
       <div className="privacy-center-list">
         <PrivacySection icon={<Database size={18} />} label="Datenüberblick" title="Was Avareno gerade kennt">
           <div className="privacy-data-grid">
@@ -466,10 +538,14 @@ function PrivacyCenterPanel({
 
         <PrivacySection icon={<Download size={18} />} label="Export" title="Kopie deiner Daten">
           <p>Erhalte eine Kopie deiner gespeicherten Dinge, Dokument-Metadaten und Einstellungen.</p>
-          {/* TODO: Enable when /api/privacy/export/request returns a real export artifact. */}
-          <button className="profile-primary-action privacy-action-button" disabled type="button">
+          <button
+            className="profile-primary-action privacy-action-button"
+            disabled={!summary.export.ready || busyAction === "export"}
+            onClick={handleExport}
+            type="button"
+          >
             <Download size={16} />
-            Daten exportieren
+            {busyAction === "export" ? "Export wird erstellt..." : "Daten exportieren"}
           </button>
           <small>{summary.export.userVisibleMessage}</small>
         </PrivacySection>
@@ -483,7 +559,13 @@ function PrivacyCenterPanel({
                     <strong>{source.name}</strong>
                     <small>{source.type} · {source.status} · {source.permissions.join(", ")}</small>
                   </div>
-                  <button disabled type="button">Trennen</button>
+                  <button
+                    disabled={!source.disconnectAvailable || busyAction === `disconnect-${source.id}`}
+                    onClick={() => handleDisconnect(source.id)}
+                    type="button"
+                  >
+                    {busyAction === `disconnect-${source.id}` ? "Trennt..." : "Trennen"}
+                  </button>
                 </div>
               ))}
             </div>
@@ -501,7 +583,7 @@ function PrivacyCenterPanel({
               checked={false}
               disabled
               label="KI-Analyse für Belege und Dokumente"
-              note="Einstellungsmodell ist vorbereitet. Extrahierte Daten müssen später sichtbar korrigierbar bleiben."
+              note="Analyse bleibt nutzerausgelöst. Korrektur läuft über das Dokument; gespeicherte Extraktionen können gelöscht werden."
               onChange={() => undefined}
             />
             <PrivacyToggle
@@ -512,6 +594,16 @@ function PrivacyCenterPanel({
               onChange={() => undefined}
             />
           </div>
+          <button
+            className="profile-secondary-action privacy-action-button"
+            disabled={!summary.aiControls.deleteAvailable || !summary.aiControls.extractedRecordCount || busyAction === "delete-ai-data"}
+            onClick={handleDeleteAiData}
+            type="button"
+          >
+            <Trash2 size={16} />
+            {busyAction === "delete-ai-data" ? "Löscht..." : "Extrahierte Daten löschen"}
+          </button>
+          <small>{summary.aiControls.extractedRecordCount ?? 0} Dokumente mit gespeicherten Extraktionen.</small>
         </PrivacySection>
 
         <PrivacySection icon={<FileLock2 size={18} />} label="Private Vault" title="Extra Schutz für sensible Dokumente">
@@ -534,7 +626,7 @@ function PrivacyCenterPanel({
                 <div className="privacy-source-row" key={event.id}>
                   <div>
                     <strong>{event.label}</strong>
-                    <small>{event.createdAt} · {event.status}</small>
+                    <small>{event.createdAt} · {event.status}{event.legalBasis ? ` · ${event.legalBasis}` : ""}</small>
                   </div>
                 </div>
               ))}
@@ -568,10 +660,11 @@ function PrivacyCenterPanel({
           <p>Eine Löschung muss Nutzerprofil, Auth-User, Dinge, Dokumente, extrahierte Metadaten, Erinnerungen, Care/Resolve-Daten, Connector-Tokens, Logs, Storage-Objekte und Backup-Regeln abdecken.</p>
           {deleteState === "confirm" ? (
             <div className="privacy-delete-confirm">
-              <strong>Noch nicht aktiv</strong>
+              <strong>Anfrage statt Sofortlöschung</strong>
               <span>{summary.deletion.userVisibleMessage}</span>
-              {/* TODO: Enable only after backend deletion orchestration covers all known tables, storage objects and Supabase auth user deletion. */}
-              <button disabled type="button">Löschung verbindlich anfordern</button>
+              <button disabled={busyAction === "account-deletion-request"} onClick={handleDeletionRequest} type="button">
+                {busyAction === "account-deletion-request" ? "Protokolliert..." : "Löschanfrage protokollieren"}
+              </button>
             </div>
           ) : null}
           <button className="leave-circle-button is-danger" onClick={() => setDeleteState("confirm")} type="button">
@@ -582,6 +675,15 @@ function PrivacyCenterPanel({
       </div>
     </section>
   );
+}
+
+function downloadBlob(fileName: string, blob: Blob) {
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  window.URL.revokeObjectURL(url);
 }
 
 function PrivacySection({

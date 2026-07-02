@@ -20,8 +20,7 @@ import {
 import { MarketingFooter, MarketingHeader } from "../components/MarketingShell";
 import { Reveal, RevealGroup } from "../components/MarketingReveal";
 import { useLanguage } from "../lib/language";
-
-type BillingPeriod = "monthly" | "yearly";
+import { formatPrice, publicPricingPlans, type BillingPeriod } from "../lib/pricing";
 
 function getHomeContent(language: "de" | "en") {
   if (language === "en") {
@@ -103,11 +102,7 @@ function getHomeContent(language: "de" | "en") {
         { icon: <Bell size={18} />, title: "Reminder", text: "Ready", meta: "Before warranty ends" },
         { icon: <FileLock2 size={18} />, title: "Private Vault", text: "Documents safe", meta: "Personal context" }
       ],
-      pricingPlans: [
-        { name: "Free", monthlyPrice: "0 EUR", yearlyPrice: "0 EUR", note: "For the first things and trying Avareno.", features: ["Up to 10 things", "Limited receipts and documents", "Manual reminders", "Basic Object Memory"], cta: "Start free", href: "/signup", highlighted: false },
-        { name: "Personal", monthlyPrice: "9 EUR", yearlyPrice: "90 EUR", yearlyNote: "Save 2 months", note: "For your private everyday memory.", features: ["Generous things with fair use", "Receipts, warranties and manuals", "Care loops and reminders", "Basic AI extraction with fair use", "Data export and Private Vault Basic"], cta: "Choose Personal", href: "/signup?plan=personal", badge: "Recommended", highlighted: true },
-        { name: "Family", monthlyPrice: "19 EUR", yearlyPrice: "190 EUR", yearlyNote: "Save 2 months", note: "For households, families and shared responsibility.", features: ["Everything in Personal", "Multiple household members", "Shared things and reminders", "More storage and AI fair use", "Extended Private Vault"], cta: "Reserve Family", badge: "Coming soon", href: "/pricing", disabled: true, highlighted: false }
-      ],
+      popularBadge: "Recommended",
       faqs: [
         { title: "Is Avareno a notes app?", text: "No. Avareno is structured around real-life things: products, receipts, warranties, documents, reminders and care actions." },
         { title: "What happens after I capture something?", text: "Avareno turns the capture into an object memory and connects the useful context around it, such as proof, warranty dates, documents and next steps." },
@@ -200,11 +195,7 @@ function getHomeContent(language: "de" | "en") {
       { icon: <Bell size={18} />, title: "Erinnerung", text: "Bereit", meta: "Vor Garantieende" },
       { icon: <FileLock2 size={18} />, title: "Privater Vault", text: "Dokumente geschützt", meta: "Persönlicher Kontext" }
     ],
-    pricingPlans: [
-      { name: "Free", monthlyPrice: "0 EUR", yearlyPrice: "0 EUR", note: "Für die ersten Dinge und zum Ausprobieren.", features: ["Bis zu 10 Dinge", "Begrenzte Belege und Dokumente", "Manuelle Erinnerungen", "Basis-Objektgedächtnis"], cta: "Kostenlos starten", href: "/signup", highlighted: false },
-      { name: "Personal", monthlyPrice: "9 EUR", yearlyPrice: "90 EUR", yearlyNote: "2 Monate sparen", note: "Für deinen privaten Speicher im Alltag.", features: ["Großzügige Dinge mit Fair Use", "Belege, Garantien und Handbücher", "Care-Loops und Erinnerungen", "Basis-KI-Extraktion mit Fair Use", "Datenexport und Private Vault Basic"], cta: "Personal wählen", href: "/signup?plan=personal", badge: "Empfohlen", highlighted: true },
-      { name: "Family", monthlyPrice: "19 EUR", yearlyPrice: "190 EUR", yearlyNote: "2 Monate sparen", note: "Für Haushalte, Familie und gemeinsame Verantwortung.", features: ["Alles aus Personal", "Mehrere Haushaltsmitglieder", "Geteilte Dinge und Erinnerungen", "Mehr Speicher und KI-Fair-Use", "Erweiterter Private Vault"], cta: "Family vormerken", badge: "Bald verfügbar", href: "/pricing", disabled: true, highlighted: false }
-    ],
+    popularBadge: "Empfohlen",
     faqs: [
       { title: "Ist Avareno eine Notiz-App?", text: "Nein. Avareno ist um echte Dinge herum strukturiert: Produkte, Belege, Garantien, Dokumente, Erinnerungen und Care-Aktionen." },
       { title: "Was passiert nach dem Erfassen?", text: "Avareno macht daraus ein Objektgedächtnis und verbindet hilfreichen Kontext wie Nachweise, Garantiedaten, Dokumente und nächste Schritte." },
@@ -224,6 +215,8 @@ export function Home() {
   const copy = getHomeContent(language);
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
   const priceSuffix = billingPeriod === "yearly" ? copy.year : copy.month;
+  const pricingPlans = publicPricingPlans();
+  const locale = language === "de" ? "de-DE" : "en-US";
 
   useEffect(() => {
     if (!window.location.hash) return;
@@ -334,30 +327,30 @@ export function Home() {
           </Reveal>
 
           <RevealGroup className="site-pricing-grid" stagger={90}>
-            {copy.pricingPlans.map((plan) => (
-              <article className={plan.highlighted ? "site-pricing-card is-highlighted" : "site-pricing-card"} key={plan.name}>
+            {pricingPlans.map((plan) => (
+              <article className={plan.isPopular ? "site-pricing-card is-highlighted" : "site-pricing-card"} key={plan.id}>
                 <div className="site-pricing-card-head">
                   <p>{plan.name}</p>
-                  {"badge" in plan ? <span>{plan.badge}</span> : null}
+                  {plan.isPopular ? <span>{copy.popularBadge}</span> : plan.unavailableLabel ? <span>{plan.unavailableLabel[language]}</span> : null}
                 </div>
-                <h3>{billingPeriod === "yearly" ? plan.yearlyPrice : plan.monthlyPrice}<span>{priceSuffix}</span></h3>
-                {billingPeriod === "yearly" && "yearlyNote" in plan ? <p className="site-pricing-saving">{plan.yearlyNote}</p> : null}
-                <p>{plan.note}</p>
+                <h3>{formatPrice(plan, billingPeriod, locale)}<span>{priceSuffix}</span></h3>
+                {billingPeriod === "yearly" && plan.yearlyNote ? <p className="site-pricing-saving">{plan.yearlyNote[language]}</p> : null}
+                <p>{plan.description[language]}</p>
                 <ul>
                   {plan.features.map((feature) => (
-                    <li key={feature}>
+                    <li key={feature.id}>
                       <Check size={15} />
-                      {feature}
+                      {feature.label[language]}
                     </li>
                   ))}
                 </ul>
-                {"disabled" in plan && plan.disabled ? (
+                {!plan.isAvailable ? (
                   <button className="site-secondary-button" disabled type="button">
-                    {plan.cta}
+                    {plan.ctaLabel[language]}
                   </button>
                 ) : (
-                  <Link className={plan.highlighted ? "site-primary-button" : "site-secondary-button"} to={"href" in plan ? plan.href : "/signup"}>
-                    {plan.cta} <ArrowRight size={16} />
+                  <Link className={plan.isPopular ? "site-primary-button" : "site-secondary-button"} to={plan.ctaHref}>
+                    {plan.ctaLabel[language]} <ArrowRight size={16} />
                   </Link>
                 )}
               </article>

@@ -29,12 +29,12 @@ EXPORT_STORAGE_AREAS = [
 @dataclass(frozen=True)
 class DataExportPlan:
     user_id: str
-    status: str = "foundation_only"
+    status: str = "partial_mvp_controls"
     categories: list[str] = field(default_factory=lambda: list(EXPORT_DATA_CATEGORIES))
     storage_areas: list[str] = field(default_factory=lambda: list(EXPORT_STORAGE_AREAS))
     blockers: list[str] = field(default_factory=lambda: [
-        "No production export archive writer is implemented yet.",
-        "File bundling and signed download URLs are not implemented yet.",
+        "No production export job/status flow is implemented yet.",
+        "Local MVP file bundling and signed API downloads exist, but private object-storage exports are not implemented yet.",
         "Supabase Auth export and provider-side retention need review.",
         "Raw AI prompt/output retention policy is not finalized.",
     ])
@@ -46,7 +46,7 @@ class DataExportPlan:
             "categories": self.categories,
             "storageAreas": self.storage_areas,
             "blockers": self.blockers,
-            "message": "Data export is planned but not complete; do not show this as a finished download.",
+            "message": "Local MVP export is partially implemented; do not show this as a complete production export process.",
         }
 
 
@@ -60,11 +60,10 @@ def request_data_export(user_id: str) -> dict[str, Any]:
         action="privacy.export.requested",
         actor_user_id=user_id,
         subject_user_id=user_id,
-        status="foundation_only",
+        status="partial_mvp_controls",
         context={"categories": len(plan.categories)},
     )
     return {
         **plan.as_dict(),
         "auditEvent": audit_event.as_dict(),
     }
-

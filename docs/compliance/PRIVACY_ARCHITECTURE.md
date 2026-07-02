@@ -101,7 +101,9 @@ Current or planned storage areas include:
   - `documents`: private user files
   - `support-files`: private user files
 - local SQLite / backend MVP storage for development
-- local `/uploads` directory in the MVP
+- local `/uploads` directory in the MVP, accessed through short-lived signed or authenticated API downloads by default
+- local MVP `PrivacyAuditEvent` records with safe event metadata only
+- local MVP `ConsentEvent` records for consent/permission history where consent flows are used
 - future production Postgres with RLS
 - future encrypted connector token storage
 - billing subscription state and safe billing event records
@@ -113,6 +115,7 @@ Before public launch, production storage must have:
 - private buckets for private files
 - user-owned path policies
 - server-side access controls
+- short-lived signed downloads or authenticated streaming for private files
 - backups and deletion/retention story
 - secrets kept server-side
 
@@ -140,14 +143,25 @@ Avareno must provide or plan:
 
 Export and deletion are mandatory product capabilities before public launch.
 
+Current MVP implementation state:
+
+- local database JSON export is available from the Privacy Center/API
+- local ZIP export bundle includes the database JSON, manifest and available local uploaded document files
+- uploaded document deletion removes the local database row, extracted text/json and verified local `/uploads` file where present
+- document UI opens local files through short-lived signed API download tickets
+- local static `/uploads` serving is disabled by default and upload size/type allowlists are active
+- AI-extracted document fields can be deleted and corrected through backend controls
+- local connected-source metadata can be disconnected
+- account deletion is request-only and is not yet a full deletion orchestrator
+
 Open implementation requirements:
 
-- export all object memory data
-- export files or provide a structured file archive
+- replace direct MVP ZIP/JSON export with authenticated export jobs, status tracking and production archive downloads
+- export production object-storage files or provide provider-side signed file download links
 - export AI-extracted metadata and user corrections
 - delete account and associated user data
-- delete or detach individual documents
-- disconnect connectors and delete stored tokens
+- delete account-related Supabase Auth/provider records and revoke sessions
+- disconnect connectors and delete/revoke stored provider tokens
 - define deletion behavior for backups
 - define deletion behavior for provider-side data
 - include local billing subscription state in export/deletion plans
@@ -188,11 +202,11 @@ Public claims must be accurate. Do not claim "100% secure", "legally verified", 
 
 - Keep `docs/compliance/IMPLEMENTATION_STATUS.md` current whenever privacy/security foundations move from TODO to implemented.
 - Keep `docs/compliance/SUBPROCESSORS_DRAFT.md` current before enabling any new provider.
-- Build data export flow.
-- Build account deletion flow.
-- Build connector disconnect and token deletion flow.
-- Add consent history if consent-based processing is used.
-- Add privacy center.
+- Build production data export job flow with status, retry, provider receipts and cross-user tests.
+- Build account deletion execution flow.
+- Build connector token deletion/revocation flow.
+- Wire real consent-based processing into consent history.
+- Keep Privacy Center controls accurate as MVP controls move to production controls.
 - Add audit/sync logs that avoid secrets and raw sensitive data.
 - Add retention settings for raw imports, AI prompts, files, and logs.
 - Maintain a subprocessor list.

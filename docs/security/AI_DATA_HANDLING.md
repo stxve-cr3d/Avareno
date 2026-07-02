@@ -52,6 +52,13 @@ Key fields that should be confirmable:
 - serial number
 - support or contract terms
 
+Current MVP controls:
+
+- `PATCH /api/documents/{document_id}/extracted-data` can update stored extracted fields after user review.
+- The item detail document review panel exposes correction for stored extracted text and structured JSON.
+- `POST /api/privacy/ai-data/delete` can remove stored `Document.extractedText` and `Document.extractedJson` values.
+- These controls do not enable a real AI provider; provider region, retention, no-training/data-use behavior and DPA/AVV remain required before production AI.
+
 ## Sensitive Documents
 
 Treat these as sensitive:

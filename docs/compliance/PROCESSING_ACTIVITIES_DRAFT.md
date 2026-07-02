@@ -175,9 +175,10 @@ Provider-specific draft entries live in `SUBPROCESSORS_DRAFT.md`. Implementation
 - Purpose: store proof, invoices, manuals, warranties, support files.
 - Data categories: uploaded files, filenames, MIME type, extracted text, document metadata.
 - Recipients: storage provider, app database, optional AI/OCR provider.
-- Retention: until user deletion/account deletion; raw extraction retention TBD.
-- Security: private buckets, user-owned paths, no public listing.
-- Open: encryption at rest, backup deletion, sensitive document handling.
+- Retention: until user deletion/account deletion; MVP document delete removes local metadata, extracted text/json and verified local `/uploads` object where present; raw extraction retention for production TBD.
+- Security: private buckets, user-owned paths, no public listing; MVP uses short-lived signed or authenticated API downloads by default, static `/uploads` requires explicit dev flag, and upload size/MIME/extension allowlists exist.
+- Export/deletion: MVP local ZIP export bundle includes available local uploaded document files with a manifest; production provider/storage export flow remains open.
+- Open: production private storage abstraction, malware scanning strategy, encryption at rest, backup deletion, sensitive document handling.
 
 ### Private Vault
 
@@ -193,18 +194,28 @@ Provider-specific draft entries live in `SUBPROCESSORS_DRAFT.md`. Implementation
 - Purpose: import or link selected data from user-approved sources.
 - Data categories: provider metadata, selected imported records, tokens/secrets, sync logs.
 - Recipients: provider APIs, app backend/storage.
-- Retention: until disconnect/deletion; token retention until disconnect.
+- Retention: until disconnect/deletion; MVP local metadata disconnect exists; token retention until disconnect for real providers.
 - Security: encrypted tokens, no frontend secrets, SSRF protection, rate limits.
-- Open: connector disconnect, token deletion, scope UI, provider DPA review.
+- Open: provider-side token deletion/revocation, scope UI, provider DPA review.
 
 ### AI Analysis And Memory Build
 
 - Purpose: extract structured facts from user-provided documents or captures.
 - Data categories: selected document text/images, prompts, outputs, extracted facts.
 - Recipients: AI/OCR provider if enabled.
-- Retention: prompt/output retention TBD by provider and app policy.
-- Security: minimization, no secrets, no unrelated user data.
-- Open: provider selection, EU processing, opt-in/consent, no-training settings, DSFA/DPIA screening.
+- Retention: prompt/output retention TBD by provider and app policy; MVP stored extracted fields can be corrected or deleted.
+- Security: minimization, no secrets, no unrelated user data; Vault categories are excluded from automatic analysis.
+- Open: provider selection, EU processing, opt-in/consent, no-training settings, DSFA/DPIA screening, dedicated review UI.
+
+### Privacy Rights, Consent And Audit
+
+- Purpose: provide user controls for export, deletion request logging, consent/permission history and safe privacy audit events.
+- Data categories: user id, privacy action type, safe status/message/context, consent scope/status/legal basis/source/timestamps.
+- Recipients: app database.
+- Retention: TODO legal review; do not store raw document text, filenames, connector payloads, prompts, tokens or secrets in privacy audit records.
+- Security: safe-context redaction, user-owned records, future RLS/access-control tests required.
+- Export/deletion: local JSON/ZIP export bundle and account deletion request logging exist; full account deletion, provider exports and backup handling remain open.
+- Open: production retention, export/deletion job status, consent revocation UX, account deletion effects on audit records.
 
 ### Public Website, Cookies, Turnstile
 

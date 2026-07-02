@@ -4,48 +4,9 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Check, Cookie, FileText, LockKeyhole, Mail, MapPin, Scale, Server, Settings, ShieldCheck } from "lucide-react";
 import { MarketingFooter, MarketingHeader } from "../components/MarketingShell";
 import { Reveal, RevealGroup } from "../components/MarketingReveal";
+import { formatPrice, publicPricingPlans, type BillingPeriod } from "../lib/pricing";
 
 const lastUpdated = "24. Juni 2026";
-
-type BillingPeriod = "monthly" | "yearly";
-
-const pricingPlans = [
-  {
-    name: "Free",
-    monthlyPrice: "0 €",
-    yearlyPrice: "0 €",
-    note: "Für die ersten Dinge und zum Ausprobieren.",
-    features: ["Bis zu 10 Dinge", "Begrenzte Belege und Dokumente", "Manuelle Erinnerungen", "Basis-Objektgedächtnis"],
-    cta: "Kostenlos starten",
-    href: "/signup",
-    highlighted: false
-  },
-  {
-    name: "Personal",
-    monthlyPrice: "9 €",
-    yearlyPrice: "90 €",
-    yearlyNote: "2 Monate sparen",
-    note: "Für deinen privaten Speicher im Alltag.",
-    features: ["Großzügige Dinge mit Fair Use", "Belege, Garantien und Handbücher", "Care-Loops und Erinnerungen", "Basis-KI-Extraktion mit Fair Use", "Datenexport und Private Vault Basic"],
-    cta: "Personal wählen",
-    href: "/signup?plan=personal",
-    badge: "Empfohlen",
-    highlighted: true
-  },
-  {
-    name: "Family",
-    monthlyPrice: "19 €",
-    yearlyPrice: "190 €",
-    yearlyNote: "2 Monate sparen",
-    note: "Für Haushalte, Familie und gemeinsame Verantwortung.",
-    features: ["Alles aus Personal", "Mehrere Haushaltsmitglieder", "Geteilte Dinge und Erinnerungen", "Mehr Speicher und KI-Fair-Use", "Erweiterter Private Vault"],
-    cta: "Family vormerken",
-    badge: "Bald verfügbar",
-    href: "/pricing",
-    disabled: true,
-    highlighted: false
-  }
-];
 
 const pricingFaq = [
   {
@@ -196,6 +157,7 @@ export function PricingPage() {
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
   usePageTitle("Preise");
   const periodLabel = billingPeriod === "yearly" ? "/Jahr" : "/Monat";
+  const pricingPlans = publicPricingPlans();
 
   return (
     <MarketingPageFrame>
@@ -218,29 +180,29 @@ export function PricingPage() {
 
       <RevealGroup as="section" className="avareno-pricing-grid" aria-label="Avareno Preispläne" stagger={90}>
         {pricingPlans.map((plan) => (
-          <article className={plan.highlighted ? "avareno-pricing-card is-highlighted" : "avareno-pricing-card"} key={plan.name}>
+          <article className={plan.isPopular ? "avareno-pricing-card is-highlighted" : "avareno-pricing-card"} key={plan.id}>
             <div className="avareno-pricing-card-head">
               <p>{plan.name}</p>
-              {"badge" in plan ? <span>{plan.badge}</span> : null}
+              {plan.isPopular ? <span>Empfohlen</span> : plan.unavailableLabel ? <span>{plan.unavailableLabel.de}</span> : null}
             </div>
-            <h2>{billingPeriod === "yearly" ? plan.yearlyPrice : plan.monthlyPrice}<span>{periodLabel}</span></h2>
-            {billingPeriod === "yearly" && "yearlyNote" in plan ? <p className="avareno-pricing-saving">{plan.yearlyNote}</p> : null}
-            <small>{plan.note}</small>
+            <h2>{formatPrice(plan, billingPeriod, "de-DE")}<span>{periodLabel}</span></h2>
+            {billingPeriod === "yearly" && plan.yearlyNote ? <p className="avareno-pricing-saving">{plan.yearlyNote.de}</p> : null}
+            <small>{plan.description.de}</small>
             <ul>
               {plan.features.map((feature) => (
-                <li key={feature}>
+                <li key={feature.id}>
                   <Check size={16} />
-                  {feature}
+                  {feature.label.de}
                 </li>
               ))}
             </ul>
-            {"disabled" in plan && plan.disabled ? (
+            {!plan.isAvailable ? (
               <button className="avareno-secondary-cta" disabled type="button">
-                {plan.cta}
+                {plan.ctaLabel.de}
               </button>
             ) : (
-              <Link className={plan.highlighted ? "avareno-primary-cta" : "avareno-secondary-cta"} to={"href" in plan ? plan.href : "/signup"}>
-                {plan.cta} <ArrowRight size={16} />
+              <Link className={plan.isPopular ? "avareno-primary-cta" : "avareno-secondary-cta"} to={plan.ctaHref}>
+                {plan.ctaLabel.de} <ArrowRight size={16} />
               </Link>
             )}
           </article>

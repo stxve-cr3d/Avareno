@@ -2,15 +2,28 @@
 
 This status file prevents incomplete privacy, deletion, export, connector, AI, and Vault work from being presented as finished.
 
+The remaining launch blockers are tracked in `docs/compliance/PRIVACY_RELEASE_BLOCKERS.md`.
+
 ## Implemented Foundation
 
 - `/app/ich` route aliases now point to the existing profile area.
-- `/app/ich/privacy` / `/app/profile/privacy` contains a "Datenschutz & Kontrolle" foundation section.
-- Export and deletion controls are visible but disabled, with copy that says the flows are not complete.
+- `/app/ich/privacy` / `/app/profile/privacy` contains a "Datenschutz & Kontrolle" section with active MVP controls where the local data model supports them.
+- JSON export is active for local database data from `/api/privacy/export/request`.
+- ZIP export bundle is active from `/api/privacy/export/bundle` with database JSON, manifest and available local uploaded document files.
+- Account deletion requests are recorded with a safe audit event, but full account deletion execution remains blocked.
+- Uploaded documents can be deleted from item detail; local metadata, extracted fields and local upload files are removed after ownership/path checks.
+- Uploaded documents are opened through short-lived signed API download tickets in the item detail UI; the ownership-checked direct API download endpoint remains as backend fallback.
+- Uploads reject empty files, oversized files and files outside the allowlisted MIME/extension set.
+- Static `/uploads` serving is disabled by default and only enabled by explicit `AVARENO_ENABLE_STATIC_UPLOADS`.
+- Stored AI-extracted document fields can be deleted from Privacy Center and corrected through the item detail document review panel.
+- Active connected-source records can be disconnected locally without exposing connector secrets to the frontend.
+- Consent/permission history tables and Privacy Center rendering exist.
 - Backend foundation modules now define:
-  - data export planning
+  - local database JSON export
+  - local uploaded document ZIP bundle with manifest
+  - short-lived signed document download tickets
   - account/document deletion planning
-  - safe audit event shaping
+  - safe privacy audit event persistence
   - connector URL/redirect validation against SSRF-style targets
   - connector scope summaries and secret-storage guard
   - AI payload safety checks and AI-assisted metadata
@@ -19,13 +32,13 @@ This status file prevents incomplete privacy, deletion, export, connector, AI, a
 
 ## Not Implemented Yet
 
-- A real data export archive/download.
+- Production export jobs/status handling, provider-side exports and cross-user export tests.
 - Account deletion execution.
 - Supabase Auth user deletion and session revocation flow.
-- Storage object deletion with signed path ownership checks.
+- Production storage object deletion with signed path ownership checks.
+- Production private object storage/bucket verification and provider adapter.
 - Connector token encryption, rotation, revocation, and deletion.
 - Provider-side deletion/revocation.
-- Consent history persistence.
 - Private Vault re-auth/PIN/passkey unlock.
 - Stronger Vault encryption architecture.
 - AI provider final configuration, retention, region, and DPA/AVV review.
@@ -34,9 +47,9 @@ This status file prevents incomplete privacy, deletion, export, connector, AI, a
 ## Privacy Review For This Foundation
 
 - Data categories touched: account/profile, email, avatar reference, object memory metadata, document/file metadata, local uploads, Supabase Storage buckets, AI-extracted facts, connector metadata, consent/audit records.
-- Storage impact: no new database tables or buckets were created. New code only lists known storage areas and buckets for future orchestration.
-- Export impact: export is a plan object only and is not shown as a completed download.
-- Deletion impact: deletion is a plan object only and is not shown as completed or executable.
+- Storage impact: no new buckets were created. The local SQLite runtime/schema now include `PrivacyAuditEvent` and `ConsentEvent`; uploaded file deletion/download is limited to verified `/uploads/` paths through signed or authenticated API endpoints, and static `/uploads` is disabled by default.
+- Export impact: local database JSON export and local uploaded document ZIP bundle are active. Supabase/Auth provider exports, billing/customer portal exports, backup/export procedures, production job flow and cross-user tests remain open.
+- Deletion impact: document deletion and AI-extracted field deletion are executable for local MVP data. Account deletion is request-only until Auth, Storage, providers and backups are orchestrated.
 - Third parties: Supabase, Cloudflare Turnstile, future AI provider, hosting, email, analytics, monitoring, affiliate providers remain draft/review items.
 - AI impact: new guardrails reject obvious secret-like keys and mark AI output as assisted/user-confirmable.
 - Connector risks: custom/public connector URLs must reject localhost, loopback, private ranges, link-local, metadata endpoints, non-http protocols, malformed URLs, credential URLs, and internal hostnames.
@@ -56,10 +69,10 @@ This status file prevents incomplete privacy, deletion, export, connector, AI, a
 
 ## Engineering Follow-Ups
 
-- Add real authenticated backend endpoints only when export/deletion can return accurate state.
-- Add database migrations only after Supabase RLS/storage policy review.
-- Add tests for connector URL validation and deletion/export planning.
-- Add user-facing status once actual export/deletion requests are queued and tracked.
+- Add production authenticated export jobs, private object storage adapter, provider receipts and cross-user tests.
+- Add account deletion orchestration only after Supabase Auth, Storage, provider revocation and backup policy are finalized.
+- Add Supabase migrations/RLS/storage policy updates for `PrivacyAuditEvent` and `ConsentEvent`.
+- Add tests for connector URL validation, document deletion, export ownership and privacy audit redaction.
 
 ## Current Audit Artifacts
 
@@ -70,4 +83,5 @@ This status file prevents incomplete privacy, deletion, export, connector, AI, a
 - `docs/compliance/COMPLIANCE_IMPLEMENTATION_PLAN.md`
 - `docs/compliance/COOKIE_TRACKING_AUDIT.md`
 - `docs/compliance/GERMANY_SAFE_RULES.md`
+- `docs/security/PRIVATE_STORAGE_SIGNED_URLS.md`
 - `docs/security/SUPABASE_SECURITY_REVIEW.md`

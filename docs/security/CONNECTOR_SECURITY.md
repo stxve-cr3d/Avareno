@@ -93,6 +93,11 @@ Disconnect must:
 - offer deletion of synced data where appropriate
 - keep only minimal audit metadata if legally/product necessary
 
+Current MVP state:
+
+- `POST /api/privacy/connected-sources/{source_id}/disconnect` can disconnect local connector metadata and remove local smart-home device/command records for that provider.
+- Real provider token revocation, encrypted token deletion and provider-side deletion receipts remain required before production connectors.
+
 ## Rate Limits And Abuse
 
 - Rate-limit connector calls by user/provider.

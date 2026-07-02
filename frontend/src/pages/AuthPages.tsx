@@ -7,11 +7,14 @@ import type { SocialAuthProvider } from "../lib/authClient";
 import { useAuth } from "../lib/authProvider";
 import { useLanguage } from "../lib/language";
 import { api } from "../lib/api";
+import { formatPrice as formatPlanPrice, getPlanById } from "../lib/pricing";
 import type { BillingStatus, CheckoutRequest, PlanKey } from "../lib/types";
 import { formatUiText } from "../lib/uiText";
 import { AppLoadingBar } from "../components/app/AppKit";
 import { LanguageSwitch } from "../components/LanguageSwitch";
+import { ThemeSwitch } from "../components/ThemeSwitch";
 import { useNotifications } from "../components/app/Notifications";
+import { useTheme, type ResolvedTheme } from "../lib/theme";
 
 type AuthMode = "login" | "signup";
 type AuthLoginMethod = "email" | "phone";
@@ -345,6 +348,7 @@ export function AccountSettingsPage() {
   const auth = useAuth();
   const { notify } = useNotifications();
   const { language, languageLabel } = useLanguage();
+  const { actualTheme, themeLabel } = useTheme();
   const [displayName, setDisplayName] = useState(auth.profile?.displayName ?? "");
   const [email, setEmail] = useState(auth.profile?.email ?? "");
   const [avatarUrl, setAvatarUrl] = useState(auth.profile?.avatarUrl ?? "");
@@ -635,6 +639,9 @@ export function AccountSettingsPage() {
   const emailStatusLabel = emailIsVerified ? "Bestätigt" : emailChanged ? "Noch nicht gespeichert" : "Nicht bestätigt";
   const profileBusy = isSavingProfile || uploadingAvatar || isSendingEmailVerification;
   const providerBusy = isChangingPassword || isRegisteringPasskey || Boolean(connectingProvider);
+  const freePlan = getPlanById("free");
+  const personalPlan = getPlanById("personal");
+  const familyPlan = getPlanById("family");
 
   return (
     <section className="account-page">
@@ -662,6 +669,14 @@ export function AccountSettingsPage() {
           </div>
           <LanguageSwitch className="account-language-switch" />
         </div>
+        <div className="account-language-row">
+          <div>
+            <small>Darstellung</small>
+            <strong>{themeLabel}</strong>
+            <span>{actualTheme === "dark" ? "Dunkel bleibt der ruhige Standard." : "Hell ist als klare Alternative aktiv."}</span>
+          </div>
+          <ThemeSwitch className="account-theme-switch" />
+        </div>
       </section>
 
       <section className="account-panel account-billing-panel">
@@ -677,12 +692,12 @@ export function AccountSettingsPage() {
         <div className="account-billing-summary">
           <div>
             <small>Aktueller Plan</small>
-            <strong>{billing?.currentPlan.name ?? "Free"}</strong>
+            <strong>{billing?.currentPlan.name ?? freePlan.name}</strong>
             <span>{billingStatusLabel(billing?.subscription.status)}</span>
           </div>
           <div>
             <small>Preis</small>
-            <strong>{billing?.currentPlan.priceLabel ?? "0 €"}<em>/Monat</em></strong>
+            <strong>{billing?.currentPlan.priceLabel ?? formatPlanPrice(freePlan, "monthly", "de-DE")}<em>/Monat</em></strong>
             <span>{billing?.subscription.currentPeriodEnd ? `Läuft bis ${formatBillingDate(billing.subscription.currentPeriodEnd)}` : "Keine Verlängerung hinterlegt"}</span>
           </div>
         </div>
@@ -699,7 +714,7 @@ export function AccountSettingsPage() {
             type="button"
           >
             <ArrowRight size={16} />
-            {billingBusy === "checkout" ? "Checkout startet..." : "Auf Personal upgraden"}
+            {billingBusy === "checkout" ? "Checkout startet..." : personalPlan.ctaLabel.de}
           </button>
           <button
             className="profile-secondary-action is-muted"
@@ -711,7 +726,7 @@ export function AccountSettingsPage() {
             Abo verwalten
           </button>
           <button className="profile-secondary-action is-muted" disabled type="button">
-            Family bald verfügbar
+            {familyPlan.ctaLabel.de}
           </button>
         </div>
         <AuthMessage error={billingError} success={billingMessage || null} />
@@ -899,6 +914,7 @@ export function AccountSettingsPage() {
 
 function AuthForm({ mode }: { mode: AuthMode }) {
   const auth = useAuth();
+  const { actualTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [authMethod, setAuthMethod] = useState<AuthLoginMethod>("email");
@@ -1162,6 +1178,7 @@ function AuthForm({ mode }: { mode: AuthMode }) {
           <TurnstileBox
             resetNonce={captchaResetNonce}
             siteKey={auth.config.turnstileSiteKey}
+            theme={actualTheme}
             onError={handleCaptchaError}
             onToken={handleCaptchaToken}
           />
@@ -1254,7 +1271,7 @@ function AuthForm({ mode }: { mode: AuthMode }) {
   );
 }
 
-function TurnstileBox({ onError, onToken, resetNonce, siteKey }: { onError: () => void; onToken: (token: string) => void; resetNonce: number; siteKey: string }) {
+function TurnstileBox({ onError, onToken, resetNonce, siteKey, theme }: { onError: () => void; onToken: (token: string) => void; resetNonce: number; siteKey: string; theme: ResolvedTheme }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [scriptReady, setScriptReady] = useState(Boolean(window.turnstile));
 
@@ -1291,7 +1308,7 @@ function TurnstileBox({ onError, onToken, resetNonce, siteKey }: { onError: () =
       callback: onToken,
       "error-callback": onError,
       "expired-callback": () => onToken(""),
-      theme: "dark",
+      theme,
       size: "normal"
     });
 

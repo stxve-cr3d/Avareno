@@ -596,7 +596,7 @@ export type PlanSubscription = {
 
 export type BillingProvider = "paddle" | "lemon_squeezy" | "stripe";
 
-export type PlanKey = "free" | "personal" | "family";
+export type PlanKey = "free" | "personal" | "pro" | "family";
 
 export type SubscriptionStatus = "free" | "active" | "trialing" | "past_due" | "paused" | "canceled" | "incomplete" | string;
 
@@ -694,6 +694,8 @@ export type Document = {
   fileName: string;
   filePath: string;
   mimeType: string;
+  extractedText?: string | null;
+  extractedJson?: string | null;
 };
 
 export type Loop = {
@@ -767,6 +769,7 @@ export type PrivacyDataOverviewItem = {
 
 export type PrivacyConnectedSource = {
   id: string;
+  provider?: string;
   name: string;
   type: string;
   status: string;
@@ -780,6 +783,7 @@ export type PrivacyPlan = {
   state: string;
   ready: boolean;
   userVisibleMessage: string;
+  included?: string[];
   includedWhenImplemented?: string[];
   requiredAreas?: string[];
   knownTables?: string[];
@@ -794,6 +798,8 @@ export type PrivacySummary = {
     receiptDocumentAnalysis: string;
     vaultAutoAnalysis: boolean;
     userCorrection: string;
+    extractedRecordCount?: number;
+    deleteAvailable?: boolean;
     note: string;
   };
   privateVault: {
@@ -804,9 +810,13 @@ export type PrivacySummary = {
   };
   consentHistory: Array<{
     id: string;
+    scope?: string;
     label: string;
     createdAt: string;
     status: string;
+    legalBasis?: string | null;
+    source?: string;
+    revokedAt?: string | null;
   }>;
   export: PrivacyPlan;
   deletion: PrivacyPlan;

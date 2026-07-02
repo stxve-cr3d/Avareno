@@ -23,6 +23,7 @@ Supabase skill/changelog note: reviewed Supabase changelog on 2026-06-28. Releva
 - RLS draft uses `TO authenticated` plus ownership checks with `(select auth.uid())::text = "userId"` or table-specific owner predicates.
 - Storage policy draft expects buckets: `avatars`, `object-images`, `receipts`, `documents`, `support-files`.
 - Storage policy draft makes avatars public and all other listed buckets private.
+- Local MVP document downloads now use short-lived signed backend URLs; this does not verify Supabase Storage bucket state.
 
 ## What Could Not Be Verified From Repo
 
@@ -32,7 +33,7 @@ Supabase skill/changelog note: reviewed Supabase changelog on 2026-06-28. Releva
 - Whether tables exist and match the SQLite schema.
 - Whether Data API exposure settings expose any tables.
 - Whether storage buckets exist and are public/private as expected.
-- Whether signed URLs or private download paths are used in production.
+- Whether Supabase signed URLs or private download paths are used in production.
 - Whether service-role key exists and where it is stored.
 - Whether Supabase Auth email provider is default Supabase email or custom SMTP.
 - Whether OAuth providers are enabled in the dashboard.
@@ -76,7 +77,8 @@ Supabase skill/changelog note: reviewed Supabase changelog on 2026-06-28. Releva
 - [ ] `receipts`, `documents`, `support-files`, `object-images` are private.
 - [ ] Object paths start with authenticated user id.
 - [ ] Users can select/upload/update/delete only their own objects.
-- [ ] Private files are served through authenticated/signed URLs, not public URLs.
+- [x] Local MVP private files are served through signed/authenticated API URLs, not public `/uploads` URLs by default.
+- [ ] Supabase private files are served through authenticated/signed URLs, not public URLs.
 - [ ] File deletion removes metadata and object.
 - [ ] File type/size validation exists before upload.
 - [ ] Backup/retention behavior for deleted objects is documented.

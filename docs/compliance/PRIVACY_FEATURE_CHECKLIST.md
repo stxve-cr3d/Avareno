@@ -128,6 +128,42 @@ Update if affected:
 - Needs lawyer/DSB review first: yes / no
 - Notes:
 
+## Completed Review: MVP Privacy Controls Foundation
+
+- Feature name: MVP Privacy Controls Foundation
+- Owner: Engineering/Product
+- Route/module: `backend/app/routers/privacy.py`, `backend/app/routers/documents.py`, `frontend/src/pages/Rewards.tsx`, `frontend/src/pages/ItemDetail.tsx`
+- Backend/API changes: JSON export request, local ZIP export bundle, account deletion request logging, local connector disconnect, AI-extracted data deletion/correction, document deletion, ownership-checked local document download, upload size/type policy
+- Database/storage changes: `PrivacyAuditEvent`, `ConsentEvent`, deletion/download of verified local `/uploads` files through signed/authenticated API endpoints; static `/uploads` disabled by default
+- Third-party providers: none added
+- Launch state: MVP/internal; production launch still blocked by Auth, Storage, provider revocation, backups and legal review
+
+Required questions:
+
+1. Personal data: profile/account metadata, product/object data, document metadata/files, extracted text/json, connector metadata, consent/audit metadata.
+2. Purpose: provide user controls for access/export, correction, deletion, disconnect and transparency.
+3. Avoid collection: audit records are limited to action/status/context; no raw document text, filenames, prompts, payloads, tokens or secrets are stored.
+4. Data minimization: export returns user-owned local database data; safe audit context is redacted and short.
+5. Storage: local SQLite for privacy audit/consent metadata; local `/uploads` for current MVP files through short-lived signed or authenticated API downloads by default.
+6. Retention: audit/consent retention remains TODO; document deletion removes local file and row where requested.
+7. Export: local database JSON export and local uploaded document ZIP bundle are active; provider-side exports, backup handling and production job flow remain open.
+8. Deletion: document and extracted-data deletion are active; account deletion is request-only until orchestration is complete.
+9. Third-party sharing: none added.
+10. AI: no real provider added; existing mock extraction fields can be corrected or deleted.
+11. Consent/legal basis: consent table exists; actual consent UX/legal basis still requires review before production flows.
+12. Connected accounts: local connector metadata can be disconnected; real token revocation remains open.
+13. Sensitive documents: yes, because uploaded files may be sensitive; UI now uses signed API downloads and static upload serving is default-off, but production still needs verified private object storage.
+14. Tokens/secrets/API credentials: no new token storage; frontend still never receives connector secrets.
+15. Logs: privacy audit stores safe event metadata only.
+16. Abuse/security risks: incomplete auth isolation in local MVP, malware scanning not implemented, missing provider revocation, missing backup deletion, missing production RLS/storage tests, direct ZIP export must be replaced by production job/status handling before high-volume use.
+
+Decision:
+
+- Privacy review complete: yes for scoped MVP controls
+- Safe to implement now: yes for local MVP controls
+- Needs lawyer/DSB review first: yes before public launch claims or production enablement
+- Notes: Do not present this as full GDPR readiness. Keep account deletion, provider revocation, production export jobs/provider exports, Vault protections, retention and backups open until production architecture is finished and reviewed.
+
 ## Completed Review: Supabase Phone/SMS OTP Auth
 
 - Feature name: Supabase Phone/SMS OTP Auth

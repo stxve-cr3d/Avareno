@@ -66,7 +66,7 @@ def _document_attachments(documents: list[dict]) -> list[dict]:
                 "id": document.get("id"),
                 "type": document_type,
                 "fileName": document.get("fileName") or "Document",
-                "filePath": document.get("filePath"),
+                "filePath": f"/api/documents/{document.get('id')}/download" if document.get("id") else None,
             }
         )
     return attachments

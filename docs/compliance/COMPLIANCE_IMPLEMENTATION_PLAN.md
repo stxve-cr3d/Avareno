@@ -8,9 +8,9 @@ Status: technical/product readiness plan, 2026-06-28. Not legal advice. Must be 
   - Keep current foundation copy explicit: export/deletion are not complete.
   - Add status model for export/deletion readiness and user-facing "not yet available" states.
 - Upload safety
-  - Add max upload size, MIME/extension allowlist, and reject empty files.
-  - Stop using public/static `/uploads` for real private documents.
-  - Create authenticated file download path or move private files to private object storage.
+  - MVP rejects empty files, oversized files and files outside the allowlisted MIME/extension set.
+  - Static `/uploads` is disabled by default and requires explicit `AVARENO_ENABLE_STATIC_UPLOADS`.
+  - MVP signed/authenticated file download path exists; move private files to private object storage before production.
 - QR/barcode scanning
   - Keep camera access user-initiated and stop the stream after close/detection.
   - Keep product QR labels data-minimal: internal item URL only, no serials, price or document data.
@@ -32,7 +32,7 @@ Status: technical/product readiness plan, 2026-06-28. Not legal advice. Must be 
 ## Must Fix Before Public Beta
 
 - Export data endpoint/service
-  - Implement authenticated export job/request.
+  - MVP local database JSON export and local uploaded document ZIP bundle are implemented; replace with authenticated export job/request before production.
   - Include user profile, items, documents metadata, files, loops/reminders, repair logs, affiliate clicks, connector metadata, consent history.
   - Provide safe archive download via short-lived authenticated/signed URL.
   - Add tests that one user cannot export another user's data.
@@ -43,17 +43,19 @@ Status: technical/product readiness plan, 2026-06-28. Not legal advice. Must be 
   - Delete Supabase Auth user server-side and revoke sessions.
   - Define backup retention behavior and user-facing wording.
 - Delete uploaded file/storage object flow
-  - Verify user ownership before deletion.
-  - Delete DB metadata and storage object together.
-  - Recalculate item completeness and remove extracted facts.
+  - MVP endpoint verifies local user ownership before deletion.
+  - MVP endpoint deletes DB metadata, extracted fields and local `/uploads` object together where present.
+  - MVP endpoint recalculates item completeness; production still needs private storage abstraction and signed path checks.
 - AI usage flags
   - Persist whether AI was used, provider, timestamp, source doc, confidence, user confirmation/correction.
   - Add per-user AI controls and no automatic Vault analysis.
 - Consent/permission history
+  - MVP `ConsentEvent` table and Privacy Center rendering exist.
   - Persist consent/permission events for cookies/analytics/newsletter/connectors/AI where relevant.
   - Include revocation state and timestamp.
 - Connector disconnect
-  - Add disconnect endpoint, token deletion, provider revocation and safe sync log.
+  - MVP local disconnect endpoint exists.
+  - Add token deletion, provider revocation and safe sync log for real connector providers.
 - Safe sync logs
   - Store only status, counts, safe message and timestamps; no raw payloads.
 - Cookie/consent review
@@ -108,14 +110,14 @@ Status: technical/product readiness plan, 2026-06-28. Not legal advice. Must be 
 
 ## Technical TODO Index
 
-- Privacy Center: finish `/api/privacy/summary`, `/api/privacy/export/request`, `/api/privacy/deletion/request`.
-- Export service: create archive builder and file bundler.
+- Privacy Center: MVP controls exist; add production job status, provider receipts and cross-user tests.
+- Export service: MVP archive builder and local file bundler exist; add production job/status flow, provider receipts and private object-storage export support.
 - Account deletion: orchestrate DB rows, files, Supabase Auth, connectors, AI records and backups note.
-- Uploaded file deletion: add authenticated endpoint and storage abstraction.
-- AI extraction review/correction: add correction model and user confirmation.
+- Uploaded file deletion/download: MVP signed/authenticated endpoints and upload policy exist; add authenticated production storage abstraction and malware scanning strategy.
+- AI extraction review/correction: MVP correction endpoint and document review UI exist; add provider disclosure and stronger confirmation flow before real AI.
 - AI usage flags: persist provider/source/confidence/user confirmation.
-- Consent/permission history: add table and UI surface.
-- Connector disconnect: add endpoint, revocation and safe logs.
+- Consent/permission history: MVP table and UI surface exist; wire real consent flows into it.
+- Connector disconnect: MVP local disconnect exists; add provider revocation and safe logs.
 - Connector SSRF validation utility: test existing helpers and use them for all outbound connector URLs.
 - Token encryption abstraction: implement before storing any connector token.
 - Safe sync logs: centralize redaction helper use.

@@ -37,10 +37,11 @@ app.add_middleware(
 app.middleware("http")(auth_middleware)
 
 uploads = PROJECT_ROOT / "uploads"
-uploads.mkdir(parents=True, exist_ok=True)
-# Compliance TODO: local static uploads are MVP-only. Use authenticated
-# downloads/private object storage before storing real private documents.
-app.mount("/uploads", StaticFiles(directory=Path(uploads)), name="uploads")
+if os.environ.get("AVARENO_ENABLE_STATIC_UPLOADS", "").strip().lower() in {"1", "true", "yes", "on"}:
+    uploads.mkdir(parents=True, exist_ok=True)
+    # Development escape hatch only. Private documents should use
+    # short-lived signed API downloads or private object storage.
+    app.mount("/uploads", StaticFiles(directory=Path(uploads)), name="uploads")
 
 app.include_router(me.router, prefix="/api/me", tags=["me"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])

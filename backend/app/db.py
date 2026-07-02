@@ -75,10 +75,43 @@ def ensure_runtime_schema(conn: sqlite3.Connection) -> None:
               FOREIGN KEY ("userId") REFERENCES "User" ("id")
             )"""
         )
+    _ensure_privacy_tables(conn)
     _ensure_product_tables(conn)
     _ensure_smart_home_tables(conn)
     _ensure_default_product_structure(conn)
     _ensure_default_smart_home_devices(conn)
+
+
+def _ensure_privacy_tables(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS "PrivacyAuditEvent" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "userId" TEXT NOT NULL,
+          "eventType" TEXT NOT NULL,
+          "status" TEXT NOT NULL,
+          "message" TEXT NOT NULL,
+          "provider" TEXT,
+          "safeContext" TEXT,
+          "createdAt" TEXT NOT NULL,
+          FOREIGN KEY ("userId") REFERENCES "User" ("id")
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS "ConsentEvent" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "userId" TEXT NOT NULL,
+          "scope" TEXT NOT NULL,
+          "label" TEXT NOT NULL,
+          "status" TEXT NOT NULL,
+          "legalBasis" TEXT,
+          "source" TEXT NOT NULL DEFAULT 'app',
+          "createdAt" TEXT NOT NULL,
+          "revokedAt" TEXT,
+          FOREIGN KEY ("userId") REFERENCES "User" ("id")
+        )"""
+    )
+    conn.execute('CREATE INDEX IF NOT EXISTS "PrivacyAuditEvent_userId_createdAt_idx" ON "PrivacyAuditEvent" ("userId", "createdAt")')
+    conn.execute('CREATE INDEX IF NOT EXISTS "ConsentEvent_userId_createdAt_idx" ON "ConsentEvent" ("userId", "createdAt")')
 
 
 def _ensure_product_tables(conn: sqlite3.Connection) -> None:

@@ -3,16 +3,17 @@
 @tailwind utilities;
 
 :root {
-  --avareno-ink: #1b1c1c;
-  --avareno-paper: #f8faf9;
-  --avareno-warm: #e8eeeb;
+  --avareno-ink: #f5f5f4;
+  --avareno-paper: #141414;
+  --avareno-warm: #1d1d1d;
   --avareno-leaf: #3ECF8E;
   --avareno-font: "Helvetica Neue", "SF Pro Text", Aptos, Inter, "Segoe UI Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --avareno-font-tight: "Helvetica Neue", "SF Pro Display", "Aptos Display", Inter, var(--avareno-font);
 
-  /* /app design tokens — do not use on public website */
+  /* Shared app theme tokens. Dark is the default Avareno experience. */
   --av-bg-base:       #141414;
   --av-bg-shell:      #191919;
+  --av-bg-page:       #141414;
   --av-bg-panel:      #1D1D1D;
   --av-bg-panel-soft: #232323;
   --av-surface-1:     rgba(255,255,255,0.04);
@@ -21,6 +22,12 @@
   --av-border-subtle: rgba(255,255,255,0.08);
   --av-border-medium: rgba(255,255,255,0.14);
   --av-border-accent: rgba(62,207,142,0.24);
+  --av-input-bg:      rgba(255,255,255,0.026);
+  --av-input-border:  rgba(255,255,255,0.08);
+  --av-button-bg:     rgba(255,255,255,0.026);
+  --av-button-text:   #A6A6A2;
+  --av-button-primary-bg: rgba(62,207,142,0.12);
+  --av-button-primary-text: #F5F5F4;
   --av-text-primary:  #F5F5F4;
   --av-text-secondary:#A6A6A2;
   --av-text-muted:    #7A7A76;
@@ -31,11 +38,102 @@
   --av-success:       #3ECF8E;
   --av-danger:        #EF7D7D;
   --av-danger-bg:     rgba(239,125,125,0.10);
-  color: #1b1c1c;
+  --av-error:         var(--av-danger);
+  --av-error-bg:      var(--av-danger-bg);
+  --av-focus-ring:    rgba(62,207,142,0.28);
+  --av-shadow-soft:   0 18px 50px rgba(0,0,0,0.22);
+  --av-shadow-lift:   0 20px 70px rgba(0,0,0,0.24);
+  --av-shadow-glow:   0 14px 38px rgba(62,207,142,0.16);
+  --av-topbar-bg:     rgba(11,15,14,0.92);
+  --av-page-dot:      rgba(255,255,255,0.055);
+  --av-page-grid:     rgba(255,255,255,0.016);
+  --av-panel-gradient: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.018));
+  --av-subtle-panel-bg: rgba(255,255,255,0.026);
+  --av-subtle-panel-hover: rgba(255,255,255,0.04);
+  --av-hero-panel-bg: #0b1010;
+  --av-hero-compact-bg: #0d1212;
+
+  --av-color-ink: 245 245 244;
+  --av-color-muted: 122 122 118;
+  --av-color-mist: 35 35 35;
+  --av-color-line: 255 255 255;
+  --av-color-leaf: 62 207 142;
+  --av-color-moss: 62 207 142;
+  --av-color-sky: 125 191 194;
+  --av-color-coral: 239 125 125;
+  --av-color-amber: 232 197 110;
+  --av-color-ember: 239 125 125;
+  --av-color-coal: 245 245 244;
+  --av-color-paper: 29 29 29;
+  --av-color-wash: 35 35 35;
+
+  color: var(--av-text-primary);
   background: var(--av-bg-base);
   font-family: var(--avareno-font);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+}
+
+html[data-theme="light"] {
+  --avareno-ink: #18201d;
+  --avareno-paper: #f5f7f5;
+  --avareno-warm: #e8eeeb;
+
+  --av-bg-base:       #f5f7f5;
+  --av-bg-shell:      #eef3f0;
+  --av-bg-page:       #f5f7f5;
+  --av-bg-panel:      #ffffff;
+  --av-bg-panel-soft: #eef3f0;
+  --av-surface-1:     rgba(12,24,20,0.035);
+  --av-surface-2:     rgba(12,24,20,0.058);
+  --av-surface-3:     rgba(12,24,20,0.085);
+  --av-border-subtle: rgba(12,24,20,0.10);
+  --av-border-medium: rgba(12,24,20,0.16);
+  --av-border-accent: rgba(32,141,93,0.28);
+  --av-input-bg:      #f8faf9;
+  --av-input-border:  rgba(12,24,20,0.13);
+  --av-button-bg:     #ffffff;
+  --av-button-text:   #42504a;
+  --av-button-primary-bg: #123e32;
+  --av-button-primary-text: #ffffff;
+  --av-text-primary:  #18201d;
+  --av-text-secondary:#42504a;
+  --av-text-muted:    #67736d;
+  --av-accent:        #208d5d;
+  --av-accent-bg:     rgba(32,141,93,0.10);
+  --av-warning:       #9a6500;
+  --av-warning-bg:    rgba(154,101,0,0.10);
+  --av-success:       #208d5d;
+  --av-danger:        #b42318;
+  --av-danger-bg:     rgba(180,35,24,0.09);
+  --av-error:         var(--av-danger);
+  --av-error-bg:      var(--av-danger-bg);
+  --av-focus-ring:    rgba(32,141,93,0.28);
+  --av-shadow-soft:   0 18px 50px rgba(23,35,29,0.08);
+  --av-shadow-lift:   0 20px 70px rgba(23,35,29,0.12);
+  --av-shadow-glow:   0 14px 38px rgba(32,141,93,0.16);
+  --av-topbar-bg:     rgba(246,249,247,0.92);
+  --av-page-dot:      rgba(12,24,20,0.075);
+  --av-page-grid:     rgba(12,24,20,0.038);
+  --av-panel-gradient: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.82));
+  --av-subtle-panel-bg: rgba(12,24,20,0.035);
+  --av-subtle-panel-hover: rgba(12,24,20,0.058);
+  --av-hero-panel-bg: #ffffff;
+  --av-hero-compact-bg: #f8faf9;
+
+  --av-color-ink: 24 32 29;
+  --av-color-muted: 103 115 109;
+  --av-color-mist: 238 243 240;
+  --av-color-line: 208 218 213;
+  --av-color-leaf: 32 141 93;
+  --av-color-moss: 18 94 73;
+  --av-color-sky: 86 144 148;
+  --av-color-coral: 180 35 24;
+  --av-color-amber: 154 101 0;
+  --av-color-ember: 180 35 24;
+  --av-color-coal: 24 32 29;
+  --av-color-paper: 248 250 249;
+  --av-color-wash: 238 243 240;
 }
 
 * {
@@ -2243,6 +2341,22 @@ select {
 .privacy-status-note svg {
   flex: 0 0 auto;
   color: #e8c56e;
+}
+
+.privacy-status-note.is-success {
+  background: rgba(62, 207, 142, 0.1);
+}
+
+.privacy-status-note.is-success svg {
+  color: var(--color-success);
+}
+
+.privacy-status-note.is-error {
+  background: rgba(239, 125, 125, 0.11);
+}
+
+.privacy-status-note.is-error svg {
+  color: var(--color-error);
 }
 
 .privacy-center-list {
@@ -23907,4 +24021,463 @@ a:focus-visible {
     transform: none;
     opacity: 0.5;
   }
+}
+
+/* ============================================================
+   Theme foundation pass
+   Central dark/light tokens override legacy one-mode surfaces.
+   ============================================================ */
+body {
+  color: var(--av-text-primary);
+  background: var(--av-bg-base);
+}
+
+input,
+textarea,
+select {
+  background: var(--av-input-bg);
+  color: var(--av-text-primary);
+}
+
+input:focus,
+textarea:focus,
+select:focus,
+button:focus-visible,
+a:focus-visible {
+  outline-color: var(--av-focus-ring);
+}
+
+.theme-switch {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 0.18rem;
+  border: 1px solid var(--av-border-subtle);
+  border-radius: 0.5rem;
+  background: var(--av-subtle-panel-bg);
+  padding: 0.18rem;
+}
+
+.theme-switch button {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.34rem;
+  border: 0;
+  border-radius: 0.36rem;
+  background: transparent;
+  color: var(--av-text-muted);
+  cursor: pointer;
+  font-size: 0.74rem;
+  font-weight: 540;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.theme-switch button:hover {
+  color: var(--av-text-secondary);
+}
+
+.theme-switch button.is-active {
+  background: var(--av-accent-bg);
+  color: var(--av-text-primary);
+  box-shadow: inset 0 0 0 1px var(--av-border-accent);
+}
+
+.avareno-app-shell {
+  min-height: 100vh;
+  color: var(--av-text-primary);
+  background:
+    radial-gradient(circle, var(--av-page-dot) 0.65px, transparent 0.8px) 0 0 / 22px 22px,
+    linear-gradient(var(--av-page-grid) 1px, transparent 1px) 0 0 / 88px 88px,
+    linear-gradient(90deg, var(--av-page-grid) 1px, transparent 1px) 0 0 / 88px 88px,
+    var(--av-bg-base) !important;
+}
+
+.avareno-app-topbar {
+  background: var(--av-topbar-bg) !important;
+  border-bottom-color: var(--av-border-subtle) !important;
+}
+
+.avareno-app-brand,
+.avareno-app-brand-text {
+  color: var(--av-text-primary) !important;
+}
+
+.avareno-app-brand-symbol,
+.avareno-profile-trigger,
+.avareno-profile-dropdown,
+.avareno-profile-avatar {
+  border-color: var(--av-border-subtle) !important;
+  background: var(--av-subtle-panel-bg) !important;
+  color: var(--av-text-secondary) !important;
+  box-shadow: none !important;
+}
+
+.avareno-app-nav a {
+  color: var(--av-text-muted) !important;
+}
+
+.avareno-app-nav a:hover,
+.avareno-app-nav a.is-active {
+  background: var(--av-subtle-panel-hover) !important;
+  color: var(--av-text-primary) !important;
+}
+
+.avareno-app-capture {
+  border: 1px solid var(--av-border-medium) !important;
+  background: var(--av-button-primary-bg) !important;
+  color: var(--av-button-primary-text) !important;
+}
+
+.avareno-app-shell .av-page-header,
+.avareno-app-shell .resolve-hero,
+.avareno-app-shell .profile-hero,
+.avareno-app-shell .friends-hero,
+.avareno-app-shell .documents-hero,
+.avareno-app-shell .care-hero,
+.avareno-app-shell .capture-studio-hero,
+.avareno-app-shell .ask-hero,
+.avareno-app-shell .account-hero,
+.avareno-app-shell .av-section,
+.avareno-app-shell .av-panel-box,
+.avareno-app-shell .av-profile-identity,
+.avareno-app-shell .av-profile-block,
+.avareno-app-shell .object-panel,
+.avareno-app-shell .resolve-next-card,
+.avareno-app-shell .resolve-home-menu,
+.avareno-app-shell .resolve-list-page,
+.avareno-app-shell .resolve-ticket-column,
+.avareno-app-shell .resolve-detail-panel,
+.avareno-app-shell .resolve-create-flow,
+.avareno-app-shell .resolve-create-body,
+.avareno-app-shell .resolve-context-block,
+.avareno-app-shell .resolve-detail-section,
+.avareno-app-shell .resolve-helper-card,
+.avareno-app-shell .resolve-solution-card,
+.avareno-app-shell .resolve-ai-review,
+.avareno-app-shell .resolve-publish-state,
+.avareno-app-shell .profile-focus,
+.avareno-app-shell .profile-stat,
+.avareno-app-shell .profile-panel,
+.avareno-app-shell .friends-board,
+.avareno-app-shell .friends-invite-strip,
+.avareno-app-shell .friends-profile-card,
+.avareno-app-shell .documents-focus,
+.avareno-app-shell .documents-stat,
+.avareno-app-shell .documents-panel,
+.avareno-app-shell .care-focus,
+.avareno-app-shell .care-form-panel,
+.avareno-app-shell .care-preview-list,
+.avareno-app-shell .capture-panel,
+.avareno-app-shell .capture-draft-card,
+.avareno-app-shell .capture-action,
+.avareno-app-shell .capture-receipt-page > div,
+.avareno-app-shell .capture-message-page > div,
+.avareno-app-shell .capture-item-page > section,
+.avareno-app-shell .capture-item-page aside > section,
+.avareno-app-shell .capture-item-page section.rounded-lg,
+.avareno-app-shell .ask-panel,
+.avareno-app-shell .ask-signal,
+.avareno-app-shell .ask-action,
+.avareno-app-shell .ask-result,
+.avareno-app-shell .account-panel,
+.avareno-app-shell .surface,
+.avareno-app-shell .ozma-modal,
+.avareno-app-shell .ozma-command {
+  border-color: var(--av-border-subtle) !important;
+  background: var(--av-panel-gradient), var(--av-bg-panel) !important;
+  box-shadow: var(--av-shadow-soft) !important;
+}
+
+.avareno-app-shell .resolve-metric-card,
+.avareno-app-shell .resolve-ticket-card,
+.avareno-app-shell .resolve-factor-row,
+.avareno-app-shell .resolve-tool-row,
+.avareno-app-shell .resolve-question-box,
+.avareno-app-shell .resolve-product-picker button,
+.avareno-app-shell .profile-preview-row,
+.avareno-app-shell .friend-row,
+.avareno-app-shell .friends-board-row,
+.avareno-app-shell .friends-week-note,
+.avareno-app-shell .friend-invite-box,
+.avareno-app-shell .pending-invite-row,
+.avareno-app-shell .privacy-toggle,
+.avareno-app-shell .private-empty-state,
+.avareno-app-shell .documents-item-row,
+.avareno-app-shell .documents-space-row,
+.avareno-app-shell .care-preview-row,
+.avareno-app-shell .capture-mode-button,
+.avareno-app-shell .capture-example,
+.avareno-app-shell .capture-item-page .rounded-lg,
+.avareno-app-shell .capture-item-page .rounded-2xl,
+.avareno-app-shell .ask-prompt,
+.avareno-app-shell .account-provider-list > div,
+.account-language-row,
+.account-billing-summary > div,
+.account-billing-note {
+  border-color: var(--av-border-subtle) !important;
+  background: var(--av-subtle-panel-bg) !important;
+  color: var(--av-text-secondary) !important;
+  box-shadow: none !important;
+}
+
+.avareno-app-shell .resolve-ticket-card:hover,
+.avareno-app-shell .resolve-ticket-card.is-active,
+.avareno-app-shell .resolve-home-choice:hover,
+.avareno-app-shell .friend-row:hover,
+.avareno-app-shell .friends-board-row:hover,
+.avareno-app-shell .documents-item-row:hover,
+.avareno-app-shell .capture-mode-button:hover,
+.avareno-app-shell .ask-result:hover,
+.avareno-app-shell .ozma-command:hover {
+  background: var(--av-subtle-panel-hover) !important;
+}
+
+.avareno-app-shell input,
+.avareno-app-shell textarea,
+.avareno-app-shell select,
+.avareno-app-shell .capture-textarea,
+.avareno-app-shell .capture-select,
+.avareno-app-shell .resolve-search,
+.avareno-app-shell .ask-input-row,
+.av-field input,
+.av-field select,
+.av-field textarea {
+  border-color: var(--av-input-border) !important;
+  background: var(--av-input-bg) !important;
+  color: var(--av-text-primary) !important;
+}
+
+.avareno-app-shell input:focus,
+.avareno-app-shell textarea:focus,
+.avareno-app-shell select:focus,
+.avareno-app-shell .capture-textarea:focus,
+.avareno-app-shell .capture-select:focus,
+.avareno-app-shell .ask-input-row:focus-within,
+.avareno-app-shell .resolve-search:focus-within,
+.av-field input:focus,
+.av-field select:focus,
+.av-field textarea:focus {
+  border-color: var(--av-border-accent) !important;
+  outline: 2px solid var(--av-focus-ring) !important;
+  outline-offset: 2px;
+}
+
+.avareno-app-shell .av-btn-primary,
+.avareno-app-shell .resolve-primary-action,
+.avareno-app-shell .resolve-create-actions button:last-child,
+.avareno-app-shell .resolve-solution-actions button:last-child,
+.avareno-app-shell .resolve-publish-state button,
+.avareno-app-shell .resolve-publish-state a,
+.avareno-app-shell .profile-primary-action,
+.avareno-app-shell .friends-primary-action,
+.avareno-app-shell .documents-primary-action,
+.avareno-app-shell .care-primary-action,
+.avareno-app-shell .capture-primary,
+.avareno-app-shell .ask-input-row button,
+.avareno-app-shell .account-save,
+.avareno-app-shell .capture-item-page button[type="submit"] {
+  border-color: var(--av-border-accent) !important;
+  background: var(--av-button-primary-bg) !important;
+  color: var(--av-button-primary-text) !important;
+}
+
+.avareno-app-shell .av-btn-secondary,
+.avareno-app-shell .resolve-secondary-action,
+.avareno-app-shell .resolve-create-actions button:first-child,
+.avareno-app-shell .profile-secondary-action,
+.avareno-app-shell .care-secondary-action,
+.avareno-app-shell .profile-section-nav a,
+.avareno-app-shell .friend-detail-back,
+.avareno-app-shell .leave-circle-button {
+  border-color: var(--av-border-subtle) !important;
+  background: var(--av-button-bg) !important;
+  color: var(--av-button-text) !important;
+}
+
+.avareno-app-shell .av-hero,
+.avareno-app-shell .capture-item-page .bg-\[\#101111\] {
+  background:
+    radial-gradient(circle at 78% 42%, var(--av-accent-bg), transparent 18rem),
+    var(--av-panel-gradient),
+    var(--av-hero-panel-bg) !important;
+}
+
+.avareno-app-shell .av-mm-card,
+.avareno-app-shell .av-attention-card,
+.avareno-app-shell .av-thing-card,
+.avareno-app-shell .av-capture,
+.avareno-app-shell .av-mem-status,
+.avareno-app-shell .av-module-list,
+.avareno-app-shell .av-streak,
+.avareno-app-shell .capture-item-page .bg-\[\#f8faf9\],
+.avareno-app-shell .capture-receipt-page .bg-wash,
+.avareno-app-shell .capture-message-page .bg-wash {
+  background: var(--av-subtle-panel-bg) !important;
+}
+
+.account-language-row {
+  border: 1px solid var(--av-border-subtle);
+}
+
+.account-language-row small,
+.account-billing-summary small {
+  color: var(--av-text-muted) !important;
+}
+
+.account-language-row strong,
+.account-billing-summary strong {
+  color: var(--av-text-primary) !important;
+}
+
+.account-language-row span,
+.account-billing-summary span,
+.account-billing-summary em,
+.account-billing-note {
+  color: var(--av-text-secondary) !important;
+}
+
+.auth-shell,
+.auth-route-loading {
+  background:
+    radial-gradient(circle at 18% 0%, var(--av-accent-bg), transparent 28rem),
+    var(--av-bg-base) !important;
+  color: var(--av-text-primary) !important;
+}
+
+.auth-card,
+.auth-dialog,
+.auth-setup-note,
+.auth-error,
+.auth-turnstile-shell {
+  border-color: var(--av-border-subtle) !important;
+  background: var(--av-panel-gradient), var(--av-bg-panel) !important;
+  box-shadow: var(--av-shadow-lift) !important;
+}
+
+.auth-mark,
+.auth-method-tabs,
+.auth-field > div,
+.auth-toggle,
+.auth-dialog-note,
+.auth-dialog-close,
+.auth-dialog-secondary,
+.auth-provider-grid button {
+  border-color: var(--av-border-subtle) !important;
+  background: var(--av-subtle-panel-bg) !important;
+  color: var(--av-text-secondary) !important;
+}
+
+.auth-intro h1,
+.auth-dialog-head h2,
+.auth-toggle strong,
+.auth-setup-note strong {
+  color: var(--av-text-primary) !important;
+}
+
+.auth-intro p,
+.auth-dialog-head span,
+.auth-field > span,
+.auth-step-label {
+  color: var(--av-text-muted) !important;
+}
+
+.auth-intro span,
+.auth-switch,
+.auth-secondary-links,
+.auth-dialog-head p,
+.auth-toggle small,
+.auth-turnstile-shell > span {
+  color: var(--av-text-secondary) !important;
+}
+
+.auth-field input {
+  color: var(--av-text-primary) !important;
+}
+
+.auth-primary,
+.auth-dialog-primary {
+  background: var(--av-button-primary-bg) !important;
+  color: var(--av-button-primary-text) !important;
+}
+
+.auth-secondary-submit,
+.auth-method-tabs button.is-active,
+.auth-success {
+  background: var(--av-accent-bg) !important;
+  color: var(--av-accent) !important;
+}
+
+.auth-text-action,
+.auth-secondary-links a {
+  color: var(--av-accent) !important;
+}
+
+html[data-theme="light"] .av-field input[type="date"] {
+  color-scheme: light;
+}
+
+@media (max-width: 560px) {
+  .theme-switch button span {
+    display: none;
+  }
+
+  .theme-switch button {
+    min-width: 2rem;
+    padding-inline: 0.45rem;
+  }
+}
+
+.site-pricing-grid,
+.avareno-pricing-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14.5rem), 1fr)) !important;
+}
+
+.site-pricing-card,
+.avareno-pricing-card {
+  min-width: 0;
+}
+
+html[data-theme="light"] .avareno-app-shell {
+  --av-bg-base:       #f5f7f5;
+  --av-bg-shell:      #eef3f0;
+  --av-bg-page:       #f5f7f5;
+  --av-bg-panel:      #ffffff;
+  --av-bg-panel-soft: #eef3f0;
+  --av-surface-1:     rgba(12,24,20,0.035);
+  --av-surface-2:     rgba(12,24,20,0.058);
+  --av-surface-3:     rgba(12,24,20,0.085);
+  --av-border-subtle: rgba(12,24,20,0.10);
+  --av-border-medium: rgba(12,24,20,0.16);
+  --av-border-accent: rgba(32,141,93,0.28);
+  --av-input-bg:      #f8faf9;
+  --av-input-border:  rgba(12,24,20,0.13);
+  --av-button-bg:     #ffffff;
+  --av-button-text:   #42504a;
+  --av-button-primary-bg: #123e32;
+  --av-button-primary-text: #ffffff;
+  --av-text-primary:  #18201d;
+  --av-text-secondary:#42504a;
+  --av-text-muted:    #67736d;
+  --av-accent:        #208d5d;
+  --av-accent-bg:     rgba(32,141,93,0.10);
+  --av-warning:       #9a6500;
+  --av-warning-bg:    rgba(154,101,0,0.10);
+  --av-success:       #208d5d;
+  --av-danger:        #b42318;
+  --av-danger-bg:     rgba(180,35,24,0.09);
+  --av-error:         var(--av-danger);
+  --av-error-bg:      var(--av-danger-bg);
+  --av-focus-ring:    rgba(32,141,93,0.28);
+  --av-shadow-soft:   0 18px 50px rgba(23,35,29,0.08);
+  --av-shadow-lift:   0 20px 70px rgba(23,35,29,0.12);
+  --av-shadow-glow:   0 14px 38px rgba(32,141,93,0.16);
+  --av-topbar-bg:     rgba(246,249,247,0.92);
+  --av-page-dot:      rgba(12,24,20,0.075);
+  --av-page-grid:     rgba(12,24,20,0.038);
+  --av-panel-gradient: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.82));
+  --av-subtle-panel-bg: rgba(12,24,20,0.035);
+  --av-subtle-panel-hover: rgba(12,24,20,0.058);
+  --av-hero-panel-bg: #ffffff;
+  --av-hero-compact-bg: #f8faf9;
 }

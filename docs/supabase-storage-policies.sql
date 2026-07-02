@@ -10,6 +10,14 @@
 --
 -- Client upload paths must start with the authenticated user id:
 -- <auth.uid()>/<filename-or-subfolder>
+--
+-- Production note:
+-- - Private document URLs should be issued only after app/backend ownership
+--   checks, either by streaming through the backend or by creating short-lived
+--   signed storage URLs server-side.
+-- - Never expose service-role keys in frontend code.
+-- - Dashboard bucket state and these policies must be verified with two-user
+--   access tests before production user files are stored.
 
 update storage.buckets
 set public = case

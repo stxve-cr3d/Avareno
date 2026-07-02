@@ -35,14 +35,16 @@ import {
   ShieldCheck,
   Store,
   Thermometer,
+  Trash2,
   UploadCloud,
   Users,
   Volume2,
   Wrench
 } from "lucide-react";
-import { api, isoDate } from "../lib/api";
+import { api, apiResourceUrl, isoDate } from "../lib/api";
+import { getAuthAccessToken } from "../lib/authClient";
 import { productQrUrl } from "../lib/productQr";
-import type { Item, Loop, RepairLog, SmartHomeDevice, SupportDraft } from "../lib/types";
+import type { Document as MemoryDocument, Item, Loop, RepairLog, SmartHomeDevice, SupportDraft } from "../lib/types";
 import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
 import { LoopCard } from "../components/LoopCard";
@@ -65,6 +67,15 @@ type ImageSuggestion = {
 };
 
 type RecommendationTab = "spare" | "buy" | "print" | "check";
+
+type SignedDocumentDownload = {
+  url: string;
+  method: "GET";
+  expiresAt: string;
+  expiresInSeconds: number;
+  fileName: string;
+  mimeType: string;
+};
 
 type ProductRecommendation = {
   id: string;
@@ -102,6 +113,10 @@ export function ItemDetail() {
   const [affiliateUrl, setAffiliateUrl] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [documentType, setDocumentType] = useState<(typeof documentTypes)[number]>("MANUAL");
+  const [reviewDocumentId, setReviewDocumentId] = useState<string | null>(null);
+  const [reviewText, setReviewText] = useState("");
+  const [reviewJsonText, setReviewJsonText] = useState("");
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const [repairDraft, setRepairDraft] = useState({
     date: new Date().toISOString().slice(0, 10),
     problem: "",
@@ -134,6 +149,12 @@ export function ItemDetail() {
   useEffect(() => {
     void load();
   }, [id]);
+
+  useEffect(() => {
+    if (!reviewDocumentId || !item?.documents?.some((document) => document.id === reviewDocumentId)) {
+      setReviewDocumentId(null);
+    }
+  }, [item?.documents, reviewDocumentId]);
 
   useEffect(() => {
     if (!item || item.imageUrl) return;
@@ -190,6 +211,82 @@ export function ItemDetail() {
       await api("/api/documents/upload", { method: "POST", body: data });
       setDocumentFile(null);
       setDetailMessage(`${documentType.toLowerCase()} hochgeladen`);
+      await load();
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function deletePassportDocument(documentId: string) {
+    if (!item) return;
+    setBusy(`document-delete-${documentId}`);
+    try {
+      await api(`/api/documents/${documentId}`, { method: "DELETE" });
+      setDetailMessage("Dokument gelöscht");
+      await load();
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function openPassportDocument(document: MemoryDocument) {
+    setBusy(`document-open-${document.id}`);
+    try {
+      const signedDownload = await api<SignedDocumentDownload>(`/api/documents/${encodeURIComponent(document.id)}/signed-download`, { method: "POST" });
+      await openPrivateDocument(signedDownload.url, signedDownload.fileName || document.fileName);
+    } catch (error) {
+      setDetailMessage(error instanceof Error ? error.message : "Dokument konnte nicht geöffnet werden");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function openDocumentReview(document: MemoryDocument) {
+    setReviewDocumentId(document.id);
+    setReviewText(document.extractedText ?? "");
+    setReviewJsonText(formatExtractedJson(document.extractedJson));
+    setReviewError(null);
+  }
+
+  async function saveDocumentReview() {
+    if (!reviewDocumentId) return;
+    let extractedJson: Record<string, unknown> | null = null;
+    try {
+      extractedJson = parseExtractedJson(reviewJsonText);
+    } catch {
+      setReviewError("JSON ist nicht gültig. Bitte korrigiere die Struktur oder leere das Feld.");
+      return;
+    }
+
+    setBusy(`document-review-${reviewDocumentId}`);
+    setReviewError(null);
+    try {
+      await api(`/api/documents/${reviewDocumentId}/extracted-data`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          extractedText: reviewText.trim() || null,
+          extractedJson
+        })
+      });
+      setDetailMessage("KI-Extraktion korrigiert");
+      await load();
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function clearDocumentExtraction() {
+    if (!reviewDocumentId) return;
+    setBusy(`document-review-clear-${reviewDocumentId}`);
+    setReviewError(null);
+    try {
+      await api("/api/privacy/ai-data/delete", {
+        method: "POST",
+        body: JSON.stringify({ documentId: reviewDocumentId })
+      });
+      setReviewText("");
+      setReviewJsonText("");
+      setDetailMessage("KI-Extraktion gelöscht");
       await load();
     } finally {
       setBusy("");
@@ -338,6 +435,7 @@ export function ItemDetail() {
 
   const warranty = warrantyState(item.warrantyUntil);
   const documents = item.documents ?? [];
+  const reviewDocument = documents.find((document) => document.id === reviewDocumentId) ?? null;
   const loops = item.loops ?? [];
   const repairLogs = item.repairLogs ?? [];
   const missing = item.missingFields ?? [];
@@ -552,7 +650,7 @@ export function ItemDetail() {
                   Dokument hinzufügen
                   <span className="mt-2 flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line bg-[#f8faf9] px-3 text-sm font-black text-muted transition hover:border-leaf hover:bg-leaf/5">
                     <UploadCloud className="shrink-0 text-leaf" size={18} />
-                    <span className="min-w-0 truncate">{documentFile ? documentFile.name : "Datumi wählen"}</span>
+                    <span className="min-w-0 truncate">{documentFile ? documentFile.name : "Datei wählen"}</span>
                     <input
                       className="hidden"
                       type="file"
@@ -583,25 +681,110 @@ export function ItemDetail() {
             <div className="mt-5 grid gap-3">
               {documents.length ? (
                 documents.map((document) => (
-                  <a
+                  <div
                     className="group flex items-center gap-3 rounded-lg border border-line bg-white p-3 text-sm font-bold text-ink transition hover:border-leaf hover:bg-leaf/5"
                     key={document.id}
-                    href={document.filePath}
                   >
-                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-[#eef2f0] text-leaf">
+                    <button
+                      className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-[#eef2f0] text-leaf"
+                      disabled={busy === `document-open-${document.id}`}
+                      onClick={() => void openPassportDocument(document)}
+                      type="button"
+                      aria-label={`${document.fileName} öffnen`}
+                    >
                       <ReceiptText size={19} />
-                    </span>
+                    </button>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{document.fileName}</span>
                       <span className="mt-1 block text-xs font-black uppercase text-muted">{document.type}</span>
                     </span>
-                    <span className="text-xs font-black text-leaf opacity-0 transition group-hover:opacity-100">Öffnen</span>
-                  </a>
+                    <button
+                      className="text-xs font-black text-leaf opacity-0 transition group-hover:opacity-100 disabled:opacity-45"
+                      disabled={busy === `document-open-${document.id}`}
+                      onClick={() => void openPassportDocument(document)}
+                      type="button"
+                    >
+                      Öffnen
+                    </button>
+                    <button
+                      className="rounded-md border border-line px-3 py-2 text-xs font-black text-ink transition hover:border-leaf hover:text-leaf"
+                      onClick={() => openDocumentReview(document)}
+                      type="button"
+                    >
+                      Prüfen
+                    </button>
+                    <button
+                      className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-red-200/70 text-red-600 transition hover:bg-red-50 disabled:opacity-45"
+                      disabled={busy === `document-delete-${document.id}`}
+                      onClick={() => void deletePassportDocument(document.id)}
+                      type="button"
+                      aria-label={`${document.fileName} löschen`}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 ))
               ) : (
                 <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">Noch kein Beleg oder Handbuch verbunden.</div>
               )}
             </div>
+            {reviewDocument ? (
+              <div className="mt-4 rounded-lg border border-line bg-white p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <span className="text-[0.68rem] font-black uppercase tracking-[0.08em] text-muted">KI-Extraktion prüfen</span>
+                    <h3 className="mt-1 text-base font-black text-ink">{reviewDocument.fileName}</h3>
+                    <p className="mt-1 text-sm font-semibold leading-6 text-muted">Korrigiere nur die gespeicherten Extraktionsdaten. Die Originaldatei bleibt unverändert.</p>
+                  </div>
+                  <button
+                    className="rounded-md border border-line px-3 py-2 text-xs font-black text-muted transition hover:border-leaf hover:text-leaf"
+                    onClick={() => setReviewDocumentId(null)}
+                    type="button"
+                  >
+                    Schließen
+                  </button>
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <label className="text-sm font-bold text-ink">
+                    Extrahierter Text
+                    <textarea
+                      className="mt-2 min-h-36 w-full resize-y rounded-lg border border-line bg-[#f8faf9] p-3 text-sm font-semibold leading-6 text-ink outline-none focus:border-leaf"
+                      onChange={(event) => setReviewText(event.target.value)}
+                      placeholder="Noch keine gespeicherte Textextraktion."
+                      value={reviewText}
+                    />
+                  </label>
+                  <label className="text-sm font-bold text-ink">
+                    Strukturierte Daten
+                    <textarea
+                      className="mt-2 min-h-36 w-full resize-y rounded-lg border border-line bg-[#f8faf9] p-3 font-mono text-xs leading-5 text-ink outline-none focus:border-leaf"
+                      onChange={(event) => setReviewJsonText(event.target.value)}
+                      placeholder='{"merchant":"...","warrantyUntil":"..."}'
+                      value={reviewJsonText}
+                    />
+                  </label>
+                </div>
+                {reviewError ? <p className="mt-3 text-sm font-bold text-red-600">{reviewError}</p> : null}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button
+                    disabled={busy === `document-review-${reviewDocument.id}`}
+                    icon={<Save size={18} />}
+                    onClick={() => void saveDocumentReview()}
+                    type="button"
+                  >
+                    {busy === `document-review-${reviewDocument.id}` ? "Speichert..." : "Korrektur speichern"}
+                  </Button>
+                  <button
+                    className="rounded-md border border-red-200/80 px-4 py-2 text-sm font-black text-red-600 transition hover:bg-red-50 disabled:opacity-45"
+                    disabled={busy === `document-review-clear-${reviewDocument.id}`}
+                    onClick={() => void clearDocumentExtraction()}
+                    type="button"
+                  >
+                    {busy === `document-review-clear-${reviewDocument.id}` ? "Löscht..." : "Extraktion löschen"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </section>
 
           <section className="object-panel rounded-lg p-4 md:p-5">
@@ -1326,6 +1509,7 @@ function productRecommendationsFor(item: Item): ProductRecommendation[] {
 }
 
 function SupportAttachmentLine({ attachment }: { attachment: { fileName: string; filePath?: string | null; type: string } }) {
+  const [opening, setOpening] = useState(false);
   const content = (
     <>
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-[#eef2f0] text-leaf">
@@ -1343,10 +1527,25 @@ function SupportAttachmentLine({ attachment }: { attachment: { fileName: string;
     return <div className="flex min-h-12 items-center gap-3 rounded-lg border border-line bg-white p-2">{content}</div>;
   }
 
+  async function openAttachment() {
+    if (!attachment.filePath) return;
+    setOpening(true);
+    try {
+      await openPrivateDocument(attachment.filePath, attachment.fileName);
+    } finally {
+      setOpening(false);
+    }
+  }
+
   return (
-    <a className="flex min-h-12 items-center gap-3 rounded-lg border border-line bg-white p-2 transition hover:border-leaf hover:bg-leaf/5" href={attachment.filePath}>
+    <button
+      className="flex min-h-12 w-full items-center gap-3 rounded-lg border border-line bg-white p-2 text-left transition hover:border-leaf hover:bg-leaf/5 disabled:opacity-50"
+      disabled={opening}
+      onClick={() => void openAttachment()}
+      type="button"
+    >
       {content}
-    </a>
+    </button>
   );
 }
 
@@ -1497,6 +1696,49 @@ function DetailRow({ icon, label, value }: { icon: ReactNode; label: string; val
       <span className="min-w-0 break-words text-base font-black text-ink">{value}</span>
     </div>
   );
+}
+
+function formatExtractedJson(value?: string | null) {
+  if (!value) return "";
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
+}
+
+function parseExtractedJson(value: string): Record<string, unknown> | null {
+  if (!value.trim()) return null;
+  const parsed = JSON.parse(value) as unknown;
+  if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+    throw new Error("Expected a JSON object");
+  }
+  return parsed as Record<string, unknown>;
+}
+
+async function openPrivateDocument(path: string, fileName: string) {
+  const headers = new Headers();
+  const token = await getAuthAccessToken();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(apiResourceUrl(path), { headers });
+  if (!response.ok) {
+    throw new Error("Document download failed");
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.target = "_blank";
+  anchor.rel = "noopener noreferrer";
+  if (!blob.type.startsWith("image/") && blob.type !== "application/pdf") {
+    anchor.download = fileName;
+  }
+  anchor.click();
+  window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
 }
 
 function warrantyState(value?: string | null): { label: string; tone: "green" | "amber" | "red" | "gray" } {

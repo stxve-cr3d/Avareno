@@ -5,24 +5,24 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#1b1c1c",
-        muted: "#66706d",
-        mist: "#eef2f0",
-        line: "#d9dfdc",
-        leaf: "#34A0A4",
-        moss: "#236B70",
-        sky: "#7DBFC2",
-        coral: "#f06b54",
-        amber: "#d97706",
-        ember: "#dc2626",
-        coal: "#1b1c1c",
-        paper: "#f8faf9",
-        wash: "#eef2f0"
+        ink: "rgb(var(--av-color-ink) / <alpha-value>)",
+        muted: "rgb(var(--av-color-muted) / <alpha-value>)",
+        mist: "rgb(var(--av-color-mist) / <alpha-value>)",
+        line: "rgb(var(--av-color-line) / <alpha-value>)",
+        leaf: "rgb(var(--av-color-leaf) / <alpha-value>)",
+        moss: "rgb(var(--av-color-moss) / <alpha-value>)",
+        sky: "rgb(var(--av-color-sky) / <alpha-value>)",
+        coral: "rgb(var(--av-color-coral) / <alpha-value>)",
+        amber: "rgb(var(--av-color-amber) / <alpha-value>)",
+        ember: "rgb(var(--av-color-ember) / <alpha-value>)",
+        coal: "rgb(var(--av-color-coal) / <alpha-value>)",
+        paper: "rgb(var(--av-color-paper) / <alpha-value>)",
+        wash: "rgb(var(--av-color-wash) / <alpha-value>)"
       },
       boxShadow: {
-        soft: "0 18px 50px rgba(23, 35, 29, 0.08)",
-        lift: "0 20px 70px rgba(52, 160, 164, 0.18)",
-        glow: "0 14px 38px rgba(52, 160, 164, 0.22)"
+        soft: "var(--av-shadow-soft)",
+        lift: "var(--av-shadow-lift)",
+        glow: "var(--av-shadow-glow)"
       }
     }
   },
