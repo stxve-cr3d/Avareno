@@ -8,18 +8,18 @@ import { CommandPalette } from "./CommandPalette";
 const nav = [
   { to: "/app", label: "Zuhause", icon: Home },
   { to: "/app/dinge", label: "Objekte", icon: Archive, activePaths: ["/app/dinge", "/app/items"] },
-  { to: "/app/resolve", label: "Resolve", icon: LifeBuoy },
-  { to: "/app/care", label: "Care", icon: PenLine },
-  { to: "/app/profile", label: "Ich", icon: UserRound, activePaths: ["/app/profile", "/app/ich", "/app/rewards", "/app/friends", "/app/settings"] }
+  { to: "/app/resolve", label: "Offene Punkte", icon: LifeBuoy },
+  { to: "/app/care", label: "Erinnerungen", icon: PenLine },
+  { to: "/app/profile", label: "Profil", icon: UserRound, activePaths: ["/app/profile", "/app/ich", "/app/rewards", "/app/friends", "/app/settings"] }
 ];
 
 const captureOptions = [
   { label: "Smart erfassen", helper: "Ein Flow für Foto, Beleg, Text und Barcode", to: "/app/capture", icon: Plus },
-  { label: "Beleg", helper: "Nachweis, Garantie und Produktkarte", to: "/app/capture/receipt", icon: ReceiptText },
-  { label: "Objekt", helper: "Produktpass für ein echtes Objekt starten", to: "/app/capture/item", icon: Package },
-  { label: "Nachricht", helper: "Kontext in Erinnerung verwandeln", to: "/app/capture/message", icon: MessageSquareText },
-  { label: "Dokument", helper: "Speichern und später verbinden", to: "/app/capture/receipt", icon: FileText },
-  { label: "Care", helper: "Garantie, Reparatur, Service, Rückgabe", to: "/app/care", icon: PenLine }
+  { label: "Objekt", helper: "Produkt oder Gerät als Objektprofil anlegen", to: "/app/capture/item", icon: Package },
+  { label: "Beleg", helper: "Kaufbeleg speichern und mit einem Objekt verbinden", to: "/app/capture/receipt", icon: ReceiptText },
+  { label: "Dokument", helper: "Anleitung, Garantie oder Vertrag hochladen", to: "/app/capture/receipt", icon: FileText },
+  { label: "Erinnerung", helper: "Service, Frist oder Rückgabe festhalten", to: "/app/capture/loop", icon: PenLine },
+  { label: "Nachricht", helper: "Notiz in eine Erinnerung verwandeln", to: "/app/capture/message", icon: MessageSquareText }
 ];
 
 export function AppShell() {
@@ -302,8 +302,8 @@ export function AppShell() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-black uppercase text-muted">Erfassen</p>
-                <h2 id="capture-modal-title" className="mt-1 text-3xl font-black text-ink">Etwas Echtes hinzufügen.</h2>
-                <p className="mt-2 max-w-lg text-sm font-semibold leading-6 text-muted">Wähle eine Quelle. Avareno macht daraus ein Objekt, einen Nachweis oder eine Care-Erinnerung.</p>
+                <h2 id="capture-modal-title" className="mt-1 text-3xl font-black text-ink">Was möchtest du erfassen?</h2>
+                <p className="mt-2 max-w-lg text-sm font-semibold leading-6 text-muted">Wähle eine Art. Details kannst du danach in Ruhe ergänzen.</p>
               </div>
               <button className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted hover:bg-wash hover:text-ink" onClick={() => setOpen(false)} type="button" aria-label="Schließen">
                 <X size={18} />

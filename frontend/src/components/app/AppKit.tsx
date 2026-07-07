@@ -546,7 +546,7 @@ export function ObjectMemoryMap({ nodes }: { nodes: ObjectMemoryMapNode[] }) {
 
   return (
     <div className="av-mm-wrap">
-      <p className="av-mm-label">Memory Build</p>
+      <p className="av-mm-label">Objektprofil</p>
       <div className="av-mm-stage">
         <svg className="av-mm-lines" viewBox="0 0 384 270" preserveAspectRatio="none" aria-hidden="true">
           <path d="M 192 115 C 192 158 86 158 86 196" fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="1.2" strokeDasharray="4 5" />
@@ -600,32 +600,32 @@ export function ObjectMemoryMap({ nodes }: { nodes: ObjectMemoryMapNode[] }) {
   );
 }
 
-export function defaultMemoryMapNodes(primaryName = "LG OLED C3"): ObjectMemoryMapNode[] {
+export function defaultMemoryMapNodes(primaryName = "E-Bike"): ObjectMemoryMapNode[] {
   return [
     {
       product: primaryName,
-      category: "TV · Media",
+      category: "Mobilität",
       type: "warranty",
       progress: 74,
       chips: [
         { tone: "ok", label: "Beleg gespeichert", icon: <FileText size={9} /> },
-        { tone: "warn", label: "Garantie 45 Tage", icon: <ShieldCheck size={9} /> },
+        { tone: "warn", label: "Service in 32 Tagen", icon: <ShieldCheck size={9} /> },
         { tone: "care", label: "1 offen", icon: <BellRing size={9} /> }
       ]
     },
     {
-      product: "Sony WH-1000XM5",
-      category: "Audio",
+      product: "Espressomaschine",
+      category: "Küche",
       type: "invoice",
       progress: 38,
       chips: [{ tone: "danger", label: "Beleg fehlt", icon: <FileText size={9} /> }]
     },
     {
-      product: "Bambu Lab X1C",
-      category: "Werkstatt",
+      product: "Kinderwagen",
+      category: "Familie",
       type: "care",
       progress: 62,
-      chips: [{ tone: "care", label: "Care offen", icon: <BellRing size={9} /> }]
+      chips: [{ tone: "care", label: "Erinnerung offen", icon: <BellRing size={9} /> }]
     }
   ];
 }

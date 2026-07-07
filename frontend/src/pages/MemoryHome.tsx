@@ -2,19 +2,14 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
-  ArrowRight,
   BellRing,
   FileText,
-  Home,
-  Monitor,
   Package,
-  PlugZap,
   Plus,
   ReceiptText,
   Router,
   ScanLine,
   ShieldCheck,
-  Sparkles,
   Wrench
 } from "lucide-react";
 import { api } from "../lib/api";
@@ -25,32 +20,12 @@ import {
   ConsoleSkeleton,
   ObjectMemoryCard,
   QuickActionCard,
-  SecondaryAction
+  SecondaryAction,
+  StatusSummaryCard
 } from "../components/app/AppKit";
 
 type LoadStatus = "loading" | "ready" | "error";
-type NodeTone = "accent" | "warn";
-type GraphNode = { title: string; sub: string; icon: ReactNode; tone: NodeTone };
 type ConnectionCounts = { devices: number; providers: number };
-
-/* Fixed anchor slots (percent of the graph box) — three per side, flanking the core. */
-const SLOTS = [
-  { x: 22, y: 18 },
-  { x: 16, y: 50 },
-  { x: 22, y: 82 },
-  { x: 78, y: 18 },
-  { x: 84, y: 50 },
-  { x: 78, y: 82 }
-];
-
-const EXAMPLE_NODES: GraphNode[] = [
-  { title: "MacBook Pro", sub: "Arbeitszimmer", icon: <Monitor size={15} />, tone: "accent" },
-  { title: "Waschmaschine", sub: "Keller", icon: <Home size={15} />, tone: "accent" },
-  { title: "Care · Filter", sub: "fällig in 12 Tagen", icon: <Wrench size={15} />, tone: "accent" },
-  { title: "Beleg · MediaMarkt", sub: "Nachweis gesichert", icon: <ReceiptText size={15} />, tone: "accent" },
-  { title: "Garantie", sub: "endet in 45 Tagen", icon: <ShieldCheck size={15} />, tone: "warn" },
-  { title: "SmartThings", sub: "verbunden", icon: <PlugZap size={15} />, tone: "accent" }
-];
 
 export function MemoryHome() {
   const [items, setItems] = useState<Item[]>([]);
@@ -92,159 +67,120 @@ export function MemoryHome() {
   }
 
   const hasItems = items.length > 0;
-  const heroNodes = hasItems ? itemsToNodes(items) : EXAMPLE_NODES;
   const attention = buildAttention(items);
   const recents = items.slice(0, 3);
+  const receiptCount = items.reduce((sum, item) => sum + (item.documents?.length ?? 0), 0);
+  const reminderCount = items.reduce((sum, item) => sum + (item.loops?.length ?? 0), 0);
+  const openCount = items.reduce((sum, item) => sum + openPointsOf(item), 0);
 
   return (
     <main className="av-console mem-home">
-      <MemoryGraphHero hasItems={hasItems} nodes={heroNodes} />
+      <header className="mem-home-head">
+        <div className="mem-home-head-copy">
+          <span className="av-page-kicker">Privater Speicher</span>
+          <h1 className="av-page-title">Zuhause</h1>
+          <p className="av-page-sub">Alles, was zu deinen Dingen gehört, an einem Ort.</p>
+        </div>
+        <div className="mem-home-head-actions">
+          <ActionButton to="/app/capture" icon={<Plus size={15} />}>
+            Erfassen
+          </ActionButton>
+        </div>
+      </header>
+
+      <QuickCapture firstRun={!hasItems} />
+
+      <section className="av-console-section">
+        <div className="av-console-section-head">
+          <div>
+            <span>Heute</span>
+            <h2>Braucht Aufmerksamkeit</h2>
+          </div>
+          <Link to="/app/resolve">Alle offenen Punkte</Link>
+        </div>
+        {attention.length ? (
+          <div className="av-attention-list">
+            {attention.map((entry, index) => (
+              <AttentionRow key={`${entry.tone}-${entry.to}`} {...entry} primary={index === 0} />
+            ))}
+          </div>
+        ) : (
+          <div className="av-empty">
+            <p className="av-empty-title">Alles ruhig.</p>
+            <div className="av-empty-body">Wenn etwas fehlt, abläuft oder Aufmerksamkeit braucht, erscheint es hier.</div>
+          </div>
+        )}
+      </section>
+
+      <section className="av-console-section">
+        <div className="av-console-section-head">
+          <div>
+            <span>Dein Speicher</span>
+            <h2>Zuletzt hinzugefügt</h2>
+          </div>
+          {hasItems ? <Link to="/app/dinge">Alle Objekte</Link> : null}
+        </div>
+        {hasItems ? (
+          <div className="av-things-grid">
+            {recents.map((item) => (
+              <ObjectMemoryCard
+                key={item.id}
+                to={`/app/dinge/${item.id}`}
+                category={item.category || itemTypeLabel(item.itemType)}
+                name={displayName(item.name)}
+                icon={<Package size={14} />}
+                completeness={item.completenessScore ?? 0}
+                invoicePresent={hasReceipt(item)}
+                warranty={warrantyShort(item)}
+                openPoints={openPointsOf(item)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="av-empty">
+            <p className="av-empty-title">Noch nichts gespeichert.</p>
+            <div className="av-empty-body">Füge dein erstes Objekt oder einen Beleg hinzu.</div>
+            <div className="av-empty-actions">
+              <SecondaryAction to="/app/capture/item">Objekt hinzufügen</SecondaryAction>
+            </div>
+          </div>
+        )}
+      </section>
 
       {hasItems ? (
-        <>
-          <section className="av-console-section">
-            <div className="av-console-section-head">
-              <div>
-                <span>Heute</span>
-                <h2>Heute wichtig</h2>
-              </div>
-              <Link to="/app/care">Care öffnen</Link>
+        <section className="av-console-section">
+          <div className="av-console-section-head">
+            <div>
+              <span>Überblick</span>
+              <h2>Deine Übersicht</h2>
             </div>
-            {attention.length ? (
-              <div className="av-attention-list">
-                {attention.map((entry, index) => (
-                  <AttentionRow key={entry.title + entry.to} {...entry} primary={index === 0} />
-                ))}
-              </div>
-            ) : (
-              <div className="av-empty">
-                <p className="av-empty-title">Alles ruhig</p>
-                <div className="av-empty-body">Neue Fristen, fehlende Belege und offene Care-Punkte erscheinen hier automatisch.</div>
-              </div>
-            )}
-          </section>
-
-          <section className="av-console-section">
-            <div className="av-console-section-head">
-              <div>
-                <span>Objektgedächtnis</span>
-                <h2>Zuletzt gesichert</h2>
-              </div>
-              <Link to="/app/dinge">Alle Objekte</Link>
-            </div>
-            <div className="av-things-grid">
-              {recents.map((item) => (
-                <ObjectMemoryCard
-                  key={item.id}
-                  to={`/app/dinge/${item.id}`}
-                  category={item.category || itemTypeLabel(item.itemType)}
-                  name={displayName(item.name)}
-                  icon={<Package size={14} />}
-                  completeness={item.completenessScore ?? 0}
-                  invoicePresent={hasReceipt(item)}
-                  warranty={warrantyShort(item)}
-                  openPoints={openPointsOf(item)}
-                />
-              ))}
-            </div>
-          </section>
-
-          {connections ? (
-            <section className="av-console-section">
-              <div className="av-console-section-head">
-                <div>
-                  <span>Zuhause</span>
-                  <h2>Verbunden</h2>
-                </div>
-              </div>
-              <QuickActionCard
-                to="/app/smart-home"
-                icon={<Router size={16} />}
-                title="Geräte & Quellen"
-                body={`${connections.devices} ${connections.devices === 1 ? "Gerät" : "Geräte"} · ${connections.providers} ${connections.providers === 1 ? "Quelle" : "Quellen"} verbunden`}
-              />
-            </section>
-          ) : null}
-
-          <QuickCapture />
-        </>
-      ) : (
-        <QuickCapture firstRun />
-      )}
-    </main>
-  );
-}
-
-function MemoryGraphHero({ hasItems, nodes }: { hasItems: boolean; nodes: GraphNode[] }) {
-  return (
-    <section className="mem-hero">
-      <div className="mem-hero-copy">
-        <span className="mem-hero-eyebrow">Privater Speicher</span>
-        <h1 className="mem-hero-title">Dein privates Gedächtnis für alles, was zählt.</h1>
-        <p className="mem-hero-sub">
-          Produkte, Belege, Garantien, Dokumente und Geräte — an einem ruhigen, privaten Ort verbunden.
-        </p>
-        <div className="mem-hero-actions">
-          <ActionButton to="/app/capture/item" icon={<Plus size={15} />}>
-            Erstes Objekt erfassen
-          </ActionButton>
-          <SecondaryAction to="/app/dinge" icon={<ArrowRight size={15} />}>
-            {hasItems ? "Alle Objekte ansehen" : "Beispiel-Gedächtnis ansehen"}
-          </SecondaryAction>
-        </div>
-        <p className="mem-hero-trust">
-          <ShieldCheck size={14} /> Privat als Standard · Export jederzeit · keine Werbung
-        </p>
-      </div>
-
-      <MemoryGraph isExample={!hasItems} nodes={nodes} />
-    </section>
-  );
-}
-
-function MemoryGraph({ isExample, nodes }: { isExample: boolean; nodes: GraphNode[] }) {
-  const shown = nodes.slice(0, 6);
-  return (
-    <div className="mem-graph" aria-hidden="true">
-      {isExample ? <span className="mem-graph-tag">Beispiel</span> : null}
-      <svg className="mem-graph-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
-        {shown.map((node, index) => {
-          const slot = SLOTS[index];
-          return (
-            <line
-              key={index}
-              className={node.tone === "warn" ? "mem-arc is-warn" : "mem-arc"}
-              x1="50"
-              y1="50"
-              x2={slot.x}
-              y2={slot.y}
-              vectorEffect="non-scaling-stroke"
-              style={{ animationDelay: `${-index * 0.8}s` }}
-            />
-          );
-        })}
-      </svg>
-      <div className="mem-graph-core">
-        <Sparkles size={20} />
-        <small>dein Objektgedächtnis</small>
-      </div>
-      {shown.map((node, index) => {
-        const slot = SLOTS[index];
-        return (
-          <div
-            key={index}
-            className={node.tone === "warn" ? "mem-graph-node is-warn" : "mem-graph-node"}
-            style={{ left: `${slot.x}%`, top: `${slot.y}%`, animationDelay: `${-index * 1.3}s` }}
-          >
-            <span className="mem-node-ic">{node.icon}</span>
-            <span className="mem-node-copy">
-              <strong>{node.title}</strong>
-              <small>{node.sub}</small>
-            </span>
           </div>
-        );
-      })}
-    </div>
+          <div className="mem-overview-grid">
+            <StatusSummaryCard label="Objekte" value={items.length} />
+            <StatusSummaryCard label="Belege & Dokumente" value={receiptCount} tone={receiptCount > 0 ? "neutral" : "warning"} />
+            <StatusSummaryCard label="Erinnerungen" value={reminderCount} />
+            <StatusSummaryCard label="Offene Punkte" value={openCount} tone={openCount > 0 ? "warning" : "success"} />
+          </div>
+        </section>
+      ) : null}
+
+      {connections && hasItems ? (
+        <section className="av-console-section">
+          <div className="av-console-section-head">
+            <div>
+              <span>Zuhause</span>
+              <h2>Verbunden</h2>
+            </div>
+          </div>
+          <QuickActionCard
+            to="/app/smart-home"
+            icon={<Router size={16} />}
+            title="Geräte & Quellen"
+            body={`${connections.devices} ${connections.devices === 1 ? "Gerät" : "Geräte"} · ${connections.providers} ${connections.providers === 1 ? "Quelle" : "Quellen"} verbunden`}
+          />
+        </section>
+      ) : null}
+    </main>
   );
 }
 
@@ -258,10 +194,10 @@ function QuickCapture({ firstRun = false }: { firstRun?: boolean }) {
         </div>
       </div>
       <div className="av-quick-action-grid">
-        <QuickActionCard primary to="/app/capture/item" icon={<Package size={16} />} title="Objekt hinzufügen" body="Produkt mit Beleg, Garantie und Care-Kontext starten." />
-        <QuickActionCard to="/app/capture/receipt" icon={<ScanLine size={16} />} title="Beleg scannen" body="Nachweis speichern und mit einem Objekt verbinden." />
-        <QuickActionCard to="/app/reports/home-binder" icon={<FileText size={16} />} title="Dokument hochladen" body="Anleitung, Vertrag oder wichtiges PDF ablegen." />
-        <QuickActionCard to="/app/capture/loop" icon={<BellRing size={16} />} title="Erinnerung anlegen" body="Frist, Rückgabe oder offenen Punkt festhalten." />
+        <QuickActionCard primary to="/app/capture/item" icon={<Package size={16} />} title="Objekt hinzufügen" body="Produkt oder Gerät mit Beleg und Garantie speichern." />
+        <QuickActionCard to="/app/capture/receipt" icon={<ScanLine size={16} />} title="Beleg scannen" body="Kaufbeleg speichern und mit einem Objekt verbinden." />
+        <QuickActionCard to="/app/reports/home-binder" icon={<FileText size={16} />} title="Dokument hochladen" body="Anleitung, Garantie, Vertrag oder wichtiges PDF ablegen." />
+        <QuickActionCard to="/app/capture/loop" icon={<BellRing size={16} />} title="Erinnerung anlegen" body="Service, Frist oder Rückgabe festhalten." />
       </div>
     </section>
   );
@@ -272,7 +208,7 @@ function MemoryLoadError({ onRetry }: { onRetry: () => void }) {
     <main className="av-console">
       <section className="av-console-section">
         <div className="av-empty">
-          <p className="av-empty-title">Dein Gedächtnis konnte nicht geladen werden</p>
+          <p className="av-empty-title">Dein Speicher konnte nicht geladen werden</p>
           <div className="av-empty-body">Die Verbindung ist gerade nicht erreichbar. Deine Daten sind sicher — versuch es gleich noch einmal.</div>
           <div style={{ marginTop: "1rem", display: "flex", justifyContent: "center" }}>
             <SecondaryAction onClick={onRetry}>Erneut versuchen</SecondaryAction>
@@ -338,7 +274,7 @@ function buildAttention(items: Item[]): AttentionEntry[] {
       to: `/app/dinge/${warrantyItem.id}`,
       tone: "warranty",
       icon: <ShieldCheck size={16} />,
-      label: "Garantie endet bald",
+      label: "Garantie läuft bald ab",
       title: displayName(warrantyItem.name),
       detail: `Garantie läuft in ${days} Tagen ab`,
       signal: `${days} Tage`,
@@ -353,9 +289,9 @@ function buildAttention(items: Item[]): AttentionEntry[] {
       to: `/app/dinge/${noReceipt.id}`,
       tone: "invoice",
       icon: <ReceiptText size={16} />,
-      label: "Nachweis unvollständig",
+      label: "Beleg fehlt",
       title: displayName(noReceipt.name),
-      detail: "Rechnung fehlt noch",
+      detail: "Für dieses Objekt ist noch kein Beleg gespeichert",
       signal: "Beleg fehlt",
       action: "Beleg hinzufügen",
       progress: noReceipt.completenessScore ?? 0
@@ -370,9 +306,9 @@ function buildAttention(items: Item[]): AttentionEntry[] {
       to: `/app/dinge/${openItem.id}`,
       tone: "care",
       icon: <Wrench size={16} />,
-      label: "Care-Punkt offen",
+      label: "Offener Punkt",
       title: displayName(openItem.name),
-      detail: "Offener Care-Punkt",
+      detail: "Ein offener Punkt wartet bei diesem Objekt",
       signal: "Offen",
       action: "Ansehen",
       progress: openItem.completenessScore ?? 0
@@ -380,19 +316,6 @@ function buildAttention(items: Item[]): AttentionEntry[] {
   }
 
   return out;
-}
-
-function itemsToNodes(items: Item[]): GraphNode[] {
-  return items.slice(0, 6).map((item) => {
-    const days = warrantyDaysLeft(item);
-    const soon = days !== null && days >= 0 && days < 60;
-    return {
-      title: displayName(item.name),
-      sub: item.category || item.space?.name || item.location || "Objekt",
-      icon: <Package size={15} />,
-      tone: soon ? "warn" : "accent"
-    };
-  });
 }
 
 function displayName(name: string) {

@@ -33,6 +33,14 @@ def connection() -> sqlite3.Connection:
 
 
 def ensure_runtime_schema(conn: sqlite3.Connection) -> None:
+    # Bootstrap a completely fresh database (e.g. first boot on a new
+    # production volume): the base tables only exist in schema.sql.
+    has_user_table = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'User'"
+    ).fetchone()
+    if not has_user_table and SCHEMA_PATH.exists():
+        conn.executescript(SCHEMA_PATH.read_text())
+
     try:
         columns = {row["name"] for row in conn.execute('PRAGMA table_info("Item")').fetchall()}
     except sqlite3.OperationalError:

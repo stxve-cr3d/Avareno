@@ -10,27 +10,28 @@
   --avareno-font: "Helvetica Neue", "SF Pro Text", Aptos, Inter, "Segoe UI Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --avareno-font-tight: "Helvetica Neue", "SF Pro Display", "Aptos Display", Inter, var(--avareno-font);
 
-  /* Shared app theme tokens. Dark is the default Avareno experience. */
-  --av-bg-base:       #141414;
-  --av-bg-shell:      #191919;
-  --av-bg-page:       #141414;
-  --av-bg-panel:      #1D1D1D;
-  --av-bg-panel-soft: #232323;
+  /* Shared app theme tokens. Dark is the default Avareno experience.
+     Neutral charcoal surfaces (aligned with the public site), green only as accent. */
+  --av-bg-base:       #080A09;
+  --av-bg-shell:      #0C0F0D;
+  --av-bg-page:       #080A09;
+  --av-bg-panel:      #171B18;
+  --av-bg-panel-soft: #1D231F;
   --av-surface-1:     rgba(255,255,255,0.04);
   --av-surface-2:     rgba(255,255,255,0.06);
   --av-surface-3:     rgba(255,255,255,0.09);
-  --av-border-subtle: rgba(255,255,255,0.08);
-  --av-border-medium: rgba(255,255,255,0.14);
+  --av-border-subtle: #242B27;
+  --av-border-medium: #313A34;
   --av-border-accent: rgba(62,207,142,0.24);
   --av-input-bg:      rgba(255,255,255,0.026);
-  --av-input-border:  rgba(255,255,255,0.08);
+  --av-input-border:  #2A332D;
   --av-button-bg:     rgba(255,255,255,0.026);
-  --av-button-text:   #A6A6A2;
+  --av-button-text:   #AEB6B0;
   --av-button-primary-bg: rgba(62,207,142,0.12);
-  --av-button-primary-text: #F5F5F4;
-  --av-text-primary:  #F5F5F4;
-  --av-text-secondary:#A6A6A2;
-  --av-text-muted:    #7A7A76;
+  --av-button-primary-text: #F2F5F3;
+  --av-text-primary:  #F2F5F3;
+  --av-text-secondary:#AEB6B0;
+  --av-text-muted:    #8B938D;
   --av-accent:        #3ECF8E;
   --av-accent-bg:     rgba(62,207,142,0.075);
   --av-warning:       #E8C56E;
@@ -44,18 +45,18 @@
   --av-shadow-soft:   0 18px 50px rgba(0,0,0,0.22);
   --av-shadow-lift:   0 20px 70px rgba(0,0,0,0.24);
   --av-shadow-glow:   0 14px 38px rgba(62,207,142,0.16);
-  --av-topbar-bg:     rgba(11,15,14,0.92);
+  --av-topbar-bg:     rgba(8,10,9,0.92);
   --av-page-dot:      rgba(255,255,255,0.055);
   --av-page-grid:     rgba(255,255,255,0.016);
   --av-panel-gradient: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.018));
   --av-subtle-panel-bg: rgba(255,255,255,0.026);
   --av-subtle-panel-hover: rgba(255,255,255,0.04);
-  --av-hero-panel-bg: #0b1010;
-  --av-hero-compact-bg: #0d1212;
+  --av-hero-panel-bg: #0E1210;
+  --av-hero-compact-bg: #101411;
 
-  --av-color-ink: 245 245 244;
-  --av-color-muted: 122 122 118;
-  --av-color-mist: 35 35 35;
+  --av-color-ink: 242 245 243;
+  --av-color-muted: 139 147 141;
+  --av-color-mist: 29 35 31;
   --av-color-line: 255 255 255;
   --av-color-leaf: 62 207 142;
   --av-color-moss: 62 207 142;
@@ -63,9 +64,9 @@
   --av-color-coral: 239 125 125;
   --av-color-amber: 232 197 110;
   --av-color-ember: 239 125 125;
-  --av-color-coal: 245 245 244;
-  --av-color-paper: 29 29 29;
-  --av-color-wash: 35 35 35;
+  --av-color-coal: 242 245 243;
+  --av-color-paper: 23 27 24;
+  --av-color-wash: 29 35 31;
 
   color: var(--av-text-primary);
   background: var(--av-bg-base);
@@ -28343,5 +28344,68 @@ html[data-theme="light"] .avareno-app-shell {
   .avareno-landing-main .site-final-cta {
     padding-top: 3.4rem;
     padding-bottom: 3.4rem;
+  }
+}
+
+/* App home rework: useful dashboard header, overview tiles, empty-state actions */
+.mem-home-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0 0.25rem;
+}
+
+.mem-home-head-copy {
+  min-width: 0;
+}
+
+.mem-home-head-copy .av-page-title {
+  margin: 0.45rem 0 0;
+}
+
+.mem-home-head-copy .av-page-sub {
+  margin: 0.5rem 0 0;
+  max-width: 34rem;
+}
+
+.mem-home-head-actions {
+  display: flex;
+  gap: 0.6rem;
+  padding-bottom: 0.3rem;
+}
+
+.mem-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.av-empty-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+@media (max-width: 900px) {
+  .mem-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .mem-home-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mem-home-head-actions {
+    padding-bottom: 0;
+  }
+
+  .mem-home-head-actions .av-btn {
+    width: 100%;
+    justify-content: center;
   }
 }
