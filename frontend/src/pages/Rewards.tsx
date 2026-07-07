@@ -893,15 +893,14 @@ function PrivacyCenterPanel({
         </PrivacySection>
 
         <PrivacySection icon={<FileLock2 size={18} />} label="Private Vault" title="Extra Schutz für sensible Dokumente">
-          <p>Vault ist als geschützter Bereich für Identität, Versicherungen, Zahlung, Medizin, Arbeits-, Vertrags- und Rechtsdokumente geplant.</p>
+          <p>Geschützter Bereich für Identität, Versicherungen, Zahlung, Medizin, Arbeits-, Vertrags- und Rechtsdokumente — PIN-gesichert und nie automatisch analysiert.</p>
           <div className="privacy-chip-row">
             {summary.privateVault.sensitiveCategories.slice(0, 7).map((category) => (
               <span key={category}>{formatVaultCategory(category)}</span>
             ))}
           </div>
           <div className="privacy-action-pair">
-            <button className="profile-secondary-action is-muted" disabled type="button">Vault verwalten</button>
-            <button className="profile-secondary-action is-muted" disabled type="button">Re-Auth / PIN TODO</button>
+            <Link className="profile-secondary-action" to="/app/vault">Vault verwalten</Link>
           </div>
         </PrivacySection>
 
@@ -1070,7 +1069,7 @@ function buildPrivacyFallback(displayName: string): PrivacySummary {
     dataOverview: [
       { id: "items", label: "Gespeicherte Objekte", value: 0, status: "TODO", note: `${displayName}s Objekt-Speicher wird geladen, sobald das Backend erreichbar ist.` },
       { id: "documents", label: "Dokumente / Belege", value: 0, status: "TODO", note: "Dokument-Metadaten und Upload-Speicher sind im Exportplan vorgesehen." },
-      { id: "sources", label: "Verbundene Quellen", value: 0, status: "TODO", note: "Connect-Quellen werden erst nach bewusster Verknuepfung angezeigt." },
+      { id: "sources", label: "Verbundene Quellen", value: 0, status: "TODO", note: "Connect-Quellen werden erst nach bewusster Verknüpfung angezeigt." },
       { id: "ai-analysis", label: "KI-Analyse", value: 0, status: "TODO", note: "Analyse bleibt kontrolliert und korrigierbar." },
       { id: "private-vault", label: "Private Vault", value: 0, status: "TODO", note: "Sensible Dokumente werden nicht automatisch analysiert." }
     ],

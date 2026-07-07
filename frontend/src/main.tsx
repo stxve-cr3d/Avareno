@@ -31,6 +31,7 @@ const MemoryHome = lazy(() => import("./pages/MemoryHome").then((m) => ({ defaul
 const HomeGraphConnect = lazy(() => import("./pages/HomeGraphConnect").then((m) => ({ default: m.HomeGraphConnect })));
 const Resolve = lazy(() => import("./pages/Resolve").then((m) => ({ default: m.Resolve })));
 const Care = lazy(() => import("./pages/Care").then((m) => ({ default: m.Care })));
+const VaultPage = lazy(() => import("./pages/VaultPage").then((m) => ({ default: m.VaultPage })));
 const PricingPage = lazy(() => import("./pages/MarketingPages").then((m) => ({ default: m.PricingPage })));
 const CheckoutPage = lazy(() => import("./pages/CheckoutPage").then((m) => ({ default: m.CheckoutPage })));
 const ImpressumPage = lazy(() => import("./pages/MarketingPages").then((m) => ({ default: m.ImpressumPage })));
@@ -131,6 +132,7 @@ const router = createBrowserRouter([
       { path: "app/profile/friends/:friendId", element: <Rewards /> },
       { path: "app/profile/privacy", element: <Rewards /> },
       { path: "app/profile/settings", element: <AccountSettingsPage /> },
+      { path: "app/vault", element: <VaultPage /> },
       { path: "app/ich", element: <Rewards /> },
       { path: "app/ich/friends", element: <Rewards /> },
       { path: "app/ich/friends/:friendId", element: <Rewards /> },

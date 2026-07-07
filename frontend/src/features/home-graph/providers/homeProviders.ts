@@ -17,7 +17,7 @@ export const homeProviders: HomeProvider[] = [
     connectionStatus: "beta",
     supportedDeviceTypes: ["Lampen", "Leuchten", "Schalter", "Sensoren"],
     supportedCapabilities: ["power", "brightness", "color", "colorTemperature", "motion"],
-    description: "Hue-Geraete koennen spaeter als Lampen, Raeume, Szenen und Garantieobjekte in Avareno landen.",
+    description: "Hue-Geräte können später als Lampen, Raeume, Szenen und Garantieobjekte in Avareno landen.",
     userFriendlyLabel: "Licht, Szenen und Hue Bridge"
   },
   {
@@ -36,8 +36,8 @@ export const homeProviders: HomeProvider[] = [
     connectionStatus: "beta",
     supportedDeviceTypes: ["Bridges", "Lampen", "Steckdosen", "Sensoren", "TVs"],
     supportedCapabilities: ["power", "brightness", "temperature", "humidity", "motion", "contact", "battery"],
-    description: "SmartThings kann viele Marken buendeln und ist ein guter erster Cloud-Connector.",
-    userFriendlyLabel: "Viele Samsung- und Matter-Geraete"
+    description: "SmartThings kann viele Marken bündeln und ist ein guter erster Cloud-Connector.",
+    userFriendlyLabel: "Viele Samsung- und Matter-Geräte"
   },
   {
     id: "tuya_smart_life",
@@ -53,10 +53,10 @@ export const homeProviders: HomeProvider[] = [
     supportsOAuth: false,
     supportsApiToken: true,
     connectionStatus: "planned",
-    supportedDeviceTypes: ["Steckdosen", "Lampen", "Sensoren", "Kameras", "Kleingeraete"],
+    supportedDeviceTypes: ["Steckdosen", "Lampen", "Sensoren", "Kameras", "Kleingeräte"],
     supportedCapabilities: ["power", "brightness", "color", "temperature", "humidity", "camera", "energy"],
-    description: "Smart-Life-Geraete sollen zuerst sauber erkannt und als Geraetepass gespeichert werden.",
-    userFriendlyLabel: "Smart Life App und Tuya-Geraete"
+    description: "Smart-Life-Geräte sollen zuerst sauber erkannt und als Gerätepass gespeichert werden.",
+    userFriendlyLabel: "Smart Life App und Tuya-Geräte"
   },
   {
     id: "tp_link_tapo",
@@ -74,7 +74,7 @@ export const homeProviders: HomeProvider[] = [
     connectionStatus: "beta",
     supportedDeviceTypes: ["Steckdosen", "Lampen", "Kameras", "Sensoren"],
     supportedCapabilities: ["power", "brightness", "color", "camera", "motion", "energy"],
-    description: "Tapo ist fuer viele Haushalte relevant, aber Steuerung bleibt bis zum Adapter klar als geplant markiert.",
+    description: "Tapo ist für viele Haushalte relevant, aber Steuerung bleibt bis zum Adapter klar als geplant markiert.",
     userFriendlyLabel: "Tapo Steckdosen, Lampen und Kameras"
   },
   {
@@ -93,7 +93,7 @@ export const homeProviders: HomeProvider[] = [
     connectionStatus: "planned",
     supportedDeviceTypes: ["Steckdosen", "Schalter", "Lampen"],
     supportedCapabilities: ["power", "brightness", "energy"],
-    description: "Kasa-Geraete koennen als App-/Provider-Kontext fuer bestehende Steckdosen und Schalter dienen.",
+    description: "Kasa-Geräte können als App-/Provider-Kontext für bestehende Steckdosen und Schalter dienen.",
     userFriendlyLabel: "Kasa Smart Produkte"
   },
   {
@@ -112,7 +112,7 @@ export const homeProviders: HomeProvider[] = [
     connectionStatus: "beta",
     supportedDeviceTypes: ["Relais", "Schalter", "Steckdosen", "Sensoren"],
     supportedCapabilities: ["power", "energy", "temperature", "humidity", "contact"],
-    description: "Shelly ist stark fuer lokale Steuerung und Energie-/Statusdaten.",
+    description: "Shelly ist stark für lokale Steuerung und Energie-/Statusdaten.",
     userFriendlyLabel: "Lokale Schalter, Relais und Energie"
   },
   {
@@ -129,10 +129,10 @@ export const homeProviders: HomeProvider[] = [
     supportsOAuth: false,
     supportsApiToken: true,
     connectionStatus: "planned",
-    supportedDeviceTypes: ["Bots", "Vorhaenge", "Schloesser", "Sensoren", "Hubs"],
+    supportedDeviceTypes: ["Bots", "Vorhänge", "Schlösser", "Sensoren", "Hubs"],
     supportedCapabilities: ["power", "lock", "contact", "temperature", "humidity", "battery"],
-    description: "SwitchBot-Geraete werden als hilfreiche Alltagsgeraete mit Batterie, App und Support-Schritten modelliert.",
-    userFriendlyLabel: "Bots, Vorhaenge, Hubs und Sensoren"
+    description: "SwitchBot-Geräte werden als hilfreiche Alltagsgeräte mit Batterie, App und Support-Schritten modelliert.",
+    userFriendlyLabel: "Bots, Vorhänge, Hubs und Sensoren"
   },
   {
     id: "home_assistant",
@@ -148,10 +148,10 @@ export const homeProviders: HomeProvider[] = [
     supportsOAuth: false,
     supportsApiToken: true,
     connectionStatus: "beta",
-    supportedDeviceTypes: ["Bridge", "Lampen", "Sensoren", "Medien", "Schloesser", "Klima"],
+    supportedDeviceTypes: ["Bridge", "Lampen", "Sensoren", "Medien", "Schlösser", "Klima"],
     supportedCapabilities: ["power", "brightness", "color", "temperature", "humidity", "lock", "scene", "mediaPlayback", "battery"],
-    description: "Home Assistant bleibt die optionale lokale Power-Bridge fuer Haushalte, die bereits viele Systeme buendeln.",
-    userFriendlyLabel: "Lokale Bridge fuer viele Marken"
+    description: "Home Assistant bleibt die optionale lokale Power-Bridge für Haushalte, die bereits viele Systeme bündeln.",
+    userFriendlyLabel: "Lokale Bridge für viele Marken"
   },
   {
     id: "matter",
@@ -167,10 +167,10 @@ export const homeProviders: HomeProvider[] = [
     supportsOAuth: false,
     supportsApiToken: false,
     connectionStatus: "planned",
-    supportedDeviceTypes: ["Matter-Geraete", "Lampen", "Steckdosen", "Sensoren", "Schloesser"],
+    supportedDeviceTypes: ["Matter-Geräte", "Lampen", "Steckdosen", "Sensoren", "Schlösser"],
     supportedCapabilities: ["power", "brightness", "color", "temperature", "lock", "motion", "contact"],
-    description: "Matter ist eine zukuenftige lokale Grundlage, aber braucht Controller-/Pairing-Architektur.",
-    userFriendlyLabel: "Matter-kompatible Geraete"
+    description: "Matter ist eine zukünftige lokale Grundlage, aber braucht Controller-/Pairing-Architektur.",
+    userFriendlyLabel: "Matter-kompatible Geräte"
   },
   {
     id: "apple_home",
@@ -186,9 +186,9 @@ export const homeProviders: HomeProvider[] = [
     supportsOAuth: false,
     supportsApiToken: false,
     connectionStatus: "planned",
-    supportedDeviceTypes: ["HomeKit-Geraete", "Matter-Geraete", "Szenen"],
+    supportedDeviceTypes: ["HomeKit-Geräte", "Matter-Geräte", "Szenen"],
     supportedCapabilities: ["power", "brightness", "color", "lock", "scene", "camera"],
-    description: "Apple Home wird als Nutzer-App erkannt; direkte Steuerung braucht spaetere Plattformklaerung.",
+    description: "Apple Home wird als Nutzer-App erkannt; direkte Steuerung braucht spätere Plattformklärung.",
     userFriendlyLabel: "Apple Home App und HomeKit"
   },
   {
@@ -205,9 +205,9 @@ export const homeProviders: HomeProvider[] = [
     supportsOAuth: true,
     supportsApiToken: false,
     connectionStatus: "planned",
-    supportedDeviceTypes: ["Nest", "Matter-Geraete", "Lautsprecher", "Displays"],
+    supportedDeviceTypes: ["Nest", "Matter-Geräte", "Lautsprecher", "Displays"],
     supportedCapabilities: ["power", "temperature", "camera", "mediaPlayback", "volume", "presence"],
-    description: "Google Home kann spaeter als App-/Oekosystem-Kontext fuer Nest und Matter-Geraete dienen.",
+    description: "Google Home kann später als App-/Ökosystem-Kontext für Nest und Matter-Geräte dienen.",
     userFriendlyLabel: "Nest, Speaker, Displays und Matter"
   },
   {
@@ -224,10 +224,10 @@ export const homeProviders: HomeProvider[] = [
     supportsOAuth: true,
     supportsApiToken: false,
     connectionStatus: "planned",
-    supportedDeviceTypes: ["Echo", "Matter-Geraete", "Szenen", "Lautsprecher"],
+    supportedDeviceTypes: ["Echo", "Matter-Geräte", "Szenen", "Lautsprecher"],
     supportedCapabilities: ["power", "scene", "mediaPlayback", "volume", "presence"],
     description: "Alexa bleibt ein wichtiger App-Kontext, ohne dass Avareno jetzt unsichere Steuerung behauptet.",
-    userFriendlyLabel: "Alexa App und Echo-Geraete"
+    userFriendlyLabel: "Alexa App und Echo-Geräte"
   },
   {
     id: "ikea_home_smart",
@@ -245,7 +245,7 @@ export const homeProviders: HomeProvider[] = [
     connectionStatus: "planned",
     supportedDeviceTypes: ["Lampen", "Rollos", "Luftreiniger", "Schalter"],
     supportedCapabilities: ["power", "brightness", "colorTemperature", "battery", "scene"],
-    description: "IKEA-Geraete werden als Haushaltsteile mit App, Anleitung, Garantie und Raumkontext erfasst.",
+    description: "IKEA-Geräte werden als Haushaltsteile mit App, Anleitung, Garantie und Raumkontext erfasst.",
     userFriendlyLabel: "IKEA Lampen, Rollos und Sensoren"
   },
   {
@@ -262,9 +262,9 @@ export const homeProviders: HomeProvider[] = [
     supportsOAuth: false,
     supportsApiToken: false,
     connectionStatus: "planned",
-    supportedDeviceTypes: ["Router", "Steckdosen", "Thermostate", "DECT-Geraete"],
+    supportedDeviceTypes: ["Router", "Steckdosen", "Thermostate", "DECT-Geräte"],
     supportedCapabilities: ["power", "temperature", "energy", "presence"],
-    description: "FRITZ!Box kann spaeter lokale Heimnetz- und DECT-Smart-Home-Signale liefern.",
+    description: "FRITZ!Box kann später lokale Heimnetz- und DECT-Smart-Home-Signale liefern.",
     userFriendlyLabel: "Router, DECT und Heimnetz"
   },
   {
@@ -283,7 +283,7 @@ export const homeProviders: HomeProvider[] = [
     connectionStatus: "planned",
     supportedDeviceTypes: ["Lautsprecher", "Soundbars", "Subwoofer"],
     supportedCapabilities: ["mediaPlayback", "volume", "presence"],
-    description: "Sonos-Geraete gehoeren in Avareno zu Medienobjekten mit Anleitung, Kaufnachweis und Raumbezug.",
+    description: "Sonos-Geräte gehören in Avareno zu Medienobjekten mit Anleitung, Kaufnachweis und Raumbezug.",
     userFriendlyLabel: "Lautsprecher und Soundbars"
   },
   {
@@ -302,7 +302,7 @@ export const homeProviders: HomeProvider[] = [
     connectionStatus: "planned",
     supportedDeviceTypes: ["Saugroboter", "Wischroboter"],
     supportedCapabilities: ["cleaning", "battery"],
-    description: "Roborock wird als Care-Geraet mit Wartung, Filterwechseln, Garantie und Reinigungsstatus gedacht.",
+    description: "Roborock wird als Care-Gerät mit Wartung, Filterwechseln, Garantie und Reinigungsstatus gedacht.",
     userFriendlyLabel: "Saug- und Wischroboter"
   },
   {
@@ -321,7 +321,7 @@ export const homeProviders: HomeProvider[] = [
     connectionStatus: "planned",
     supportedDeviceTypes: ["Luftreiniger", "Ventilatoren", "Staubsauger"],
     supportedCapabilities: ["power", "temperature", "humidity", "battery"],
-    description: "Dyson-Produkte sind besonders gute Kandidaten fuer Geraetepass, Filter, Garantie und Support.",
+    description: "Dyson-Produkte sind besonders gute Kandidaten für Gerätepass, Filter, Garantie und Support.",
     userFriendlyLabel: "Luftreiniger, Ventilatoren und Pflege"
   },
   {
@@ -340,7 +340,7 @@ export const homeProviders: HomeProvider[] = [
     connectionStatus: "planned",
     supportedDeviceTypes: ["Kameras", "Tuerklingeln", "Sensoren", "HomeBase"],
     supportedCapabilities: ["camera", "motion", "battery", "alarm"],
-    description: "Sicherheitsgeraete werden vor echter Steuerung besonders vorsichtig behandelt.",
+    description: "Sicherheitsgeräte werden vor echter Steuerung besonders vorsichtig behandelt.",
     userFriendlyLabel: "Kameras, Klingeln und HomeBase"
   },
   {
@@ -359,7 +359,7 @@ export const homeProviders: HomeProvider[] = [
     connectionStatus: "planned",
     supportedDeviceTypes: ["Thermostate", "Sensoren", "Controller", "Alarme"],
     supportedCapabilities: ["temperature", "humidity", "motion", "contact", "alarm", "battery"],
-    description: "Bosch Smart Home gehoert in den Home Graph als Care-, Sicherheits- und Raumstatus-System.",
+    description: "Bosch Smart Home gehört in den Home Graph als Care-, Sicherheits- und Raumstatus-System.",
     userFriendlyLabel: "Thermostate, Sensoren und Sicherheit"
   },
   {
@@ -378,7 +378,7 @@ export const homeProviders: HomeProvider[] = [
     connectionStatus: "planned",
     supportedDeviceTypes: ["Thermostate", "Schalter", "Sensoren", "Aktoren"],
     supportedCapabilities: ["power", "temperature", "humidity", "contact", "battery"],
-    description: "Homematic IP ist ein wichtiger deutscher Smart-Home-Kontext fuer Heizung und Sensorik.",
+    description: "Homematic IP ist ein wichtiger deutscher Smart-Home-Kontext für Heizung und Sensorik.",
     userFriendlyLabel: "Heizung, Aktoren und Sensoren"
   },
   {
@@ -395,9 +395,9 @@ export const homeProviders: HomeProvider[] = [
     supportsOAuth: false,
     supportsApiToken: false,
     connectionStatus: "planned",
-    supportedDeviceTypes: ["Hubs", "Sensoren", "Schalter", "Kameras", "Schloesser"],
+    supportedDeviceTypes: ["Hubs", "Sensoren", "Schalter", "Kameras", "Schlösser"],
     supportedCapabilities: ["power", "motion", "contact", "temperature", "humidity", "lock", "camera", "battery"],
-    description: "Aqara-Geraete koennen ueber Hubs, Matter oder spaetere Provider-Adapter in den Home Graph wachsen.",
+    description: "Aqara-Geräte können über Hubs, Matter oder spätere Provider-Adapter in den Home Graph wachsen.",
     userFriendlyLabel: "Hubs, Sensoren, Schalter und Matter"
   }
 ];

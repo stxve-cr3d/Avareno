@@ -17,7 +17,6 @@ import {
   ActionButton,
   ConsoleSkeleton,
   ObjectMemoryCard,
-  ObjectMemoryGraph,
   QuickActionCard,
   SecondaryAction,
   StatusSummaryCard
@@ -72,9 +71,7 @@ export function Items() {
 
   const documentCount = items.reduce((sum, item) => sum + (item.documents?.length ?? 0), 0);
   const openTotal = items.reduce((sum, item) => sum + openPointsOf(item), 0);
-  const incompleteCount = items.filter((item) => (item.completenessScore ?? 0) < 100).length;
   const warrantyRiskCount = items.filter(warrantySoon).length;
-  const completeCount = items.filter((item) => (item.completenessScore ?? 0) >= 100).length;
   const hasItems = items.length > 0;
 
   if (loading) {
@@ -95,12 +92,11 @@ export function Items() {
               Objekt erfassen <Plus size={14} />
             </Link>
           </div>
-          <div className="av-status-grid" aria-label="Objekte status summary">
+          <div className="av-status-grid av-status-grid-4" aria-label="Objekte status summary">
             <StatusSummaryCard label="Objekte" value={items.length} />
             <StatusSummaryCard label="Dokumente" value={documentCount} />
             <StatusSummaryCard label="Offen" value={openTotal} tone={openTotal > 0 ? "warning" : "neutral"} />
             <StatusSummaryCard label="Garantie-Risiken" value={warrantyRiskCount} tone={warrantyRiskCount > 0 ? "warning" : "neutral"} />
-            <StatusSummaryCard label="Vollständig" value={completeCount} tone="success" />
           </div>
         </div>
       </section>
@@ -201,22 +197,10 @@ export function Items() {
 
 function LibraryEmpty() {
   return (
-    <div className="av-empty-rich">
-      <div className="av-empty-visual">
-        <ObjectMemoryGraph
-          title="LG OLED C3"
-          category="TV / Media · Beispiel"
-          icon={<Monitor size={14} />}
-          edges={[
-            { tone: "green", label: "Beleg gespeichert" },
-            { tone: "amber", label: "Garantie endet in 45 Tagen" },
-            { tone: "teal", label: "Erinnerung öffnen" }
-          ]}
-        />
-      </div>
+    <div className="av-empty-rich av-empty-start">
       <div className="av-empty-copy">
         <h3>Noch keine Objekte gespeichert</h3>
-        <p>Füge dein erstes Objekt hinzu und Avareno merkt sich Beleg, Garantie und offene Punkte.</p>
+        <p>Füge dein erstes echtes Objekt hinzu. Danach kannst du Belege, Garantie, Dokumente, Smart-Home-Verknüpfungen und offene Punkte an einem Ort verwalten.</p>
         <div className="av-empty-actions">
           <ActionButton to="/app/capture/item" icon={<Plus size={15} />}>Objekt erfassen</ActionButton>
           <SecondaryAction to="/app/capture/receipt" icon={<ScanLine size={15} />}>Rechnung scannen</SecondaryAction>

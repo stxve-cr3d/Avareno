@@ -27,7 +27,7 @@ def search(q: str = Query("", min_length=0)) -> dict:
 
         items = rows_to_dicts(conn.execute('SELECT * FROM "Item" WHERE userId = ?', (user["id"],)).fetchall())
         for item in items:
-            docs = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ?', (item["id"],)).fetchall())
+            docs = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ? AND vaultId IS NULL', (item["id"],)).fetchall())
             if _contains(
                 [
                     item.get("name"),
@@ -51,7 +51,7 @@ def search(q: str = Query("", min_length=0)) -> dict:
                         "subtitle": f"{item.get('category') or 'Objekt'} - {item.get('model') or 'ohne Model'}",
                         "meta": f"{item.get('completenessScore', 0)}% komplett",
                         "route": f"/items/{item['id']}",
-                        "status": " - ".join(fields[:2]) if fields else "vollstaendig",
+                        "status": " - ".join(fields[:2]) if fields else "vollständig",
                     }
                 )
 
@@ -71,7 +71,7 @@ def search(q: str = Query("", min_length=0)) -> dict:
                     }
                 )
 
-        docs = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE userId = ?', (user["id"],)).fetchall())
+        docs = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE userId = ? AND vaultId IS NULL', (user["id"],)).fetchall())
         for document in docs:
             if _contains([document.get("fileName"), document.get("type"), document.get("extractedText")], query):
                 route = f"/items/{document['itemId']}" if document.get("itemId") else "/items"

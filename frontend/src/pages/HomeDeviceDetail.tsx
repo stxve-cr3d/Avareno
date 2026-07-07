@@ -2,17 +2,29 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
+  ArrowDown,
   ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   BookOpen,
   CheckCircle2,
+  CornerDownLeft,
   Clock3,
+  FastForward,
   FileText,
+  Gamepad2,
   Home,
   Link2,
+  ListVideo,
+  Menu,
+  Pause,
+  Play,
   Power,
   RadioTower,
+  Rewind,
   RefreshCw,
   ShieldCheck,
+  Square,
   Tv,
   Volume2,
   VolumeX,
@@ -76,8 +88,13 @@ export type HomeDeviceResolveTopic = {
 
 type DetailStatus = "loading" | "ready" | "error";
 type TvCommand = "power_on" | "power_off" | "volume_up" | "volume_down" | "mute_toggle" | "source_menu";
-type DetailBusy = TvCommand | "link" | null;
-type OpenControl = "volume" | "source" | "moment" | null;
+type RemoteKey =
+  | "KEY_UP" | "KEY_DOWN" | "KEY_LEFT" | "KEY_RIGHT" | "KEY_ENTER" | "KEY_RETURN"
+  | "KEY_HOME" | "KEY_MENU" | "KEY_GUIDE" | "KEY_INFO"
+  | "KEY_CHUP" | "KEY_CHDOWN"
+  | "KEY_PLAY" | "KEY_PAUSE" | "KEY_STOP" | "KEY_REWIND" | "KEY_FF";
+type DetailBusy = TvCommand | "link" | RemoteKey | null;
+type OpenControl = "volume" | "source" | "remote" | "moment" | null;
 
 export function HomeDeviceDetailPage() {
   const { deviceId } = useParams();
@@ -132,6 +149,22 @@ export function HomeDeviceDetailPage() {
     }
   }
 
+  async function sendRemoteKey(key: RemoteKey) {
+    if (!device) return;
+    setBusyAction(key);
+    setMessage("");
+    try {
+      await api(`/api/smart-home/devices/${device.id}/remote-key`, {
+        method: "POST",
+        body: JSON.stringify({ key })
+      });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Fernbedienung: Taste konnte nicht gesendet werden.");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   async function linkDeviceToItem(itemId: string | null) {
     if (!device) return;
     setBusyAction("link");
@@ -156,7 +189,7 @@ export function HomeDeviceDetailPage() {
     return (
       <main className="hd-page">
         <section className="hd-empty">
-          <span>Home Graph</span>
+          <span>Geräteprofil</span>
           <h1>Gerät nicht erreichbar</h1>
           <p>Die Smart-Home-Verbindung konnte gerade nicht geladen werden. Es werden keine Zugangsdaten im Browser gespeichert.</p>
           <button className="hd-secondary" onClick={() => void load()} type="button">
@@ -171,7 +204,7 @@ export function HomeDeviceDetailPage() {
     return (
       <main className="hd-page">
         <section className="hd-empty">
-          <span>Home Graph</span>
+          <span>Geräteprofil</span>
           <h1>Gerät nicht gefunden</h1>
           <p>Dieses Gerät ist nicht mehr verbunden oder gehört nicht zu deinem aktuellen Avareno-Konto.</p>
           <Link className="hd-secondary" to="/app/smart-home">
@@ -198,7 +231,7 @@ export function HomeDeviceDetailPage() {
 
       <section className="hd-hero">
         <div className="hd-hero-copy">
-          <span className="hd-kicker">Avareno Home Graph</span>
+          <span className="hd-kicker">Avareno Geräteprofil</span>
           <h1>{displayDeviceName(device)}</h1>
           <p>Ein echtes Gerät in deinem Zuhause, verbunden mit App, Raum, Belegen, Garantie und Aktionen.</p>
           <div className="hd-badges">
@@ -256,6 +289,15 @@ export function HomeDeviceDetailPage() {
               status={powerAvailable && isTvLike(device) ? "Verfügbar" : "Nicht verbunden"}
             />
             <ControlRow
+              available={isTvLike(device) && device.provider === "LOCAL_DISCOVERY"}
+              actionLabel="Öffnen"
+              icon={<Gamepad2 size={17} />}
+              label="Fernbedienung"
+              note={isTvLike(device) && device.provider === "LOCAL_DISCOVERY" ? "Navigation, Kanal und Wiedergabe direkt am TV senden" : "Nur für lokal verbundene Fernseher verfügbar"}
+              onAction={() => setOpenControl(openControl === "remote" ? null : "remote")}
+              status={isTvLike(device) && device.provider === "LOCAL_DISCOVERY" ? "Verfügbar" : "Nicht verbunden"}
+            />
+            <ControlRow
               available={powerAvailable && isTvLike(device)}
               actionLabel="Öffnen"
               icon={<Tv size={17} />}
@@ -278,6 +320,7 @@ export function HomeDeviceDetailPage() {
               busyAction={busyAction}
               control={openControl}
               onCommand={(command) => void sendDeviceCommand(command)}
+              onRemoteKey={(key) => void sendRemoteKey(key)}
               powerAvailable={powerAvailable}
             />
           ) : null}
@@ -317,7 +360,7 @@ export function HomeDeviceDetailPage() {
       </section>
 
       <section className="hd-panel hd-graph-panel">
-        <SectionIntro title="Home Graph" subtitle="Alles, was zu diesem Gerät gehört, an einem Ort verbunden." />
+        <SectionIntro title="Geräteprofil" subtitle="Alles, was zu diesem Gerät gehört, an einem Ort verbunden." />
         <HomeGraphVisual device={device} relations={relations} />
       </section>
 
@@ -453,13 +496,84 @@ function ControlDetailPanel({
   busyAction,
   control,
   onCommand,
+  onRemoteKey,
   powerAvailable
 }: {
   busyAction: DetailBusy;
   control: OpenControl;
   onCommand: (command: TvCommand) => void;
+  onRemoteKey: (key: RemoteKey) => void;
   powerAvailable: boolean;
 }) {
+  if (control === "remote") {
+    return (
+      <div className="hd-control-detail">
+        <div>
+          <strong>Fernbedienung</strong>
+          <small>Sendet echte Tasten an den Fernseher. Erfordert eine freigegebene lokale Verbindung.</small>
+        </div>
+        <div className="hd-remote">
+          <div className="hd-remote-dpad">
+            <span />
+            <button disabled={busyAction === "KEY_UP"} onClick={() => onRemoteKey("KEY_UP")} type="button" aria-label="Hoch">
+              <ArrowUp size={16} />
+            </button>
+            <span />
+            <button disabled={busyAction === "KEY_LEFT"} onClick={() => onRemoteKey("KEY_LEFT")} type="button" aria-label="Links">
+              <ArrowLeft size={16} />
+            </button>
+            <button className="is-center" disabled={busyAction === "KEY_ENTER"} onClick={() => onRemoteKey("KEY_ENTER")} type="button">
+              OK
+            </button>
+            <button disabled={busyAction === "KEY_RIGHT"} onClick={() => onRemoteKey("KEY_RIGHT")} type="button" aria-label="Rechts">
+              <ArrowRight size={16} />
+            </button>
+            <span />
+            <button disabled={busyAction === "KEY_DOWN"} onClick={() => onRemoteKey("KEY_DOWN")} type="button" aria-label="Runter">
+              <ArrowDown size={16} />
+            </button>
+            <span />
+          </div>
+          <div className="hd-command-grid">
+            <button disabled={busyAction === "KEY_RETURN"} onClick={() => onRemoteKey("KEY_RETURN")} type="button">
+              <CornerDownLeft size={15} /> Zurück
+            </button>
+            <button disabled={busyAction === "KEY_HOME"} onClick={() => onRemoteKey("KEY_HOME")} type="button">
+              <Home size={15} /> Home
+            </button>
+            <button disabled={busyAction === "KEY_MENU"} onClick={() => onRemoteKey("KEY_MENU")} type="button">
+              <Menu size={15} /> Menü
+            </button>
+            <button disabled={busyAction === "KEY_GUIDE"} onClick={() => onRemoteKey("KEY_GUIDE")} type="button">
+              <ListVideo size={15} /> Guide
+            </button>
+            <button disabled={busyAction === "KEY_CHUP"} onClick={() => onRemoteKey("KEY_CHUP")} type="button">
+              Kanal +
+            </button>
+            <button disabled={busyAction === "KEY_CHDOWN"} onClick={() => onRemoteKey("KEY_CHDOWN")} type="button">
+              Kanal -
+            </button>
+            <button disabled={busyAction === "KEY_PLAY"} onClick={() => onRemoteKey("KEY_PLAY")} type="button">
+              <Play size={15} /> Play
+            </button>
+            <button disabled={busyAction === "KEY_PAUSE"} onClick={() => onRemoteKey("KEY_PAUSE")} type="button">
+              <Pause size={15} /> Pause
+            </button>
+            <button disabled={busyAction === "KEY_STOP"} onClick={() => onRemoteKey("KEY_STOP")} type="button">
+              <Square size={15} /> Stop
+            </button>
+            <button disabled={busyAction === "KEY_REWIND"} onClick={() => onRemoteKey("KEY_REWIND")} type="button">
+              <Rewind size={15} /> Zurückspulen
+            </button>
+            <button disabled={busyAction === "KEY_FF"} onClick={() => onRemoteKey("KEY_FF")} type="button">
+              <FastForward size={15} /> Vorspulen
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (control === "volume") {
     return (
       <div className="hd-control-detail">
@@ -535,12 +649,15 @@ function ProductLinkPanel({
   selectedItemId: string;
   setSelectedItemId: (value: string) => void;
 }) {
+  const [editing, setEditing] = useState(false);
   return (
     <div className="hd-link-panel">
       <div>
         <strong>Produktakte</strong>
         <small>{linkedItem ? `Verbunden mit ${linkedItem.name}` : "Verbinde dieses Gerät mit dem echten Produkt."}</small>
       </div>
+      {editing ? (
+        <>
       <label>
         <span>Produkt auswählen</span>
         <select disabled={busy} onChange={(event) => setSelectedItemId(event.currentTarget.value)} value={selectedItemId}>
@@ -556,19 +673,40 @@ function ProductLinkPanel({
         <button disabled={busy || selectedItemId === (device.itemId ?? "")} onClick={() => onLink(selectedItemId || null)} type="button">
           {busy ? "Speichern..." : "Speichern"}
         </button>
+        <button
+          disabled={busy}
+          onClick={() => {
+            setSelectedItemId(device.itemId ?? "");
+            setEditing(false);
+          }}
+          type="button"
+        >
+          Sperren
+        </button>
         {device.itemId ? (
-          <button disabled={busy} onClick={() => onLink(null)} type="button">
+          <button disabled={busy} onClick={() => {
+            if (window.confirm("Produktakte wirklich von diesem Gerät lösen")) onLink(null);
+          }} type="button">
             Lösen
           </button>
         ) : null}
       </div>
+        </>
+      ) : (
+        <div className="hd-link-actions">
+          {linkedItem ? <Link to={`/app/dinge/${linkedItem.id}`}>Produktakte öffnen</Link> : null}
+          <button disabled={busy} onClick={() => setEditing(true)} type="button">
+            Bearbeiten
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
 function HomeGraphVisual({ device, relations }: { device: SmartHomeDevice; relations: HomeDeviceRelation[] }) {
   return (
-    <div className="hd-graph" aria-label="Home Graph Visual">
+    <div className="hd-graph" aria-label="Geräteprofil Übersicht">
       <div className="hd-graph-center">
         <Tv size={22} />
         <strong>{displayDeviceName(device)}</strong>

@@ -236,12 +236,48 @@ Decision:
 - Needs lawyer/DSB review first: yes before public production launch
 - Notes: verify Supabase project region, auth email provider, sender domain, SPF/DKIM/DMARC, DPA/AVV, retention/deletion, and Datenschutzerklaerung disclosure.
 
+## Completed Review: Public Legal Operator Details
+
+- Feature name: Public legal operator details
+- Owner: Founder/Product
+- Route/module: `frontend/src/pages/MarketingPages.tsx`, `/impressum`, `/datenschutz`, `/cookies`
+- Backend/API changes: none
+- Database/storage changes: none
+- Third-party providers: none added
+- Launch state: supplied operator details added; legal/tax review still required before public paid launch
+
+Required questions:
+
+1. Personal data: public business/operator contact details for Stefan Weiss / SelaPrinting Studio, including address, contact emails and tax number.
+2. Purpose: identify the website/app operator and support legal transparency for German launch readiness.
+3. Avoid collection: no user data collected; only public operator details shown.
+4. Data minimization: only the details supplied for public legal/billing context are shown.
+5. Storage: static frontend source/docs.
+6. Retention: until operator details change.
+7. Export: not applicable to user export.
+8. Deletion: update/remove if operator or legal basis changes.
+9. Third-party sharing: no new sharing by this change.
+10. AI: no.
+11. Consent/legal basis: not user consent; legal transparency/operator identification.
+12. Connected accounts: no.
+13. Sensitive documents: no.
+14. Tokens/secrets/API credentials: none.
+15. Logs: no logging added.
+16. Abuse/security risks: stale or incorrect legal/tax data could mislead users; needs legal/tax review before launch.
+
+Decision:
+
+- Privacy review complete: yes for publishing supplied operator details.
+- Safe to implement now: yes.
+- Needs lawyer/DSB/tax review first: yes before public paid launch.
+- Notes: confirm contact mailboxes are active, verify whether phone/alternative direct contact is required, and align Stripe invoice templates with the same operator details.
+
 ## Completed Review: Billing And Subscription Foundation
 
 - Feature name: Billing and subscription foundation
 - Owner: Engineering/Product
 - Route/module: `backend/app/services/billing.py`, `backend/app/routers/billing.py`, `backend/app/routers/webhooks.py`, `frontend/src/pages/Home.tsx`, `frontend/src/pages/MarketingPages.tsx`, `frontend/src/pages/AuthPages.tsx`
-- Backend/API changes: billing status, server-side Stripe Checkout, Stripe Billing Portal session creation and Stripe webhook endpoint
+- Backend/API changes: billing status, server-side Stripe Checkout, embedded Stripe Checkout client-secret endpoint, Stripe Billing Portal session creation and Stripe webhook endpoint
 - Database/storage changes: `PlanSubscription` billing columns, `BillingEvent` safe event table
 - Third-party providers: Stripe as preferred subscription billing direction
 - Launch state: Stripe foundation; paid checkout is implemented server-side and production launch still requires Stripe Tax, invoice, retention, cancellation and legal/tax review
@@ -251,7 +287,7 @@ Required questions:
 1. Personal data: Avareno user id, plan key, billing interval, subscription status, provider customer id, provider subscription id, provider price id, period dates, cancellation flag, safe webhook event id/type/status. Stripe may process email, payment, invoice and tax/VAT metadata.
 2. Purpose: create and manage paid subscription state and provider webhook synchronization.
 3. Avoid collection: Free plan avoids provider checkout. Paid plans require provider-side billing data.
-4. Data minimization: client sends only `planKey`; prices and provider ids are server-side. Avareno stores no card/payment method details and no raw webhook payloads.
+4. Data minimization: client sends only `planKey` and `billingInterval`; prices and provider ids are server-side. Embedded Checkout returns only a Stripe `clientSecret`. Avareno stores no card/payment method details and no raw webhook payloads.
 5. Storage: local SQLite MVP now; future production database with RLS. Stripe stores provider-side billing/payment records after Checkout is implemented.
 6. Retention: local/provider retention is not final and must be defined before paid launch.
 7. Export: export flow must include local subscription state.

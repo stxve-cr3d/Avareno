@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import hashlib
 import ipaddress
 import os
 import socket
@@ -8,7 +10,13 @@ from enum import Enum
 from typing import Any
 from urllib.parse import urlparse
 
+from cryptography.fernet import Fernet, InvalidToken
+
 from app.utils import now_iso
+
+# Versioned prefix on every ciphertext we write, so future key-rotation or
+# algorithm changes can tell old and new formats apart at read time.
+_SECRET_ENVELOPE_PREFIX = "enc:v1:"
 
 
 class ConnectorSecurityError(ValueError):
@@ -109,12 +117,70 @@ def require_connector_secret_backend() -> str:
     return key
 
 
+def _fernet_from_env() -> Fernet | None:
+    """Derive a Fernet key from AVARENO_CONNECTOR_SECRET_KEY (any-length string).
+
+    Fernet requires a 32-byte urlsafe-base64 key; operators should be able to set
+    any passphrase in the env var, so we stretch it with SHA-256 rather than
+    forcing them to pre-generate a Fernet-formatted key. Returns None if the env
+    var is unset - callers must then refuse to persist the secret in plaintext
+    rather than falling back to storing it unencrypted.
+    """
+    raw = os.environ.get("AVARENO_CONNECTOR_SECRET_KEY", "").strip()
+    if not raw:
+        return None
+    derived = hashlib.sha256(raw.encode("utf-8")).digest()
+    return Fernet(base64.urlsafe_b64encode(derived))
+
+
+def encrypt_secret(plaintext: str) -> str | None:
+    """Encrypt a secret for storage. Returns None (never plaintext) if no key is configured."""
+    if not plaintext.strip():
+        return None
+    fernet = _fernet_from_env()
+    if fernet is None:
+        return None
+    token = fernet.encrypt(plaintext.encode("utf-8")).decode("ascii")
+    return f"{_SECRET_ENVELOPE_PREFIX}{token}"
+
+
+def decrypt_secret(stored: str | None) -> str | None:
+    """Decrypt a secret written by encrypt_secret.
+
+    Values without the envelope prefix are treated as legacy plaintext (written
+    before this module encrypted anything) and returned as-is so existing local
+    devices are not force-disconnected by this change; the next successful
+    write re-encrypts them. Decryption failures (wrong/rotated key, corrupt
+    value) return None rather than raising, so callers fall back to
+    re-pairing instead of crashing.
+    """
+    if not stored:
+        return None
+    if not stored.startswith(_SECRET_ENVELOPE_PREFIX):
+        return stored
+    fernet = _fernet_from_env()
+    if fernet is None:
+        return None
+    ciphertext = stored[len(_SECRET_ENVELOPE_PREFIX):]
+    try:
+        return fernet.decrypt(ciphertext.encode("ascii")).decode("utf-8")
+    except (InvalidToken, ValueError):
+        return None
+
+
 def prepare_connector_secret_for_storage(secret: str) -> dict[str, str]:
+    """Encrypt a connector secret for the (future) shared connector-secrets store.
+
+    Raises if no encryption key is configured or the secret is empty - callers
+    must never fall back to plaintext storage.
+    """
     require_connector_secret_backend()
     if not secret.strip():
         raise ConnectorSecurityError("Connector secret is empty")
-    # TODO: replace this guard with envelope encryption before persisting secrets.
-    raise ConnectorSecurityError("Encrypted connector secret storage is not implemented; refusing plaintext storage")
+    encrypted = encrypt_secret(secret)
+    if encrypted is None:
+        raise ConnectorSecurityError("Connector secret could not be encrypted")
+    return {"ciphertext": encrypted, "createdAt": now_iso()}
 
 
 def redact_connector_payload(payload: Any) -> Any:

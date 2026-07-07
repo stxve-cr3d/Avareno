@@ -55,6 +55,11 @@ class BillingPlan:
     features: tuple[str, ...]
     item_limit: int
     storage_limit_mb: int
+    reminder_limit: int
+    ai_actions_per_month: int
+    vault_limit: int
+    household_member_limit: int
+    feature_keys: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -75,6 +80,11 @@ class BillingPlan:
             "features": list(self.features),
             "itemLimit": self.item_limit,
             "storageLimitMb": self.storage_limit_mb,
+            "reminderLimit": self.reminder_limit,
+            "aiActionsPerMonth": self.ai_actions_per_month,
+            "vaultLimit": self.vault_limit,
+            "householdMemberLimit": self.household_member_limit,
+            "featureKeys": list(self.feature_keys),
         }
 
 
@@ -92,10 +102,15 @@ def plan_catalog() -> list[BillingPlan]:
             available=True,
             checkout_enabled=True,
             cta="Kostenlos starten",
-            note="Fuer die ersten Objekte und zum Ausprobieren.",
-            features=("30 Objekte", "100 MB Dokumentenspeicher", "5 Erinnerungen", "10 AI-Aktionen pro Monat", "1 Vault", "Garantie- und Beleg-Tracking"),
+            note="Für die ersten Objekte und zum Ausprobieren.",
+            features=("30 Objekte mit Garantie & Beleg", "100 MB für Belege & Dokumente", "5 aktive Erinnerungen", "10 AI-Aktionen pro Monat", "1 Private Vault mit PIN-Schutz"),
             item_limit=30,
             storage_limit_mb=100,
+            reminder_limit=5,
+            ai_actions_per_month=10,
+            vault_limit=1,
+            household_member_limit=1,
+            feature_keys=("warrantyTracking", "receiptTracking", "privateVault"),
         ),
         BillingPlan(
             key="personal",
@@ -108,11 +123,16 @@ def plan_catalog() -> list[BillingPlan]:
             recommended=False,
             available=True,
             checkout_enabled=stripe_checkout_configured("personal"),
-            cta="Personal waehlen",
-            note="Fuer deinen privaten Speicher im Alltag.",
-            features=("300 Objekte", "2 GB Dokumentenspeicher", "100 Erinnerungen", "100 AI-Aktionen pro Monat", "1 Vault", "Basis-Exporte"),
+            cta="Personal wählen",
+            note="Für deinen privaten Speicher im Alltag.",
+            features=("300 Objekte mit Garantie & Beleg", "2 GB für Belege & Dokumente", "100 aktive Erinnerungen", "100 AI-Aktionen pro Monat", "1 Private Vault mit PIN-Schutz"),
             item_limit=300,
             storage_limit_mb=2048,
+            reminder_limit=100,
+            ai_actions_per_month=100,
+            vault_limit=1,
+            household_member_limit=1,
+            feature_keys=("warrantyTracking", "receiptTracking", "privateVault"),
         ),
         BillingPlan(
             key="pro",
@@ -125,11 +145,16 @@ def plan_catalog() -> list[BillingPlan]:
             recommended=True,
             available=True,
             checkout_enabled=stripe_checkout_configured("pro"),
-            cta="Pro waehlen",
-            note="Fuer groessere Objektgedaechtnisse und mehr AI-Unterstuetzung.",
-            features=("2.000 Objekte", "20 GB Dokumentenspeicher", "1.000 Erinnerungen", "500 AI-Aktionen pro Monat", "3 Vaults", "Eigene Felder", "Vollstaendige Exporte"),
+            cta="Pro wählen",
+            note="Für größere Objektgedächtnisse und mehr AI-Unterstützung.",
+            features=("2.000 Objekte mit Garantie & Beleg", "20 GB für Belege & Dokumente", "1.000 aktive Erinnerungen", "500 AI-Aktionen pro Monat", "3 Private Vaults mit PIN-Schutz"),
             item_limit=2000,
             storage_limit_mb=20480,
+            reminder_limit=1000,
+            ai_actions_per_month=500,
+            vault_limit=3,
+            household_member_limit=1,
+            feature_keys=("warrantyTracking", "receiptTracking", "privateVault"),
         ),
         BillingPlan(
             key="family",
@@ -142,11 +167,16 @@ def plan_catalog() -> list[BillingPlan]:
             recommended=False,
             available=True,
             checkout_enabled=stripe_checkout_configured("family"),
-            cta="Family waehlen",
-            note="Fuer Haushalte, Familie und gemeinsame Verantwortung.",
-            features=("5.000 Objekte", "50 GB Dokumentenspeicher", "2.500 Erinnerungen", "1.000 AI-Aktionen pro Monat", "5 Vaults", "5 Haushaltsmitglieder", "Geteilte Bereiche"),
+            cta="Family wählen",
+            note="Für Haushalte, Familie und gemeinsame Verantwortung.",
+            features=("5.000 Objekte für den ganzen Haushalt", "50 GB für Belege & Dokumente", "2.500 aktive Erinnerungen", "1.000 AI-Aktionen pro Monat", "5 Private Vaults mit PIN-Schutz", "5 Familienmitglieder (in Vorbereitung)"),
             item_limit=5000,
             storage_limit_mb=51200,
+            reminder_limit=2500,
+            ai_actions_per_month=1000,
+            vault_limit=5,
+            household_member_limit=5,
+            feature_keys=("warrantyTracking", "receiptTracking", "privateVault"),
         ),
     ]
 
@@ -230,7 +260,7 @@ def create_checkout(
             "line_items[0][quantity]": "1",
             "success_url": stripe_checkout_success_url(),
             "cancel_url": stripe_checkout_cancel_url(plan.key, interval),
-            "custom_text[submit][message]": "Avareno speichert keine Zahlungsdaten. Zahlung, Rechnung und Abo-Verwaltung laufen sicher ueber Stripe.",
+            "custom_text[submit][message]": "Avareno speichert keine Zahlungsdaten. Zahlung, Rechnung und Abo-Verwaltung laufen sicher über Stripe.",
             "metadata[userId]": user["id"],
             "metadata[planId]": plan.key,
             "metadata[billingInterval]": interval,
@@ -245,6 +275,86 @@ def create_checkout(
     return {"planKey": plan.key, "billingInterval": interval, "checkoutUrl": checkout_url, "provider": ACTIVE_PROVIDER, "mode": "checkout"}
 
 
+def create_embedded_checkout(
+    conn: sqlite3.Connection,
+    user: dict[str, Any],
+    plan_key: str,
+    billing_interval: str,
+) -> dict[str, Any]:
+    plan = plan_by_key(plan_key)
+    interval = _normalize_billing_interval(billing_interval)
+    if plan.key == "free":
+        raise BillingValidationError("Free is not a Stripe checkout plan")
+
+    price_id = get_stripe_price_id(plan.key, interval)
+    customer_id = get_or_create_stripe_customer(conn, user)
+    session = stripe_api_post(
+        "/checkout/sessions",
+        {
+            "mode": "subscription",
+            "ui_mode": "embedded_page",
+            "customer": customer_id,
+            "client_reference_id": user["id"],
+            "locale": stripe_checkout_locale(),
+            "billing_address_collection": "auto",
+            "line_items[0][price]": price_id,
+            "line_items[0][quantity]": "1",
+            "return_url": stripe_embedded_checkout_return_url(),
+            "custom_text[submit][message]": "Avareno speichert keine Zahlungsdaten. Zahlung, Rechnung und Abo-Verwaltung laufen sicher über Stripe.",
+            "metadata[userId]": user["id"],
+            "metadata[planId]": plan.key,
+            "metadata[billingInterval]": interval,
+            "subscription_data[metadata][userId]": user["id"],
+            "subscription_data[metadata][planId]": plan.key,
+            "subscription_data[metadata][billingInterval]": interval,
+        },
+    )
+    client_secret = session.get("client_secret")
+    if not isinstance(client_secret, str) or not client_secret:
+        raise BillingProviderError("Stripe did not return a checkout client secret")
+    return {"planKey": plan.key, "billingInterval": interval, "clientSecret": client_secret, "provider": ACTIVE_PROVIDER, "mode": "embedded_checkout"}
+
+
+def create_elements_checkout(
+    conn: sqlite3.Connection,
+    user: dict[str, Any],
+    plan_key: str,
+    billing_interval: str,
+) -> dict[str, Any]:
+    plan = plan_by_key(plan_key)
+    interval = _normalize_billing_interval(billing_interval)
+    if plan.key == "free":
+        raise BillingValidationError("Free is not a Stripe checkout plan")
+
+    price_id = get_stripe_price_id(plan.key, interval)
+    customer_id = get_or_create_stripe_customer(conn, user)
+    session = stripe_api_post(
+        "/checkout/sessions",
+        {
+            "mode": "subscription",
+            "ui_mode": "elements",
+            "customer": customer_id,
+            "client_reference_id": user["id"],
+            "locale": stripe_checkout_locale(),
+            "billing_address_collection": "auto",
+            "line_items[0][price]": price_id,
+            "line_items[0][quantity]": "1",
+            "return_url": stripe_elements_checkout_return_url(),
+            "custom_text[submit][message]": "Avareno speichert keine Zahlungsdaten. Zahlung, Rechnung und Abo-Verwaltung laufen sicher über Stripe.",
+            "metadata[userId]": user["id"],
+            "metadata[planId]": plan.key,
+            "metadata[billingInterval]": interval,
+            "subscription_data[metadata][userId]": user["id"],
+            "subscription_data[metadata][planId]": plan.key,
+            "subscription_data[metadata][billingInterval]": interval,
+        },
+    )
+    client_secret = session.get("client_secret")
+    if not isinstance(client_secret, str) or not client_secret:
+        raise BillingProviderError("Stripe did not return a checkout client secret")
+    return {"planKey": plan.key, "billingInterval": interval, "clientSecret": client_secret, "provider": ACTIVE_PROVIDER, "mode": "elements_checkout"}
+
+
 def create_billing_portal(conn: sqlite3.Connection, user: dict[str, Any], return_url: str | None = None) -> dict[str, Any]:
     subscription = get_or_create_subscription(conn, user)
     customer_id = str(subscription.get("providerCustomerId") or "").strip()
@@ -255,6 +365,85 @@ def create_billing_portal(conn: sqlite3.Connection, user: dict[str, Any], return
         {
             "customer": customer_id,
             "return_url": _safe_return_url(return_url) or stripe_portal_return_url(),
+        },
+    )
+    portal_url = session.get("url")
+    if not isinstance(portal_url, str) or not portal_url.startswith("https://"):
+        raise BillingProviderError("Stripe did not return a billing portal URL")
+    return {"provider": ACTIVE_PROVIDER, "portalUrl": portal_url}
+
+
+def _require_stripe_subscription(subscription: dict[str, Any]) -> str:
+    provider_subscription_id = str(subscription.get("providerSubscriptionId") or "").strip()
+    if not provider_subscription_id:
+        raise BillingValidationError("Kein aktives Stripe-Abo vorhanden. Schließe zuerst einen Checkout ab.")
+    return provider_subscription_id
+
+
+def cancel_subscription(conn: sqlite3.Connection, user: dict[str, Any]) -> dict[str, Any]:
+    """Cancel at period end - the user keeps access until the paid period runs out."""
+    subscription = get_or_create_subscription(conn, user)
+    provider_subscription_id = _require_stripe_subscription(subscription)
+    result = stripe_api_post(f"/subscriptions/{provider_subscription_id}", {"cancel_at_period_end": "true"})
+    _upsert_subscription_from_stripe_subscription(conn, result, user_id=user["id"])
+    refreshed = get_or_create_subscription(conn, user)
+    return {"ok": True, "subscription": _subscription_view(refreshed)}
+
+
+def reactivate_subscription(conn: sqlite3.Connection, user: dict[str, Any]) -> dict[str, Any]:
+    subscription = get_or_create_subscription(conn, user)
+    provider_subscription_id = _require_stripe_subscription(subscription)
+    result = stripe_api_post(f"/subscriptions/{provider_subscription_id}", {"cancel_at_period_end": "false"})
+    _upsert_subscription_from_stripe_subscription(conn, result, user_id=user["id"])
+    refreshed = get_or_create_subscription(conn, user)
+    return {"ok": True, "subscription": _subscription_view(refreshed)}
+
+
+def change_subscription_plan(conn: sqlite3.Connection, user: dict[str, Any], plan_key: str, billing_interval: str) -> dict[str, Any]:
+    """Switch an existing Stripe subscription to another plan/interval with proration."""
+    plan = plan_by_key(plan_key)
+    interval = _normalize_billing_interval(billing_interval)
+    if plan.key == "free":
+        raise BillingValidationError("Wechsel auf Free läuft über Kündigen - das Abo endet dann zum Periodenende.")
+
+    subscription = get_or_create_subscription(conn, user)
+    provider_subscription_id = _require_stripe_subscription(subscription)
+    price_id = get_stripe_price_id(plan.key, interval)
+
+    current = stripe_api_get(f"/subscriptions/{provider_subscription_id}")
+    items = ((current.get("items") or {}).get("data")) or []
+    if not items or not isinstance(items[0], dict) or not items[0].get("id"):
+        raise BillingProviderError("Stripe subscription has no line item to update")
+
+    result = stripe_api_post(
+        f"/subscriptions/{provider_subscription_id}",
+        {
+            "items[0][id]": str(items[0]["id"]),
+            "items[0][price]": price_id,
+            "proration_behavior": "create_prorations",
+            "cancel_at_period_end": "false",
+            "metadata[planId]": plan.key,
+            "metadata[billingInterval]": interval,
+        },
+    )
+    _upsert_subscription_from_stripe_subscription(conn, result, user_id=user["id"])
+    refreshed = get_or_create_subscription(conn, user)
+    return {"ok": True, "planKey": plan.key, "billingInterval": interval, "subscription": _subscription_view(refreshed)}
+
+
+def create_payment_method_update_session(conn: sqlite3.Connection, user: dict[str, Any], return_url: str | None = None) -> dict[str, Any]:
+    """Portal deep link straight into the payment-method form - the user never
+    sees the generic portal landing page."""
+    subscription = get_or_create_subscription(conn, user)
+    customer_id = str(subscription.get("providerCustomerId") or "").strip()
+    if not customer_id:
+        raise BillingValidationError("Stripe customer is not available for this account")
+    session = stripe_api_post(
+        "/billing_portal/sessions",
+        {
+            "customer": customer_id,
+            "return_url": _safe_return_url(return_url) or stripe_portal_return_url(),
+            "flow_data[type]": "payment_method_update",
         },
     )
     portal_url = session.get("url")
@@ -495,6 +684,20 @@ def stripe_checkout_cancel_url(plan_key: PlanKey | None = None, interval: Billin
         selected_interval = interval or "monthly"
         return f"{_app_origin()}/checkout/{plan_key}?interval={selected_interval}&billing=cancelled"
     return f"{_app_origin()}/pricing?billing=cancelled"
+
+
+def stripe_embedded_checkout_return_url() -> str:
+    configured = os.environ.get("STRIPE_EMBEDDED_CHECKOUT_RETURN_URL", "").strip()
+    if configured:
+        return configured
+    return f"{_app_origin()}/app/settings/account?billing=success&session_id={{CHECKOUT_SESSION_ID}}"
+
+
+def stripe_elements_checkout_return_url() -> str:
+    configured = os.environ.get("STRIPE_ELEMENTS_CHECKOUT_RETURN_URL", "").strip()
+    if configured:
+        return configured
+    return f"{_app_origin()}/app/settings/account?billing=success&session_id={{CHECKOUT_SESSION_ID}}"
 
 
 def stripe_portal_return_url() -> str:
@@ -809,6 +1012,7 @@ def _subscription_view(subscription: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": subscription.get("id"),
         "provider": subscription.get("provider") or ACTIVE_PROVIDER,
+        "hasStripeSubscription": bool(str(subscription.get("providerSubscriptionId") or "").strip()),
         "planKey": _normalize_plan_key(subscription.get("planKey") or subscription.get("tier")),
         "status": subscription.get("status") or "ACTIVE",
         "currentPeriodStart": subscription.get("currentPeriodStart"),

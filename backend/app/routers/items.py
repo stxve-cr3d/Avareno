@@ -9,6 +9,7 @@ from app.db import db, row_to_dict, rows_to_dicts
 from app.dependencies import get_default_user
 from app.schemas import ItemCreate, ItemPatch, RepairLogCreate
 from app.services.barcode_lookup import barcode_format, lookup_barcode, normalize_barcode
+from app.services.entitlements import PlanLimitExceeded, require_item_capacity
 from app.services.item_service import calculate_completeness_score, missing_fields
 from app.services.product_images import suggest_product_image
 from app.services.providers.compatibility_provider import build_provider_preview
@@ -19,7 +20,7 @@ router = APIRouter()
 
 
 def _documents(conn, item_id: str) -> list[dict]:
-    return rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ?', (item_id,)).fetchall())
+    return rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ? AND vaultId IS NULL', (item_id,)).fetchall())
 
 
 def _loops(conn, item_id: str) -> list[dict]:
@@ -189,6 +190,10 @@ def get_item(item_id: str) -> dict:
 def create_item(payload: ItemCreate) -> dict:
     with db() as conn:
         user = get_default_user(conn)
+        try:
+            require_item_capacity(conn, user)
+        except PlanLimitExceeded as exc:
+            raise HTTPException(status_code=402, detail=exc.payload()) from exc
         now = now_iso()
         item_id = make_id()
         household_id = payload.householdId or _default_household_id(conn, user["id"])

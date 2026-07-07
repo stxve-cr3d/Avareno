@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.db import row_to_dict, rows_to_dicts
+from app.services.connectors.security import decrypt_secret, encrypt_secret
 from app.utils import make_id, now_iso
 
 SMARTTHINGS_PROVIDER = "SAMSUNG_SMARTTHINGS"
@@ -338,7 +339,7 @@ def home_graph_connect_preview(provider_id: str) -> dict:
             "available": False,
             "mode": "PLANNED",
             "title": "Steuerung geplant",
-            "message": "Dieser Anbieter ist im Home Graph vorgesehen, aber noch nicht fuer den sicheren Connect-Flow freigeschaltet.",
+            "message": "Dieser Anbieter ist im Home Graph vorgesehen, aber noch nicht für den sicheren Connect-Flow freigeschaltet.",
             "safeCapabilities": [],
             "devices": [],
             "privacyNotes": [
@@ -355,12 +356,12 @@ def home_graph_connect_preview(provider_id: str) -> dict:
         "available": True,
         "mode": "MOCK_CONNECT",
         "title": f"{provider['name']} sicher vormerken",
-        "message": "Dieser Flow importiert nur Demo-Geraete mit ungefaehrlichen Funktionen. Echte Provider-Logins kommen erst nach Security Review.",
+        "message": "Dieser Flow importiert nur Demo-Geräte mit ungefährlichen Funktionen. Echte Provider-Logins kommen erst nach Security Review.",
         "safeCapabilities": sorted(HOME_GRAPH_SAFE_CAPABILITIES),
         "devices": devices,
         "privacyNotes": [
             "Es werden keine echten Provider-Zugangsdaten abgefragt.",
-            "Es werden nur Name, Raum, Typ und ungefaehrliche Capabilities vorgemerkt.",
+            "Es werden nur Name, Raum, Typ und ungefährliche Capabilities vorgemerkt.",
             "Keine Locks, Kameras, Alarmanlagen, Heizungen oder sicherheitskritischen Befehle.",
         ],
     }
@@ -441,7 +442,7 @@ def execute_command(conn: sqlite3.Connection, user_id: str, device_id: str, comm
         raw_json = _json_or_empty_dict(device.get("rawJson"))
         token = _samsung_token_from_result(result)
         if token:
-            raw_json["samsungRemoteToken"] = token
+            _store_samsung_token(raw_json, token)
         mac = _samsung_mac_from_info(result.get("device") if isinstance(result, dict) else None)
         if mac:
             raw_json["wifiMac"] = mac
@@ -492,6 +493,82 @@ def execute_command(conn: sqlite3.Connection, user_id: str, device_id: str, comm
     return row_to_dict(conn.execute('SELECT * FROM "SmartHomeCommand" WHERE id = ?', (command_id,)).fetchone()) or {}
 
 
+# Allowlisted Samsung remote keys — discrete actions only. KEY_POWER excluded on
+# purpose (toggle, dangerous); power is handled by execute_command's dedicated
+# power_on/power_off path which reads real TV state first.
+SAMSUNG_REMOTE_KEYS = {
+    "KEY_VOLUP", "KEY_VOLDOWN", "KEY_MUTE",
+    "KEY_UP", "KEY_DOWN", "KEY_LEFT", "KEY_RIGHT", "KEY_ENTER", "KEY_RETURN",
+    "KEY_HOME", "KEY_MENU", "KEY_SOURCE", "KEY_GUIDE", "KEY_INFO",
+    "KEY_CHUP", "KEY_CHDOWN",
+    "KEY_PLAY", "KEY_PAUSE", "KEY_STOP", "KEY_REWIND", "KEY_FF",
+}
+
+
+def _read_samsung_token(raw_json: dict) -> str | None:
+    """Read+decrypt the stored Samsung remote-control token, if any.
+
+    Returns None (not the ciphertext) when there is no token, decryption fails,
+    or no encryption key is configured - all of these correctly fall through to
+    the existing "needs pairing" flow rather than sending a broken token.
+    """
+    stored = raw_json.get("samsungRemoteToken")
+    if not stored:
+        return None
+    return decrypt_secret(str(stored).strip() or None)
+
+
+def _store_samsung_token(raw_json: dict, token: str) -> None:
+    """Encrypt and store the Samsung remote-control token in raw_json.
+
+    If AVARENO_CONNECTOR_SECRET_KEY is not configured, the token is deliberately
+    NOT persisted (never falls back to plaintext) - the TV still works for this
+    session, but the user will need to re-approve pairing after a restart.
+    """
+    encrypted = encrypt_secret(token)
+    if encrypted:
+        raw_json["samsungRemoteToken"] = encrypted
+
+
+def get_device_detail(conn: sqlite3.Connection, user_id: str, device_id: str) -> dict:
+    device = row_to_dict(
+        conn.execute('SELECT * FROM "SmartHomeDevice" WHERE id = ? AND userId = ?', (device_id, user_id)).fetchone()
+    )
+    if not device:
+        raise ValueError("Smart home device not found")
+    item = row_to_dict(conn.execute('SELECT * FROM "Item" WHERE id = ?', (device["itemId"],)).fetchone()) if device.get("itemId") else None
+    return {"device": device, "item": item}
+
+
+def send_remote_key(conn: sqlite3.Connection, user_id: str, device_id: str, key: str) -> dict:
+    device = row_to_dict(
+        conn.execute('SELECT * FROM "SmartHomeDevice" WHERE id = ? AND userId = ?', (device_id, user_id)).fetchone()
+    )
+    if not device:
+        raise ValueError("Smart home device not found")
+    if key not in SAMSUNG_REMOTE_KEYS:
+        raise ValueError("Unsupported remote key")
+    if device["provider"] != LOCAL_DISCOVERY_PROVIDER:
+        raise ValueError("Remote control is only available for locally connected TVs")
+    raw_json = _json_or_empty_dict(device.get("rawJson"))
+    host = _host_without_port(str(raw_json.get("host") or "").strip())
+    text = f"{device.get('name') or ''} {device.get('deviceType') or ''}".lower()
+    if not host or ("samsung" not in text and "tv" not in text):
+        raise ValueError("Remote control is only available for detected TV devices")
+    _resolve_private_host(host)
+    token = _read_samsung_token(raw_json)
+    result = _send_samsung_tv_key(host, key, token)
+    now = now_iso()
+    command_id = make_id()
+    conn.execute(
+        """INSERT INTO "SmartHomeCommand" (id, userId, deviceId, command, payload, status, result, createdAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (command_id, user_id, device_id, f"remote_key:{key}", json.dumps({"key": key}), "SENT", json.dumps(result), now),
+    )
+    conn.execute('UPDATE "SmartHomeDevice" SET status = ?, updatedAt = ?, lastSeenAt = ? WHERE id = ?', ("ONLINE", now, now, device_id))
+    return result
+
+
 def link_device_to_item(conn: sqlite3.Connection, user_id: str, device_id: str, item_id: str | None) -> dict:
     device = row_to_dict(
         conn.execute('SELECT * FROM "SmartHomeDevice" WHERE id = ? AND userId = ?', (device_id, user_id)).fetchone()
@@ -528,11 +605,11 @@ def pair_local_device(conn: sqlite3.Connection, user_id: str, device_id: str) ->
     text = f"{device.get('name') or ''} {device.get('deviceType') or ''} {json.dumps(raw_json)}".lower()
     if device.get("provider") != LOCAL_DISCOVERY_PROVIDER or ("samsung" not in text and "tv" not in text):
         raise ValueError("Only local Samsung TV pairing is supported")
-    result = _pair_samsung_tv(host, str(raw_json.get("samsungRemoteToken") or "").strip() or None)
+    result = _pair_samsung_tv(host, _read_samsung_token(raw_json))
     token = result.get("token")
     device_info = result.get("device")
     if token:
-        raw_json["samsungRemoteToken"] = token
+        _store_samsung_token(raw_json, token)
     mac = _samsung_mac_from_info(device_info if isinstance(device_info, dict) else None)
     if mac:
         raw_json["wifiMac"] = mac
@@ -1418,7 +1495,7 @@ def _send_smartthings_command(provider_device_id: str, commands: list[dict]) -> 
 def _send_local_tv_command(device: dict, command: str) -> dict:
     raw_json = _json_or_empty_dict(device.get("rawJson"))
     host = _host_without_port(str(raw_json.get("host") or "").strip())
-    token = str(raw_json.get("samsungRemoteToken") or "").strip() or None
+    token = _read_samsung_token(raw_json)
     device_info = _samsung_device_info(host) if host else None
     text = " ".join(
         [

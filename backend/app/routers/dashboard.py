@@ -54,7 +54,7 @@ def dashboard() -> dict:
         )
         incomplete_items = []
         for item in items:
-            documents = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ?', (item["id"],)).fetchall())
+            documents = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ? AND vaultId IS NULL', (item["id"],)).fetchall())
             item["documents"] = documents
             item["missingFields"] = missing_fields(item, documents)
             if int(item["completenessScore"]) < 100:

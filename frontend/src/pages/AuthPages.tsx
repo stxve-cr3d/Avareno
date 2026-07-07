@@ -8,7 +8,7 @@ import { useAuth } from "../lib/authProvider";
 import { useLanguage } from "../lib/language";
 import { api } from "../lib/api";
 import { formatPrice as formatPlanPrice, getPaidPlans, getPlanById } from "../lib/pricing";
-import type { BillingInvoice, BillingStatus } from "../lib/types";
+import type { BillingInvoice, BillingStatus, BillingUsage } from "../lib/types";
 import { formatUiText } from "../lib/uiText";
 import { AppLoadingBar } from "../components/app/AppKit";
 import { LanguageSwitch } from "../components/LanguageSwitch";
@@ -376,6 +376,7 @@ export function AccountSettingsPage() {
   const [emailVerificationError, setEmailVerificationError] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [billing, setBilling] = useState<BillingStatus | null>(null);
+  const [billingUsage, setBillingUsage] = useState<BillingUsage | null>(null);
   const [billingInvoices, setBillingInvoices] = useState<BillingInvoice[]>([]);
   const [billingError, setBillingError] = useState("");
   const [billingInvoiceError, setBillingInvoiceError] = useState("");
@@ -414,11 +415,11 @@ export function AccountSettingsPage() {
 
     if (billingReturnState === "success") {
       setBillingError("");
-      setBillingMessage("Stripe Checkout wurde abgeschlossen. Wir aktualisieren deinen Planstatus; falls der Webhook noch verarbeitet wird, kann der neue Plan kurz verzoegert erscheinen.");
+      setBillingMessage("Stripe Checkout wurde abgeschlossen. Wir aktualisieren deinen Planstatus; falls der Webhook noch verarbeitet wird, kann der neue Plan kurz verzögert erscheinen.");
       void loadBillingStatus();
     } else if (billingReturnState === "portal") {
       setBillingError("");
-      setBillingMessage("Zurueck aus der Abo-Verwaltung. Dein Planstatus wurde aktualisiert.");
+      setBillingMessage("Zurück aus der Abo-Verwaltung. Dein Planstatus wurde aktualisiert.");
       void loadBillingStatus();
     } else if (billingReturnState === "cancelled" || billingReturnState === "canceled") {
       setBillingError("");
@@ -625,6 +626,12 @@ export function AccountSettingsPage() {
 
       const result = await api<BillingStatus>("/api/billing/status");
       setBilling(result);
+      // Live usage vs plan limits - tolerates failure, panel just hides.
+      try {
+        setBillingUsage(await api<BillingUsage>("/api/billing/usage"));
+      } catch {
+        setBillingUsage(null);
+      }
       try {
         const invoices = await api<BillingInvoice[]>("/api/billing/invoices");
         setBillingInvoices(invoices);
@@ -650,7 +657,7 @@ export function AccountSettingsPage() {
 
     const token = await getAuthAccessToken();
     if (!token) {
-      setBillingError("Die Abo-Verwaltung braucht eine echte Login-Session. Melde dich bitte erneut ueber Supabase an.");
+      setBillingError("Die Abo-Verwaltung braucht eine echte Login-Session. Melde dich bitte erneut über Supabase an.");
       return;
     }
 
@@ -670,6 +677,56 @@ export function AccountSettingsPage() {
     }
   }
 
+  /* In-app subscription management: cancel/reactivate/plan change run through
+     our own API (Stripe server-side); only the payment-method form deep-links
+     into the Stripe portal flow. */
+  async function runSubscriptionAction(action: "cancel" | "reactivate", confirmText?: string) {
+    if (confirmText && !window.confirm(confirmText)) return;
+    setBillingError("");
+    setBillingMessage("");
+    setBillingBusy("portal");
+    try {
+      await api(`/api/billing/subscription/${action}`, { method: "POST", body: JSON.stringify({}) });
+      setBillingMessage(action === "cancel" ? "Abo gekündigt - läuft zum Periodenende aus." : "Abo reaktiviert.");
+      await loadBillingStatus();
+    } catch (caught) {
+      setBillingError(caught instanceof Error ? caught.message : "Aktion fehlgeschlagen.");
+      setBillingBusy(null);
+    }
+  }
+
+  async function changePlan(planKey: string) {
+    setBillingError("");
+    setBillingMessage("");
+    setBillingBusy("portal");
+    try {
+      const interval = billing?.subscription.billingInterval === "yearly" ? "yearly" : "monthly";
+      await api("/api/billing/subscription/change-plan", { method: "POST", body: JSON.stringify({ planKey, billingInterval: interval }) });
+      setBillingMessage(`Plan gewechselt zu ${planKey}. Differenz wird anteilig verrechnet.`);
+      await loadBillingStatus();
+    } catch (caught) {
+      setBillingError(caught instanceof Error ? caught.message : "Planwechsel fehlgeschlagen.");
+      setBillingBusy(null);
+    }
+  }
+
+  async function openPaymentMethodUpdate() {
+    setBillingError("");
+    setBillingBusy("portal");
+    try {
+      const returnUrl = new URL(window.location.href);
+      returnUrl.searchParams.set("billing", "payment-method");
+      const result = await api<{ portalUrl: string }>("/api/billing/portal/payment-method", {
+        method: "POST",
+        body: JSON.stringify({ returnUrl: returnUrl.toString() })
+      });
+      window.location.assign(result.portalUrl);
+    } catch (caught) {
+      setBillingError(caught instanceof Error ? caught.message : "Zahlungsmethode kann gerade nicht geändert werden.");
+      setBillingBusy(null);
+    }
+  }
+
   const normalizedEmail = email.trim().toLowerCase();
   const profileEmail = auth.profile?.email.trim().toLowerCase() ?? "";
   const emailChanged = normalizedEmail !== profileEmail;
@@ -682,9 +739,9 @@ export function AccountSettingsPage() {
   const paidPlans = getPaidPlans();
   const billingProviderNote = billing
     ? billing.providerConfigured
-      ? "Stripe Checkout ist serverseitig vorbereitet. Rechtliche, steuerliche und Provider-Pruefung bleiben vor Launch offen."
+      ? "Stripe Checkout ist serverseitig vorbereitet. Rechnungsaussteller ist SelaPrinting Studio, Stefan Weiss. Rechtliche, steuerliche und Provider-Prüfung bleiben vor Launch offen."
       : "Stripe-Konfiguration wurde vom laufenden Backend noch nicht erkannt. Falls die env.local gerade aktualisiert wurde, starte den Backend-Server neu."
-    : "Planstatus ist noch nicht geladen. Fuer Stripe Checkout brauchst du eine echte Supabase-Session; die Stripe-Keys liegen nur serverseitig.";
+    : "Planstatus ist noch nicht geladen. Für Stripe Checkout brauchst du eine echte Supabase-Session; die Stripe-Keys liegen nur serverseitig.";
 
   return (
     <section className="account-page">
@@ -727,7 +784,7 @@ export function AccountSettingsPage() {
           <div>
             <span>Plan & Abrechnung</span>
             <h2>Dein Avareno-Plan</h2>
-            <p>Billing ist als Stripe-Subscription-Foundation vorbereitet. Zahlungsdaten bleiben beim Anbieter und werden hier nicht gespeichert.</p>
+            <p>Billing ist als Stripe-Subscription-Foundation vorbereitet. Avareno ist ein Angebot von SelaPrinting Studio; Zahlungsdaten bleiben bei Stripe.</p>
           </div>
           <CreditCard size={18} />
         </div>
@@ -744,15 +801,45 @@ export function AccountSettingsPage() {
             <span>{billing?.subscription.currentPeriodEnd ? `Läuft bis ${formatBillingDate(billing.subscription.currentPeriodEnd)}` : "Keine Verlängerung hinterlegt"}</span>
           </div>
         </div>
+        {billingUsage ? (
+          <div className="account-usage" aria-label="Aktuelle Nutzung deines Plans">
+            <UsageBar label="Objekte" entry={billingUsage.usage.items} />
+            <UsageBar label="Speicher" entry={billingUsage.usage.storageMb} unit="MB" />
+            <UsageBar label="Erinnerungen" entry={billingUsage.usage.reminders} />
+            <UsageBar label="AI-Aktionen diesen Monat" entry={billingUsage.usage.aiActionsPerMonth} />
+            <UsageBar label="Private Vaults" entry={billingUsage.usage.vaults} />
+          </div>
+        ) : null}
         <div className="account-billing-note">
           {billingProviderNote}
         </div>
+        {billing?.subscription.cancelAtPeriodEnd ? (
+          <p className="account-cancel-note">
+            Abo ist gekündigt und läuft {billing.subscription.currentPeriodEnd ? `am ${formatBillingDate(billing.subscription.currentPeriodEnd)}` : "zum Periodenende"} aus. Danach gilt Free.
+          </p>
+        ) : null}
         <div className="account-action-row">
           {paidPlans.map((plan) => {
             const isCurrentPlan = billing?.subscription.planKey === plan.id;
             if (isCurrentPlan || billingBusy === "status") {
               return (
                 <button className={plan.isPopular ? "profile-secondary-action" : "profile-secondary-action is-muted"} disabled key={plan.id} type="button">
+                  <ArrowRight size={16} />
+                  {plan.ctaLabel.de}
+                </button>
+              );
+            }
+            if (billing?.subscription.hasStripeSubscription) {
+              // Existing Stripe subscription: switch plan in place (prorated),
+              // no second checkout.
+              return (
+                <button
+                  className={plan.isPopular ? "profile-secondary-action" : "profile-secondary-action is-muted"}
+                  disabled={billingBusy !== null}
+                  key={plan.id}
+                  onClick={() => void changePlan(plan.id)}
+                  type="button"
+                >
                   <ArrowRight size={16} />
                   {plan.ctaLabel.de}
                 </button>
@@ -769,24 +856,85 @@ export function AccountSettingsPage() {
               </Link>
             );
           })}
-          <button
-            className="profile-secondary-action is-muted"
-            disabled={!billing?.portalConfigured || billingBusy === "portal"}
-            onClick={() => void openBillingPortal()}
-            type="button"
-          >
-            <CreditCard size={16} />
-            Abo verwalten
-          </button>
         </div>
+        {billing?.subscription.hasStripeSubscription ? (
+          <div className="account-action-row">
+            <button
+              className="profile-secondary-action is-muted"
+              disabled={billingBusy !== null}
+              onClick={() => void openPaymentMethodUpdate()}
+              type="button"
+            >
+              <CreditCard size={16} />
+              Zahlungsmethode ändern
+            </button>
+            {billing.subscription.cancelAtPeriodEnd ? (
+              <button
+                className="profile-secondary-action"
+                disabled={billingBusy !== null}
+                onClick={() => void runSubscriptionAction("reactivate")}
+                type="button"
+              >
+                Abo reaktivieren
+              </button>
+            ) : (
+              <button
+                className="profile-secondary-action is-muted"
+                disabled={billingBusy !== null}
+                onClick={() => void runSubscriptionAction("cancel", "Abo wirklich kündigen? Es bleibt bis zum Ende der bezahlten Periode aktiv und wechselt dann auf Free.")}
+                type="button"
+              >
+                Abo kündigen
+              </button>
+            )}
+            <button
+              className="profile-secondary-action is-muted"
+              disabled={!billing?.portalConfigured || billingBusy === "portal"}
+              onClick={() => void openBillingPortal()}
+              type="button"
+            >
+              Stripe-Portal (Rechnungen)
+            </button>
+          </div>
+        ) : null}
         <AuthMessage error={billingError} success={billingMessage || null} />
+        {import.meta.env.DEV ? (
+          <div className="account-dev-plan-row" aria-label="Dev: Plan direkt umschalten">
+            <small>Dev-Test: Plan direkt setzen (nur lokal, ohne Stripe)</small>
+            <div>
+              {(["free", "personal", "pro", "family"] as const).map((planKey) => (
+                <button
+                  className={billing?.subscription.planKey === planKey ? "profile-secondary-action" : "profile-secondary-action is-muted"}
+                  disabled={billingBusy !== null}
+                  key={planKey}
+                  onClick={() => {
+                    setBillingBusy("status");
+                    setBillingMessage("");
+                    api("/api/billing/dev/set-plan", { method: "POST", body: JSON.stringify({ planKey }) })
+                      .then(() => {
+                        setBillingMessage(`Plan auf ${planKey} gesetzt (Dev).`);
+                        return loadBillingStatus();
+                      })
+                      .catch((error: unknown) => {
+                        setBillingError(error instanceof Error ? error.message : "Dev-Planwechsel fehlgeschlagen.");
+                        setBillingBusy(null);
+                      });
+                  }}
+                  type="button"
+                >
+                  {planKey}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="account-invoice-list">
           <div className="account-invoice-head">
             <div>
               <small>Rechnungen</small>
               <strong>Stripe-Rechnungshistorie</strong>
             </div>
-            <span>{billingInvoices.length ? `${billingInvoices.length} Eintraege` : "Noch keine Rechnung"}</span>
+            <span>{billingInvoices.length ? `${billingInvoices.length} Einträge` : "Noch keine Rechnung"}</span>
           </div>
           {billingInvoiceError ? <p className="account-invoice-note is-error">{billingInvoiceError}</p> : null}
           {billingInvoices.length === 0 && !billingInvoiceError ? (
@@ -802,7 +950,7 @@ export function AccountSettingsPage() {
                   <strong>{formatBillingAmount(invoice.amountPaid || invoice.amountDue, invoice.currency)}</strong>
                   {invoice.hostedInvoiceUrl ? (
                     <a href={invoice.hostedInvoiceUrl} target="_blank" rel="noreferrer">
-                      Bei Stripe oeffnen
+                      Bei Stripe öffnen
                     </a>
                   ) : null}
                 </div>
@@ -1590,6 +1738,23 @@ function ProviderStatus({ children, icon, label, status }: { children?: ReactNod
         </span>
       </span>
       {children ? <span className="account-provider-control">{children}</span> : null}
+    </div>
+  );
+}
+
+function UsageBar({ label, entry, unit }: { label: string; entry: { current: number; limit: number }; unit?: string }) {
+  const ratio = entry.limit > 0 ? Math.min(1, entry.current / entry.limit) : 0;
+  const tone = ratio >= 0.9 ? "is-critical" : ratio >= 0.7 ? "is-warn" : "";
+  const format = (value: number) => new Intl.NumberFormat("de-DE").format(value);
+  return (
+    <div className="account-usage-row">
+      <span className="account-usage-label">{label}</span>
+      <span className="account-usage-meter" role="progressbar" aria-valuemin={0} aria-valuemax={entry.limit} aria-valuenow={entry.current} aria-label={label}>
+        <span className={`account-usage-fill ${tone}`} style={{ width: `${Math.round(ratio * 100)}%` }} />
+      </span>
+      <span className="account-usage-value">
+        {format(entry.current)} / {format(entry.limit)}{unit ? ` ${unit}` : ""}
+      </span>
     </div>
   );
 }

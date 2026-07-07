@@ -625,6 +625,7 @@ export type BillingPlan = {
 export type BillingSubscriptionState = {
   id?: string;
   provider?: BillingProvider | string;
+  hasStripeSubscription?: boolean;
   planKey: PlanKey;
   status: SubscriptionStatus;
   currentPeriodStart?: string | null;
@@ -960,4 +961,19 @@ export type AssistantAnswer = {
     imageUrl?: string | null;
   }[];
   actions: string[];
+};
+
+export type BillingUsageEntry = { current: number; limit: number };
+
+export type BillingUsage = {
+  planKey: string;
+  planName: string;
+  featureKeys: string[];
+  usage: {
+    items: BillingUsageEntry;
+    storageMb: BillingUsageEntry;
+    reminders: BillingUsageEntry;
+    aiActionsPerMonth: BillingUsageEntry;
+    vaults: BillingUsageEntry;
+  };
 };

@@ -11,6 +11,18 @@ Status: server-side Stripe Checkout and webhook foundation, 2026-07-02. Not lega
 - Avareno may store minimal invoice metadata and Stripe-hosted invoice/PDF links for account history, but must not download or persist invoice PDFs in local document storage.
 - Checkout, portal and webhook routes are implemented server-side. Do not enable production payments until Stripe Tax/VAT, invoice, cancellation, retention and legal/tax review are complete.
 
+## Legal Operator And Invoice Basis
+
+Current supplied website/billing operator details:
+
+- Product/brand: Avareno.
+- Legal operator: SelaPrinting Studio, Stefan Weiss.
+- Address: Poyßlstraße 1, 93480 Hohenwarth, Germany.
+- Tax number: 211/286/61007.
+- VAT note: Kleinunternehmer gemäß § 19 UStG. Es wird keine Umsatzsteuer ausgewiesen.
+
+Stripe products, Checkout, hosted invoices and customer emails should use these legal operator details where required. Review the exact invoice template, cancellation wording, customer portal copy, VAT/tax behavior and bookkeeping process with a German tax advisor before accepting production payments.
+
 ## Plans
 
 | Plan | Monthly | Yearly | Stripe lookup keys | Purpose |
@@ -48,7 +60,8 @@ Server-side only:
 
 Frontend/public:
 
-- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` reserved for future client-side Stripe UI. Current Checkout redirects use only server-created Checkout Session URLs.
+- `VITE_STRIPE_PUBLISHABLE_KEY` enables embedded Stripe Checkout in the Vite frontend.
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` remains accepted as a legacy alias.
 
 Do not hardcode live Stripe Price IDs in UI components. The public pricing config stores lookup keys only.
 
@@ -67,6 +80,12 @@ Do not hardcode live Stripe Price IDs in UI components. The public pricing confi
   - Rejects Free.
   - Loads Stripe Price IDs from server env vars.
   - Reuses or creates a Stripe customer and returns a Stripe Checkout Session URL.
+- `POST /api/billing/checkout/embedded`
+  - Requires an authenticated user.
+  - Accepts only `planKey` and `billingInterval`.
+  - Rejects Free.
+  - Creates an embedded Stripe Checkout Session server-side and returns only the Checkout `clientSecret`.
+  - Payment details are rendered by Stripe.js in an iframe; Avareno still does not receive card, wallet or bank details.
 - `POST /api/billing/portal`
   - Requires an authenticated user with a Stripe customer id.
   - Creates a Stripe Billing Portal session server-side.
@@ -77,24 +96,28 @@ Do not hardcode live Stripe Price IDs in UI components. The public pricing confi
 
 ## Checkout Review Flow
 
-Public pricing and account plan actions route paid plans to `/checkout/:planId?interval=monthly|yearly` before Stripe Hosted Checkout.
+Public pricing and account plan actions route paid plans to `/checkout/:planId?interval=monthly|yearly` before Stripe Checkout.
 
 - The review page reads plan names, prices, limits and features from the central frontend pricing config.
 - The review page does not collect payment data and does not render card fields.
-- Stripe Hosted Checkout remains responsible for payment method selection, payment details, invoices and provider-side tax/payment handling.
+- If `VITE_STRIPE_PUBLISHABLE_KEY` is configured, the review page embeds Stripe Checkout inside the Avareno checkout surface.
+- If the publishable key is missing or embedded Checkout is unavailable, the review page falls back to a server-created Stripe Hosted Checkout redirect.
+- Stripe Checkout remains responsible for payment method selection, payment details, invoices and provider-side tax/payment handling.
 - Payment methods are controlled in the Stripe Dashboard. The app does not hardcode `payment_method_types`.
+- Current Dashboard direction: cards, Apple Pay, Amazon Pay, Link, EPS and Klarna are enabled; SEPA bank transfer is planned next. The frontend may display this as informational copy, but Stripe remains the source of truth for whether a method is actually offered in a specific Checkout session.
 - A Checkout Session is created only after an authenticated user confirms the selected paid plan.
 - The server session uses `locale=de` by default, `billing_address_collection=auto`, and a short custom submit note.
 - Internal Avareno auth aliases such as `@auth.avareno.local` must not be sent to Stripe as customer email. If no real email is available, Checkout collects the customer email.
 - Default success and billing portal return URLs point back to `/app/settings/account`.
 - Default cancellation URLs return to the selected `/checkout/:planId` review page with `billing=cancelled`.
+- Embedded Checkout uses `STRIPE_EMBEDDED_CHECKOUT_RETURN_URL` when set; otherwise it returns to `/app/settings/account?billing=success&session_id={CHECKOUT_SESSION_ID}`.
 - The account page consumes `billing=success`, `billing=portal` and cancellation return states, refreshes billing status, then removes the URL marker.
 
 ## Stripe Hosted Checkout Appearance
 
 Hosted Checkout can only be customized within Stripe's supported branding and Checkout settings. Use Stripe Dashboard branding for logo, icon, background color, button color, font, shapes and custom domain. Product names, descriptions and recurring price amounts come from Stripe Product and Price objects, so the Dashboard prices must match the central pricing config before launch.
 
-For a fully custom Avareno-styled payment page, use Stripe embedded Checkout or Elements later. That is a larger integration and must keep card/payment data inside Stripe Elements, not Avareno-controlled inputs.
+The MVP now prefers embedded Stripe Checkout when the publishable key is configured. For an even more custom Avareno-styled payment page later, use Stripe Elements. That is a larger integration and must keep card/payment data inside Stripe Elements, not Avareno-controlled inputs.
 
 ## Subscription State
 
@@ -174,6 +197,7 @@ The webhook upserts invoice metadata for `invoice.finalized`, `invoice.paid`, `i
 - Live Stripe webhook endpoint must use the live endpoint signing secret in production `STRIPE_WEBHOOK_SECRET`; do not reuse the local Stripe CLI or test-mode webhook secret.
 - Stripe Products and recurring Prices verified against the configured env vars.
 - Stripe Tax/VAT, invoice template, legal invoice fields and inclusive price behavior reviewed before production.
+- Stripe invoice template includes the correct operator details, Kleinunternehmer note and required contact/address fields.
 - Customer portal, cancellation, renewal, refund, invoice emails and invoice/PDF behavior verified in Stripe test mode.
 - DPA/AVV, region, subprocessors and transfer mechanisms documented.
 - Datenschutzerklaerung, AGB/terms and cancellation copy reviewed.

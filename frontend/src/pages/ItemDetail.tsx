@@ -18,8 +18,10 @@ import {
   ImageOff,
   LifeBuoy,
   Link2,
+  Lock,
   MapPin,
   Package,
+  Pencil,
   PlugZap,
   Plus,
   Power,
@@ -45,7 +47,7 @@ import {
 import { api, apiResourceUrl, dateInputValue, isoDate } from "../lib/api";
 import { getAuthAccessToken } from "../lib/authClient";
 import { productQrUrl } from "../lib/productQr";
-import type { Document as MemoryDocument, Item, Loop, RepairLog, SmartHomeDevice, SupportDraft } from "../lib/types";
+import type { Document as MemoryDocument, Item, Loop, RepairLog, SmartHomeDevice, SupportDraft, SupportDraftAttachment } from "../lib/types";
 import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
 import { LoopCard } from "../components/LoopCard";
@@ -155,6 +157,11 @@ export function ItemDetail() {
   const [busy, setBusy] = useState("");
   const [recommendationTab, setRecommendationTab] = useState<RecommendationTab>("spare");
   const [dismissedWarrantyItemId, setDismissedWarrantyItemId] = useState<string | null>(null);
+  const [ownershipEditing, setOwnershipEditing] = useState(false);
+  const [passportEditing, setPassportEditing] = useState(false);
+  const [commerceEditing, setCommerceEditing] = useState(false);
+  const [serialEditing, setSerialEditing] = useState(false);
+  const [documentsEditing, setDocumentsEditing] = useState(false);
 
   async function load() {
     if (!id) return;
@@ -222,11 +229,53 @@ export function ItemDetail() {
 
   async function saveSerial() {
     if (!item) return;
-    setItem(await api<Item>(`/api/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ serialNumber }) }));
+    const updated = await api<Item>(`/api/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ serialNumber }) });
+    setItem(updated);
+    resetSerial(updated);
+    setSerialEditing(false);
+    setDetailMessage("Seriennummer gespeichert");
   }
 
   function updateOwnershipField(field: keyof OwnershipForm, value: string) {
     setOwnershipForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function resetOwnershipForm(nextItem = item) {
+    if (!nextItem) return;
+    setOwnershipForm({
+      merchant: nextItem.merchant ?? "",
+      purchaseDate: dateInputValue(nextItem.purchaseDate),
+      price: nextItem.price != null ? String(nextItem.price) : "",
+      warrantyUntil: dateInputValue(nextItem.warrantyUntil),
+      manufacturer: nextItem.manufacturer ?? "",
+      model: nextItem.model ?? "",
+      serialNumber: nextItem.serialNumber ?? "",
+      barcode: nextItem.barcode ?? "",
+      location: nextItem.location ?? nextItem.space?.name ?? "",
+      supportContact: nextItem.supportContact ?? nextItem.supportUrl ?? ""
+    });
+  }
+
+  function resetPassportLinks(nextItem = item) {
+    if (!nextItem) return;
+    setPassportLinks({
+      manualUrl: nextItem.manualUrl ?? "",
+      driverUrl: nextItem.driverUrl ?? "",
+      softwareUrl: nextItem.softwareUrl ?? "",
+      supportUrl: nextItem.supportUrl ?? "",
+      supportContact: nextItem.supportContact ?? ""
+    });
+  }
+
+  function resetCommerceLinks(nextItem = item) {
+    if (!nextItem) return;
+    setReorderUrl(nextItem.reorderUrl ?? "");
+    setAffiliateUrl(nextItem.affiliateUrl ?? "");
+  }
+
+  function resetSerial(nextItem = item) {
+    if (!nextItem) return;
+    setSerialNumber(nextItem.serialNumber ?? "");
   }
 
   async function saveOwnership() {
@@ -252,7 +301,9 @@ export function ItemDetail() {
       });
       setItem(updated);
       setSerialNumber(updated.serialNumber ?? "");
+      resetOwnershipForm(updated);
       setDetailMessage("Grunddaten gespeichert");
+      setOwnershipEditing(false);
     } catch (error) {
       setDetailMessage(error instanceof Error ? error.message : "Grunddaten konnten nicht gespeichert werden");
     } finally {
@@ -270,7 +321,9 @@ export function ItemDetail() {
       body: JSON.stringify(cleaned)
     });
     setItem(updated);
+    resetPassportLinks(updated);
     setDetailMessage("Produktpass gespeichert");
+    setPassportEditing(false);
   }
 
   async function uploadPassportDocument() {
@@ -292,6 +345,9 @@ export function ItemDetail() {
 
   async function deletePassportDocument(documentId: string) {
     if (!item) return;
+    const document = item.documents?.find((entry) => entry.id === documentId);
+    const label = document?.fileName || "dieses Dokument";
+    if (!window.confirm(`${label} wirklich löschen Diese Aktion entfernt den Nachweis aus Avareno.`)) return;
     setBusy(`document-delete-${documentId}`);
     try {
       await api(`/api/documents/${documentId}`, { method: "DELETE" });
@@ -308,7 +364,7 @@ export function ItemDetail() {
       const signedDownload = await api<SignedDocumentDownload>(`/api/documents/${encodeURIComponent(document.id)}/signed-download`, { method: "POST" });
       await openPrivateDocument(signedDownload.url, signedDownload.fileName || document.fileName);
     } catch (error) {
-      setDetailMessage(error instanceof Error ? error.message : "Dokument konnte nicht geÃ¶ffnet werden");
+      setDetailMessage(error instanceof Error ? error.message : "Dokument konnte nicht geöffnet werden");
     } finally {
       setBusy("");
     }
@@ -427,16 +483,6 @@ export function ItemDetail() {
     }
   }
 
-  async function completeProfile() {
-    if (!item) return;
-    setItem(
-      await api<Item>(`/api/items/${item.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ serialNumber: serialNumber || "SN-MVP-001" })
-      })
-    );
-  }
-
   async function saveCommerceLinks() {
     if (!item) return;
     const updated = await api<Item>(`/api/items/${item.id}`, {
@@ -452,7 +498,9 @@ export function ItemDetail() {
       body: JSON.stringify({ type: "COMMERCE", message: "Nachkauf and shop links updated." })
     });
     setItem(updated);
+    resetCommerceLinks(updated);
     setDetailMessage("Shop links gespeichert");
+    setCommerceEditing(false);
   }
 
   async function smartCommand(deviceId: string, command: string) {
@@ -651,114 +699,180 @@ export function ItemDetail() {
       <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_23rem]">
         <div className="space-y-5">
           <section className="object-panel rounded-lg p-4 md:p-5">
-            <SectionTitle eyebrow="Grunddaten" title="Besitz und Kauf" icon={<FileText size={19} />} />
+            <div className="flex items-start justify-between gap-3">
+              <SectionTitle eyebrow="Grunddaten" title="Besitz und Kauf" icon={<FileText size={19} />} />
+              <button
+                className="profile-secondary-action is-muted"
+                onClick={() => {
+                  if (ownershipEditing) resetOwnershipForm();
+                  setOwnershipEditing((current) => !current);
+                }}
+                type="button"
+              >
+                {ownershipEditing ? <Lock size={15} /> : <Pencil size={15} />} {ownershipEditing ? "Sperren" : "Bearbeiten"}
+              </button>
+            </div>
             <div className="mt-5 grid gap-3 rounded-lg border border-line bg-white p-3">
-              <EditableDetailField icon={<Store size={18} />} label="Gekauft bei" value={ownershipForm.merchant} onChange={(value) => updateOwnershipField("merchant", value)} placeholder="Händler oder Shop" />
-              <EditableDetailField icon={<CalendarClock size={18} />} label="Gekauft am" value={ownershipForm.purchaseDate} onChange={(value) => updateOwnershipField("purchaseDate", value)} type="date" />
-              <EditableDetailField icon={<CreditCard size={18} />} label={`Gezahlt (${item.currency})`} value={ownershipForm.price} onChange={(value) => updateOwnershipField("price", value)} placeholder="0.00" type="number" />
-              <EditableDetailField icon={<ShieldCheck size={18} />} label="Garantie bis" value={ownershipForm.warrantyUntil} onChange={(value) => updateOwnershipField("warrantyUntil", value)} type="date" />
-              <EditableDetailField icon={<Package size={18} />} label="Marke" value={ownershipForm.manufacturer} onChange={(value) => updateOwnershipField("manufacturer", value)} placeholder="Samsung" />
-              <EditableDetailField icon={<Package size={18} />} label="Modell" value={ownershipForm.model} onChange={(value) => updateOwnershipField("model", value)} placeholder="OLED, Modellnummer..." />
-              <EditableDetailField icon={<ClipboardCheck size={18} />} label="Seriennummer" value={ownershipForm.serialNumber} onChange={(value) => updateOwnershipField("serialNumber", value)} placeholder="Seriennummer" />
-              <EditableDetailField icon={<ScanBarcode size={18} />} label="Barcode / GTIN" value={ownershipForm.barcode} onChange={(value) => updateOwnershipField("barcode", value)} placeholder="EAN / GTIN" />
-              <EditableDetailField icon={<MapPin size={18} />} label="Standort" value={ownershipForm.location} onChange={(value) => updateOwnershipField("location", value)} placeholder="Wohnzimmer" />
-              <EditableDetailField icon={<LifeBuoy size={18} />} label="Support" value={ownershipForm.supportContact} onChange={(value) => updateOwnershipField("supportContact", value)} placeholder="Support-URL, E-Mail oder Notiz" />
-              <div className="flex justify-end">
-                <Button onClick={saveOwnership} icon={<Save size={18} />} disabled={busy === "ownership-save"}>
-                  {busy === "ownership-save" ? "Speichert..." : "Grunddaten speichern"}
-                </Button>
-              </div>
+              {ownershipEditing ? (
+                <>
+                  <EditableDetailField icon={<Store size={18} />} label="Gekauft bei" value={ownershipForm.merchant} onChange={(value) => updateOwnershipField("merchant", value)} placeholder="Händler oder Shop" />
+                  <EditableDetailField icon={<CalendarClock size={18} />} label="Gekauft am" value={ownershipForm.purchaseDate} onChange={(value) => updateOwnershipField("purchaseDate", value)} type="date" />
+                  <EditableDetailField icon={<CreditCard size={18} />} label={`Gezahlt (${item.currency})`} value={ownershipForm.price} onChange={(value) => updateOwnershipField("price", value)} placeholder="0.00" type="number" />
+                  <EditableDetailField icon={<ShieldCheck size={18} />} label="Garantie bis" value={ownershipForm.warrantyUntil} onChange={(value) => updateOwnershipField("warrantyUntil", value)} type="date" />
+                  <EditableDetailField icon={<Package size={18} />} label="Marke" value={ownershipForm.manufacturer} onChange={(value) => updateOwnershipField("manufacturer", value)} placeholder="Samsung" />
+                  <EditableDetailField icon={<Package size={18} />} label="Modell" value={ownershipForm.model} onChange={(value) => updateOwnershipField("model", value)} placeholder="OLED, Modellnummer..." />
+                  <EditableDetailField icon={<ClipboardCheck size={18} />} label="Seriennummer" value={ownershipForm.serialNumber} onChange={(value) => updateOwnershipField("serialNumber", value)} placeholder="Seriennummer" />
+                  <EditableDetailField icon={<ScanBarcode size={18} />} label="Barcode / GTIN" value={ownershipForm.barcode} onChange={(value) => updateOwnershipField("barcode", value)} placeholder="EAN / GTIN" />
+                  <EditableDetailField icon={<MapPin size={18} />} label="Standort" value={ownershipForm.location} onChange={(value) => updateOwnershipField("location", value)} placeholder="Wohnzimmer" />
+                  <EditableDetailField icon={<LifeBuoy size={18} />} label="Support" value={ownershipForm.supportContact} onChange={(value) => updateOwnershipField("supportContact", value)} placeholder="Support-URL, E-Mail oder Notiz" />
+                  <div className="flex justify-end">
+                    <Button onClick={saveOwnership} icon={<Save size={18} />} disabled={busy === "ownership-save"}>
+                      {busy === "ownership-save" ? "Speichert..." : "Grunddaten speichern"}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <DetailRow icon={<Store size={18} />} label="Gekauft bei" onClick={() => setOwnershipEditing(true)} value={item.merchant ?? "Unbekannt"} />
+                  <DetailRow icon={<CalendarClock size={18} />} label="Gekauft am" onClick={() => setOwnershipEditing(true)} value={formatDate(item.purchaseDate)} />
+                  <DetailRow icon={<CreditCard size={18} />} label="Gezahlt" onClick={() => setOwnershipEditing(true)} value={`${item.price ?? 0} ${item.currency}`} />
+                  <DetailRow icon={<ShieldCheck size={18} />} label="Garantie bis" onClick={() => setOwnershipEditing(true)} value={formatDate(item.warrantyUntil)} />
+                  <DetailRow icon={<Package size={18} />} label="Marke / Modell" onClick={() => setOwnershipEditing(true)} value={identity} />
+                  <DetailRow icon={<ClipboardCheck size={18} />} label="Seriennummer" onClick={() => setOwnershipEditing(true)} value={item.serialNumber ?? "Fehlt"} />
+                  <DetailRow icon={<ScanBarcode size={18} />} label="Barcode / GTIN" onClick={() => setOwnershipEditing(true)} value={item.barcode ?? "Fehlt"} />
+                  <DetailRow icon={<MapPin size={18} />} label="Standort" onClick={() => setOwnershipEditing(true)} value={item.location ?? "Unbekannt"} />
+                  <DetailRow icon={<LifeBuoy size={18} />} label="Support" onClick={() => setOwnershipEditing(true)} value={item.supportContact ?? item.supportUrl ?? "Fehlt"} />
+                </>
+              )}
             </div>
           </section>
 
           <section className="object-panel rounded-lg p-4 md:p-5">
-            <SectionTitle eyebrow="Produktpass" title="Handbuch, Software, Support" icon={<BookOpen size={19} />} />
+            <div className="flex items-start justify-between gap-3">
+              <SectionTitle eyebrow="Produktpass" title="Handbuch, Software, Support" icon={<BookOpen size={19} />} />
+              <button
+                className="profile-secondary-action is-muted"
+                onClick={() => {
+                  if (passportEditing) resetPassportLinks();
+                  setPassportEditing((current) => !current);
+                }}
+                type="button"
+              >
+                {passportEditing ? <Lock size={15} /> : <Pencil size={15} />} {passportEditing ? "Sperren" : "Bearbeiten"}
+              </button>
+            </div>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <PassportLink icon={<BookOpen size={17} />} label="Handbuch" saved={hasManualDocument} url={item.manualUrl} />
               <PassportLink icon={<Cpu size={17} />} label="Treiber" saved={hasDriverDocument} url={item.driverUrl} />
               <PassportLink icon={<Package size={17} />} label="Software" saved={hasSoftwareDocument} url={item.softwareUrl} />
               <PassportLink icon={<LifeBuoy size={17} />} label="Support" url={item.supportUrl} />
             </div>
-            <div className="mt-5 grid gap-3 md:grid-cols-2">
-              <PassportField
-                label="Handbuch-URL"
-                value={passportLinks.manualUrl}
-                onChange={(value) => setPassportLinks((current) => ({ ...current, manualUrl: value }))}
-                placeholder="https://brand.com/manual"
-              />
-              <PassportField
-                label="Treiber-URL"
-                value={passportLinks.driverUrl}
-                onChange={(value) => setPassportLinks((current) => ({ ...current, driverUrl: value }))}
-                placeholder="https://brand.com/drivers"
-              />
-              <PassportField
-                label="Software URL"
-                value={passportLinks.softwareUrl}
-                onChange={(value) => setPassportLinks((current) => ({ ...current, softwareUrl: value }))}
-                placeholder="https://brand.com/software"
-              />
-              <PassportField
-                label="Support URL"
-                value={passportLinks.supportUrl}
-                onChange={(value) => setPassportLinks((current) => ({ ...current, supportUrl: value }))}
-                placeholder="https://brand.com/support"
-              />
-              <div className="md:col-span-2">
-                <PassportField
-                  label="Support-Kontakt"
-                  value={passportLinks.supportContact}
-                  onChange={(value) => setPassportLinks((current) => ({ ...current, supportContact: value }))}
-                  placeholder="LG Support, support@example.com, case portal"
-                />
+            {passportEditing ? (
+              <>
+                <div className="mt-5 grid gap-3 md:grid-cols-2">
+                  <PassportField
+                    label="Handbuch-URL"
+                    value={passportLinks.manualUrl}
+                    onChange={(value) => setPassportLinks((current) => ({ ...current, manualUrl: value }))}
+                    placeholder="https://brand.com/manual"
+                  />
+                  <PassportField
+                    label="Treiber-URL"
+                    value={passportLinks.driverUrl}
+                    onChange={(value) => setPassportLinks((current) => ({ ...current, driverUrl: value }))}
+                    placeholder="https://brand.com/drivers"
+                  />
+                  <PassportField
+                    label="Software URL"
+                    value={passportLinks.softwareUrl}
+                    onChange={(value) => setPassportLinks((current) => ({ ...current, softwareUrl: value }))}
+                    placeholder="https://brand.com/software"
+                  />
+                  <PassportField
+                    label="Support URL"
+                    value={passportLinks.supportUrl}
+                    onChange={(value) => setPassportLinks((current) => ({ ...current, supportUrl: value }))}
+                    placeholder="https://brand.com/support"
+                  />
+                  <div className="md:col-span-2">
+                    <PassportField
+                      label="Support-Kontakt"
+                      value={passportLinks.supportContact}
+                      onChange={(value) => setPassportLinks((current) => ({ ...current, supportContact: value }))}
+                      placeholder="LG Support, support@example.com, case portal"
+                    />
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm font-bold text-muted">{passportLinkCount}/5 Hilfen gespeichert</p>
+                  <Button onClick={savePassportLinks} icon={<Save size={18} />}>
+                    Produktpass speichern
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="mt-4 rounded-lg border border-line bg-white/70 p-3 text-sm font-bold text-muted">
+                {passportLinkCount}/5 Hilfen gespeichert. Zum Ändern zuerst entsperren.
               </div>
-            </div>
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm font-bold text-muted">{passportLinkCount}/5 passport helpers gespeichert</p>
-              <Button onClick={savePassportLinks} icon={<Save size={18} />}>
-                Produktpass speichern
-              </Button>
-            </div>
+            )}
           </section>
 
           <ProductRecommendationPanel item={item} tab={recommendationTab} setTab={setRecommendationTab} />
 
           <section className="object-panel rounded-lg p-4 md:p-5">
-            <SectionTitle eyebrow="Nachweise" title="Belege und Dokumente" icon={<ReceiptText size={19} />} />
-            <div className="mt-5 rounded-lg border border-line bg-white p-3">
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem_auto] md:items-end">
-                <label className="block text-sm font-bold text-ink">
-                  Dokument hinzufÃ¼gen
-                  <span className="mt-2 flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line bg-[#f8faf9] px-3 text-sm font-black text-muted transition hover:border-leaf hover:bg-leaf/5">
-                    <UploadCloud className="shrink-0 text-leaf" size={18} />
-                    <span className="min-w-0 truncate">{documentFile ? documentFile.name : "Datei wÃ¤hlen"}</span>
-                    <input
-                      className="hidden"
-                      type="file"
-                      accept="image/*,.pdf,.txt,.doc,.docx"
-                      onChange={(event) => setDocumentFile(event.target.files?.[0] ?? null)}
-                    />
-                  </span>
-                </label>
-                <label className="block text-sm font-bold text-ink">
-                  Typ
-                  <select
-                    className="mt-2 h-12 w-full rounded-lg border border-line bg-[#f8faf9] px-3 text-sm font-black text-ink outline-none focus:border-leaf"
-                    value={documentType}
-                    onChange={(event) => setDocumentType(event.target.value as (typeof documentTypes)[number])}
-                  >
-                    {documentTypes.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <Button onClick={uploadPassportDocument} disabled={!documentFile || busy === "document-upload"} icon={<UploadCloud size={18} />} type="button">
-                  {busy === "document-upload" ? "LÃ¤dt hoch..." : "AnhÃ¤ngen"}
-                </Button>
-              </div>
+            <div className="flex items-start justify-between gap-3">
+              <SectionTitle eyebrow="Nachweise" title="Belege und Dokumente" icon={<ReceiptText size={19} />} />
+              <button
+                className="profile-secondary-action is-muted"
+                onClick={() => {
+                  if (documentsEditing) setDocumentFile(null);
+                  setDocumentsEditing((current) => !current);
+                }}
+                type="button"
+              >
+                {documentsEditing ? <Lock size={15} /> : <Pencil size={15} />} {documentsEditing ? "Sperren" : "Bearbeiten"}
+              </button>
             </div>
+            {documentsEditing ? (
+              <div className="mt-5 rounded-lg border border-line bg-white p-3">
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem_auto] md:items-end">
+                  <label className="block text-sm font-bold text-ink">
+                    Dokument hinzufügen
+                    <span className="mt-2 flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line bg-[#f8faf9] px-3 text-sm font-black text-muted transition hover:border-leaf hover:bg-leaf/5">
+                      <UploadCloud className="shrink-0 text-leaf" size={18} />
+                      <span className="min-w-0 truncate">{documentFile ? documentFile.name : "Datei wählen"}</span>
+                      <input
+                        className="hidden"
+                        type="file"
+                        accept="image/*,.pdf,.txt,.doc,.docx"
+                        onChange={(event) => setDocumentFile(event.target.files?.[0] ?? null)}
+                      />
+                    </span>
+                  </label>
+                  <label className="block text-sm font-bold text-ink">
+                    Typ
+                    <select
+                      className="mt-2 h-12 w-full rounded-lg border border-line bg-[#f8faf9] px-3 text-sm font-black text-ink outline-none focus:border-leaf"
+                      value={documentType}
+                      onChange={(event) => setDocumentType(event.target.value as (typeof documentTypes)[number])}
+                    >
+                      {documentTypes.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <Button onClick={uploadPassportDocument} disabled={!documentFile || busy === "document-upload"} icon={<UploadCloud size={18} />} type="button">
+                    {busy === "document-upload" ? "Lädt hoch..." : "Anhängen"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-5 rounded-lg border border-line bg-white/70 p-3 text-sm font-bold text-muted">
+                Upload und Löschen sind gesperrt. Dokumente können weiterhin geöffnet oder geprüft werden.
+              </div>
+            )}
             <div className="mt-5 grid gap-3">
               {documents.length ? (
                 documents.map((document) => (
@@ -794,15 +908,17 @@ export function ItemDetail() {
                     >
                       PrÃ¼fen
                     </button>
-                    <button
-                      className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-red-200/70 text-red-600 transition hover:bg-red-50 disabled:opacity-45"
-                      disabled={busy === `document-delete-${document.id}`}
-                      onClick={() => void deletePassportDocument(document.id)}
-                      type="button"
-                      aria-label={`${document.fileName} lÃ¶schen`}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {documentsEditing ? (
+                      <button
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-red-200/70 text-red-600 transition hover:bg-red-50 disabled:opacity-45"
+                        disabled={busy === `document-delete-${document.id}`}
+                        onClick={() => void deletePassportDocument(document.id)}
+                        type="button"
+                        aria-label={`${document.fileName} löschen`}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    ) : null}
                   </div>
                 ))
               ) : (
@@ -861,7 +977,7 @@ export function ItemDetail() {
                     onClick={() => void clearDocumentExtraction()}
                     type="button"
                   >
-                    {busy === `document-review-clear-${reviewDocument.id}` ? "LÃ¶scht..." : "Extraktion lÃ¶schen"}
+                    {busy === `document-review-clear-${reviewDocument.id}` ? "Löscht..." : "Extraktion löschen"}
                   </button>
                 </div>
               </div>
@@ -1028,7 +1144,19 @@ export function ItemDetail() {
           </section>
 
           <section className="object-panel rounded-lg p-4">
-            <SectionTitle eyebrow="Nachkauf" title="Links und Haushalt" icon={<Repeat2 size={19} />} />
+            <div className="flex items-start justify-between gap-3">
+              <SectionTitle eyebrow="Nachkauf" title="Links und Haushalt" icon={<Repeat2 size={19} />} />
+              <button
+                className="profile-secondary-action is-muted"
+                onClick={() => {
+                  if (commerceEditing) resetCommerceLinks();
+                  setCommerceEditing((current) => !current);
+                }}
+                type="button"
+              >
+                {commerceEditing ? <Lock size={15} /> : <Pencil size={15} />} {commerceEditing ? "Sperren" : "Bearbeiten"}
+              </button>
+            </div>
             <div className="mt-5 grid gap-3">
               {shopUrl ? (
                 <a
@@ -1043,27 +1171,35 @@ export function ItemDetail() {
               ) : (
                 <div className="rounded-lg border border-dashed border-line bg-white/70 p-4 text-sm font-bold text-muted">Kein Nachkauf-Link verbunden.</div>
               )}
-              <label className="block text-sm font-bold text-ink">
-                Nachkauf-Link
-                <input
-                  value={reorderUrl}
-                  onChange={(event) => setReorderUrl(event.target.value)}
-                  className="mt-2 w-full rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
-                  placeholder="https://shop.example/product"
-                />
-              </label>
-              <label className="block text-sm font-bold text-ink">
-                Partner-Link
-                <input
-                  value={affiliateUrl}
-                  onChange={(event) => setAffiliateUrl(event.target.value)}
-                  className="mt-2 w-full rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
-                  placeholder="https://partner.example/product?tag=avareno"
-                />
-              </label>
-              <Button onClick={saveCommerceLinks} icon={<Save size={18} />}>
-                Links speichern
-              </Button>
+              {commerceEditing ? (
+                <>
+                  <label className="block text-sm font-bold text-ink">
+                    Nachkauf-Link
+                    <input
+                      value={reorderUrl}
+                      onChange={(event) => setReorderUrl(event.target.value)}
+                      className="mt-2 w-full rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
+                      placeholder="https://shop.example/product"
+                    />
+                  </label>
+                  <label className="block text-sm font-bold text-ink">
+                    Partner-Link
+                    <input
+                      value={affiliateUrl}
+                      onChange={(event) => setAffiliateUrl(event.target.value)}
+                      className="mt-2 w-full rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
+                      placeholder="https://partner.example/producttag=avareno"
+                    />
+                  </label>
+                  <Button onClick={saveCommerceLinks} icon={<Save size={18} />}>
+                    Links speichern
+                  </Button>
+                </>
+              ) : (
+                <div className="rounded-lg border border-line bg-white/70 p-3 text-sm font-bold text-muted">
+                  Links sind geschützt. Zum Ändern zuerst entsperren.
+                </div>
+              )}
               {detailMessage ? <p className="rounded-full bg-leaf/10 px-3 py-2 text-xs font-black text-leaf">{detailMessage}</p> : null}
               <div className="grid gap-2 rounded-lg bg-white p-3 ring-1 ring-line">
                 <SmallFact icon={<Users size={16} />} label="Sichtbar" value={visibilityLabel(item.visibility)} />
@@ -1074,24 +1210,39 @@ export function ItemDetail() {
           </section>
 
           <section className="object-panel rounded-lg p-4">
-            <SectionTitle eyebrow="NÃ¤chster fehlender Punkt" title="Seriennummer" icon={<Wrench size={19} />} />
-            <label className="mt-5 block text-sm font-bold text-ink">
-              Seriennummer
-              <input
-                value={serialNumber}
-                onChange={(event) => setSerialNumber(event.target.value)}
-                className="mt-2 w-full rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
-                placeholder="Seriennummer scannen oder eingeben"
-              />
-            </label>
-            <div className="mt-4 grid gap-2">
-              <Button onClick={saveSerial} icon={<Save size={18} />}>
-                Seriennummer speichern
-              </Button>
-              <Button variant="secondary" onClick={completeProfile}>
-                Beispiel einsetzen
-              </Button>
+            <div className="flex items-start justify-between gap-3">
+              <SectionTitle eyebrow="Nächster fehlender Punkt" title="Seriennummer" icon={<Wrench size={19} />} />
+              <button
+                className="profile-secondary-action is-muted"
+                onClick={() => {
+                  if (serialEditing) resetSerial();
+                  setSerialEditing((current) => !current);
+                }}
+                type="button"
+              >
+                {serialEditing ? <Lock size={15} /> : <Pencil size={15} />} {serialEditing ? "Sperren" : "Bearbeiten"}
+              </button>
             </div>
+            {serialEditing ? (
+              <>
+                <label className="mt-5 block text-sm font-bold text-ink">
+                  Seriennummer
+                  <input
+                    value={serialNumber}
+                    onChange={(event) => setSerialNumber(event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
+                    placeholder="Seriennummer scannen oder eingeben"
+                  />
+                </label>
+                <div className="mt-4 grid gap-2">
+                  <Button onClick={saveSerial} icon={<Save size={18} />}>
+                    Seriennummer speichern
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <DetailRow icon={<ClipboardCheck size={18} />} label="Seriennummer" onClick={() => setSerialEditing(true)} value={item.serialNumber ?? "Fehlt"} />
+            )}
           </section>
 
           <section className="object-panel rounded-lg p-4">
@@ -1182,7 +1333,7 @@ export function ItemDetail() {
               </Button>
             </div>
             <div className="mt-4 grid gap-3">
-              {loops.length ? loops.map((loop) => <LoopCard key={loop.id} loop={loop} />) : <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">Noch keine Care-Punkte fÃ¼r dieses Produkt.</div>}
+              {loops.length ? loops.map((loop) => <LoopCard key={loop.id} loop={loop} />) : <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">Noch keine Care-Punkte für dieses Produkt.</div>}
             </div>
           </section>
         </aside>
@@ -1391,7 +1542,7 @@ function ProductRecommendationCard({ recommendation }: { recommendation: Product
             <h3>{recommendation.title}</h3>
           </div>
           <small className={recommendation.verification === "exact" ? "is-exact" : "is-check"}>
-            {recommendation.verification === "exact" ? "passt zum Modell" : "bitte prÃ¼fen"}
+            {recommendation.verification === "exact" ? "passt zum Modell" : "bitte prüfen"}
           </small>
         </div>
         <p>{recommendation.note}</p>
@@ -1453,7 +1604,7 @@ function ProductQrPanel({ item }: { item: Item }) {
       <SectionTitle eyebrow="Produkt-QR" title="Label zum Scannen" icon={<QrCode size={19} />} />
       <div className="product-qr-body">
         <div className="product-qr-code">
-          {qrDataUrl ? <img src={qrDataUrl} alt={`QR-Code fÃ¼r ${item.name}`} /> : <QrCode size={56} />}
+          {qrDataUrl ? <img src={qrDataUrl} alt={`QR-Code für ${item.name}`} /> : <QrCode size={56} />}
         </div>
         <div className="product-qr-copy">
           <p>Der Code Ã¶ffnet diesen Produktpass in Avareno. Er enthÃ¤lt keine Seriennummer, keinen Preis und keine Dokumentdaten.</p>
@@ -1634,7 +1785,7 @@ function productRecommendationsFor(item: Item): ProductRecommendation[] {
   ];
 }
 
-function SupportAttachmentLine({ attachment }: { attachment: { fileName: string; filePath?: string | null; type: string } }) {
+function SupportAttachmentLine({ attachment }: { attachment: SupportDraftAttachment }) {
   const [opening, setOpening] = useState(false);
   const content = (
     <>
@@ -1654,10 +1805,13 @@ function SupportAttachmentLine({ attachment }: { attachment: { fileName: string;
   }
 
   async function openAttachment() {
-    if (!attachment.filePath) return;
     setOpening(true);
     try {
-      await openPrivateDocument(attachment.filePath, attachment.fileName);
+      // Always go through the signed-ticket download flow (short-lived, ownership-checked
+      // server-side) rather than fetching the stored filePath directly - the raw /uploads
+      // path is not a safe, authenticated route.
+      const signedDownload = await api<SignedDocumentDownload>(`/api/documents/${encodeURIComponent(attachment.id)}/signed-download`, { method: "POST" });
+      await openPrivateDocument(signedDownload.url, signedDownload.fileName || attachment.fileName);
     } finally {
       setOpening(false);
     }
@@ -1845,12 +1999,30 @@ function EditableDetailField({
   );
 }
 
-function DetailRow({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
-  return (
-    <div className="grid gap-3 p-4 sm:grid-cols-[2.5rem_11rem_1fr] sm:items-center">
+function DetailRow({ icon, label, onClick, value }: { icon: ReactNode; label: string; onClick: () => void; value: string }) {
+  const content = (
+    <>
       <span className="grid h-10 w-10 place-items-center rounded-md bg-[#eef2f0] text-leaf">{icon}</span>
       <span className="text-xs font-black uppercase text-muted">{label}</span>
       <span className="min-w-0 break-words text-base font-black text-ink">{value}</span>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        className="grid gap-3 rounded-lg p-4 text-left transition hover:bg-leaf/5 focus:outline-none focus:ring-2 focus:ring-leaf/30 sm:grid-cols-[2.5rem_11rem_1fr] sm:items-center"
+        onClick={onClick}
+        type="button"
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div className="grid gap-3 p-4 sm:grid-cols-[2.5rem_11rem_1fr] sm:items-center">
+      {content}
     </div>
   );
 }

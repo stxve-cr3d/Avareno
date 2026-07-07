@@ -5,14 +5,12 @@ export type AppLocale = "de" | "en";
 export type CurrencyCode = "EUR";
 
 export type PlanFeature =
-  | "warrantyTracking"
-  | "receiptTracking"
-  | "basicExports"
-  | "customFields"
-  | "fullExports"
-  | "advancedAiAssistance"
-  | "sharedSpaces"
-  | "familyReminders";
+  | "itemQuota"
+  | "storageQuota"
+  | "reminderQuota"
+  | "aiQuota"
+  | "privateVault"
+  | "familyMembers";
 
 export type PlanLimitKey = keyof PlanLimits;
 
@@ -61,7 +59,7 @@ export const pricingPlans = [
     id: "free",
     name: "Free",
     description: {
-      de: "Fuer die ersten Objekte und zum Ausprobieren.",
+      de: "Für die ersten Objekte und zum Ausprobieren.",
       en: "For the first things and trying Avareno."
     },
     currency: "EUR",
@@ -79,8 +77,11 @@ export const pricingPlans = [
       householdMembers: 1
     },
     features: [
-      feature("warrantyTracking", "Garantie-Tracking", "Warranty tracking"),
-      feature("receiptTracking", "Beleg-Tracking", "Receipt tracking")
+      feature("itemQuota", "30 Objekte mit Garantie & Beleg", "30 items with warranty & receipt"),
+      feature("storageQuota", "100 MB für Belege & Dokumente", "100 MB for receipts & documents"),
+      feature("reminderQuota", "5 aktive Erinnerungen", "5 active reminders"),
+      feature("aiQuota", "10 AI-Aktionen pro Monat", "10 AI actions per month"),
+      feature("privateVault", "1 Private Vault mit PIN-Schutz", "1 private vault with PIN protection")
     ],
     isPopular: false,
     isStripeSubscription: false,
@@ -91,7 +92,7 @@ export const pricingPlans = [
     id: "personal",
     name: "Personal",
     description: {
-      de: "Fuer deinen privaten Speicher im Alltag.",
+      de: "Für deinen privaten Speicher im Alltag.",
       en: "For your private everyday memory."
     },
     currency: "EUR",
@@ -109,20 +110,22 @@ export const pricingPlans = [
       householdMembers: 1
     },
     features: [
-      feature("warrantyTracking", "Garantie-Tracking", "Warranty tracking"),
-      feature("receiptTracking", "Beleg-Tracking", "Receipt tracking"),
-      feature("basicExports", "Basis-Exporte", "Basic exports")
+      feature("itemQuota", "300 Objekte mit Garantie & Beleg", "300 items with warranty & receipt"),
+      feature("storageQuota", "2 GB für Belege & Dokumente", "2 GB for receipts & documents"),
+      feature("reminderQuota", "100 aktive Erinnerungen", "100 active reminders"),
+      feature("aiQuota", "100 AI-Aktionen pro Monat", "100 AI actions per month"),
+      feature("privateVault", "1 Private Vault mit PIN-Schutz", "1 private vault with PIN protection")
     ],
     isPopular: false,
     isStripeSubscription: true,
-    ctaLabel: { de: "Personal waehlen", en: "Choose Personal" },
+    ctaLabel: { de: "Personal wählen", en: "Choose Personal" },
     ctaHref: "/signup?plan=personal"
   },
   {
     id: "pro",
     name: "Pro",
     description: {
-      de: "Fuer groessere Objektgedaechtnisse und mehr AI-Unterstuetzung.",
+      de: "Für größere Objektgedächtnisse und mehr AI-Unterstützung.",
       en: "For larger object memories and more AI assistance."
     },
     currency: "EUR",
@@ -140,22 +143,22 @@ export const pricingPlans = [
       householdMembers: 1
     },
     features: [
-      feature("warrantyTracking", "Garantie-Tracking", "Warranty tracking"),
-      feature("receiptTracking", "Beleg-Tracking", "Receipt tracking"),
-      feature("customFields", "Eigene Felder", "Custom fields"),
-      feature("fullExports", "Vollstaendige Exporte", "Full exports"),
-      feature("advancedAiAssistance", "Erweiterte AI-Unterstuetzung", "Advanced AI assistance")
+      feature("itemQuota", "2.000 Objekte mit Garantie & Beleg", "2,000 items with warranty & receipt"),
+      feature("storageQuota", "20 GB für Belege & Dokumente", "20 GB for receipts & documents"),
+      feature("reminderQuota", "1.000 aktive Erinnerungen", "1,000 active reminders"),
+      feature("aiQuota", "500 AI-Aktionen pro Monat", "500 AI actions per month"),
+      feature("privateVault", "3 Private Vaults mit PIN-Schutz", "3 private vaults with PIN protection")
     ],
     isPopular: true,
     isStripeSubscription: true,
-    ctaLabel: { de: "Pro waehlen", en: "Choose Pro" },
+    ctaLabel: { de: "Pro wählen", en: "Choose Pro" },
     ctaHref: "/signup?plan=pro"
   },
   {
     id: "family",
     name: "Family",
     description: {
-      de: "Fuer Haushalte, Familie und gemeinsame Verantwortung.",
+      de: "Für Haushalte, Familie und gemeinsame Verantwortung.",
       en: "For households, families and shared responsibility."
     },
     currency: "EUR",
@@ -173,16 +176,16 @@ export const pricingPlans = [
       householdMembers: 5
     },
     features: [
-      feature("warrantyTracking", "Garantie-Tracking", "Warranty tracking"),
-      feature("receiptTracking", "Beleg-Tracking", "Receipt tracking"),
-      feature("sharedSpaces", "Geteilte Bereiche", "Shared spaces"),
-      feature("familyReminders", "Familien-Erinnerungen", "Family reminders"),
-      feature("customFields", "Eigene Felder", "Custom fields"),
-      feature("fullExports", "Vollstaendige Exporte", "Full exports")
+      feature("itemQuota", "5.000 Objekte für den ganzen Haushalt", "5,000 items for the whole household"),
+      feature("storageQuota", "50 GB für Belege & Dokumente", "50 GB for receipts & documents"),
+      feature("reminderQuota", "2.500 aktive Erinnerungen", "2,500 active reminders"),
+      feature("aiQuota", "1.000 AI-Aktionen pro Monat", "1,000 AI actions per month"),
+      feature("privateVault", "5 Private Vaults mit PIN-Schutz", "5 private vaults with PIN protection"),
+      feature("familyMembers", "5 Familienmitglieder (in Vorbereitung)", "5 family members (coming soon)")
     ],
     isPopular: false,
     isStripeSubscription: true,
-    ctaLabel: { de: "Family waehlen", en: "Choose Family" },
+    ctaLabel: { de: "Family wählen", en: "Choose Family" },
     ctaHref: "/signup?plan=family"
   }
 ] satisfies PricingPlan[];

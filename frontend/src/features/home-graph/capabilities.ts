@@ -35,7 +35,7 @@ export const homeCapabilityLabels: Record<HomeCapability, string> = {
   battery: "Batterie",
   energy: "Energie",
   mediaPlayback: "Medien",
-  volume: "Lautstaerke",
+  volume: "Lautstärke",
   cleaning: "Reinigung",
   camera: "Kamera",
   alarm: "Alarm",

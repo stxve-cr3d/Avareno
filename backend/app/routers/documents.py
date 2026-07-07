@@ -18,6 +18,7 @@ from app.services.document_storage import (
     safe_local_upload_path,
     verify_signed_document_download_ticket,
 )
+from app.services.entitlements import PlanLimitExceeded, require_storage_capacity
 from app.services.item_service import calculate_completeness_score
 from app.services.privacy import record_privacy_audit_event
 from app.services.xp_service import award_xp
@@ -62,6 +63,19 @@ class ExtractedDataPatch(BaseModel):
     extractedJson: dict[str, Any] | None = None
 
 
+@router.get("")
+def list_documents() -> list[dict]:
+    """All non-vault documents of the user (vault contents need a vault ticket)."""
+    with db() as conn:
+        user = get_default_user(conn)
+        return rows_to_dicts(
+            conn.execute(
+                'SELECT * FROM "Document" WHERE userId = ? AND vaultId IS NULL ORDER BY createdAt DESC',
+                (user["id"],),
+            ).fetchall()
+        )
+
+
 @router.post("/upload", status_code=201)
 async def upload_document(
     file: UploadFile = File(...),
@@ -88,6 +102,10 @@ async def upload_document(
         target = UPLOAD_ROOT / stored_name
         content = await file.read()
         _validate_upload_policy(file.filename, file.content_type, content)
+        try:
+            require_storage_capacity(conn, user, len(content))
+        except PlanLimitExceeded as exc:
+            raise HTTPException(status_code=402, detail=exc.payload()) from exc
         # Compliance TODO: add malware scanning, private object storage,
         # and deletion/export orchestration before accepting real user files.
         target.write_bytes(content)
@@ -97,8 +115,8 @@ async def upload_document(
         doc_type = type.upper()
         conn.execute(
             """INSERT INTO "Document"
-               (id, userId, itemId, type, fileName, filePath, mimeType, createdAt, updatedAt)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               (id, userId, itemId, type, fileName, filePath, mimeType, fileSize, createdAt, updatedAt)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 doc_id,
                 user["id"],
@@ -107,12 +125,13 @@ async def upload_document(
                 file.filename,
                 f"/uploads/{stored_name}",
                 file.content_type or "application/octet-stream",
+                len(content),
                 now,
                 now,
             ),
         )
         if item:
-            docs = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ?', (itemId,)).fetchall())
+            docs = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ? AND vaultId IS NULL', (itemId,)).fetchall())
             score = calculate_completeness_score(item, docs)
             conn.execute(
                 'UPDATE "Item" SET completenessScore = ?, updatedAt = ? WHERE id = ?',
@@ -236,7 +255,7 @@ def delete_document(document_id: str) -> dict:
                 )
             item = row_to_dict(conn.execute('SELECT * FROM "Item" WHERE id = ? AND userId = ?', (item_id, user["id"])).fetchone())
             if item:
-                docs = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ?', (item_id,)).fetchall())
+                docs = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ? AND vaultId IS NULL', (item_id,)).fetchall())
                 score = calculate_completeness_score(item, docs)
                 conn.execute('UPDATE "Item" SET completenessScore = ?, updatedAt = ? WHERE id = ?', (score, now_iso(), item_id))
 
@@ -304,3 +323,39 @@ def _validate_upload_policy(file_name: str, content_type: str | None, content: b
     normalized_mime = (content_type or "").split(";", 1)[0].strip().lower()
     if normalized_mime not in ALLOWED_UPLOAD_MIME_TYPES:
         raise HTTPException(status_code=400, detail="File type is not allowed")
+
+    # Extension and Content-Type are both client-supplied and can be spoofed
+    # (e.g. an .html/.js payload renamed to .pdf with a forged header). Verify
+    # the actual file bytes match a known signature for the claimed type.
+    if not _content_matches_extension(extension, content):
+        raise HTTPException(status_code=400, detail="File content does not match its extension")
+
+
+# Magic-byte signatures for every extension we accept. .txt has no reliable
+# binary signature by definition, so it is intentionally excluded here and
+# accepted on extension/MIME alone (nothing stronger exists to check).
+_MAGIC_BYTE_CHECKS: dict[str, Any] = {
+    ".pdf": (lambda content: content.startswith(b"%PDF-")),
+    ".png": (lambda content: content.startswith(b"\x89PNG\r\n\x1a\n")),
+    ".jpg": (lambda content: content.startswith(b"\xff\xd8\xff")),
+    ".jpeg": (lambda content: content.startswith(b"\xff\xd8\xff")),
+    ".webp": (lambda content: content[:4] == b"RIFF" and content[8:12] == b"WEBP"),
+    # .docx is a zip container (PK\x03\x04); .doc is a legacy OLE2 compound file.
+    ".docx": (lambda content: content.startswith(b"PK\x03\x04")),
+    ".doc": (lambda content: content.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")),
+}
+
+
+def _content_matches_extension(extension: str, content: bytes) -> bool:
+    check = _MAGIC_BYTE_CHECKS.get(extension)
+    if check is None:
+        return True
+    return bool(check(content))
+
+
+# Compliance note: this validates that uploaded bytes genuinely are the file
+# type they claim to be (extension/MIME spoofing). It is NOT malware scanning -
+# a well-formed PDF/DOCX can still carry a malicious payload (macros, exploits
+# embedded in a valid container). Real malware scanning needs an external
+# engine (e.g. a ClamAV daemon or a scanning API) that this environment does
+# not have; wire one in before accepting uploads from untrusted users at scale.

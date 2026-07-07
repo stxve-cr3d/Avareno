@@ -6,12 +6,26 @@ import { MarketingFooter, MarketingHeader } from "../components/MarketingShell";
 import { Reveal, RevealGroup } from "../components/MarketingReveal";
 import { formatPrice, getYearlySavings, publicPricingPlans, type BillingPeriod } from "../lib/pricing";
 
-const lastUpdated = "24. Juni 2026";
+const lastUpdated = "7. Juli 2026";
+
+const legalOperator = {
+  productName: "Avareno",
+  businessName: "SelaPrinting Studio",
+  ownerName: "Stefan Weiss",
+  street: "Poyßlstraße 1",
+  postalCode: "93480",
+  city: "Hohenwarth",
+  country: "Deutschland",
+  email: "hello@avareno.app",
+  privacyEmail: "privacy@avareno.app",
+  taxNumber: "211/286/61007",
+  taxNote: "Kleinunternehmer gemäß § 19 UStG. Es wird keine Umsatzsteuer ausgewiesen."
+};
 
 const pricingFaq = [
   {
     title: "Sind die Preise schon final?",
-    text: "Die Struktur Free, Personal und Family ist als Premium-Setup vorbereitet. Vor echter Abrechnung müssen Zahlungsanbieter, Steuern, Rechnungen, Widerruf, Kündigung, Datenverarbeitung und Auftragsverarbeitung final geprüft werden."
+    text: "Die Struktur Free, Personal, Pro und Family ist als Premium-Setup vorbereitet. Vor echter Abrechnung müssen Zahlungsanbieter, Steuern, Rechnungen, Widerruf, Kündigung, Datenverarbeitung und Auftragsverarbeitung final geprüft werden."
   },
   {
     title: "Warum gibt es kein sehr großes Gratis-Kontingent?",
@@ -23,7 +37,7 @@ const pricingFaq = [
   },
   {
     title: "Ist Billing schon aktiv?",
-    text: "Die technische Grundlage ist fuer Stripe-Subscriptions vorbereitet. Ohne serverseitige Stripe Checkout Sessions, Price-Aufloesung und Webhooks startet Avareno keinen Zahlungslauf."
+    text: "Die technische Grundlage ist für Stripe-Subscriptions vorbereitet. Ohne serverseitige Stripe Checkout Sessions, Price-Auflösung und Webhooks startet Avareno keinen Zahlungslauf."
   }
 ];
 
@@ -31,7 +45,7 @@ const privacySections = [
   {
     icon: <ShieldCheck size={19} />,
     title: "Verantwortlicher",
-    text: "Verantwortlich für diese Website und App ist der unten im Impressum genannte Anbieter. Bitte Namen, Anschrift und Kontaktadresse vor einem echten Launch ergänzen."
+    text: `${legalOperator.productName} ist ein Angebot von ${legalOperator.businessName}, ${legalOperator.ownerName}. Die vollständigen Anbieter- und Kontaktdaten stehen im Impressum.`
   },
   {
     icon: <Server size={19} />,
@@ -117,8 +131,8 @@ function DraftNotice() {
     <aside className="avareno-draft-notice">
       <Scale size={20} />
       <div>
-        <strong>Entwurf für den Launch</strong>
-        <p>Die Inhalte sind strukturiert vorbereitet, aber keine Rechtsberatung. Vor Veröffentlichung bitte echte Anbieter-, Hosting- und Verarbeitungsdaten eintragen und rechtlich prüfen lassen.</p>
+        <strong>Rechtlicher Hinweis</strong>
+        <p>Diese Angaben bilden den aktuellen Betreiberstand ab, ersetzen aber keine Rechtsberatung. Vor Paid Launch bitte Impressum, Datenschutz, AGB, Widerruf, Steuern und Rechnungsangaben fachlich prüfen lassen.</p>
       </div>
     </aside>
   );
@@ -234,7 +248,7 @@ export function ImpressumPage() {
       <StandardHero
         eyebrow="Impressum"
         title="Anbieterkennzeichnung."
-        text="Diese Seite ist als saubere Struktur vorbereitet. Die konkreten Angaben müssen vor dem öffentlichen Launch ergänzt werden."
+        text={`${legalOperator.productName} ist ein Angebot von ${legalOperator.businessName}, ${legalOperator.ownerName}.`}
       >
         <DraftNotice />
       </StandardHero>
@@ -246,34 +260,45 @@ export function ImpressumPage() {
           <dl>
             <div>
               <dt>Anbieter</dt>
-              <dd>Avareno / [Name oder Firma ergänzen]</dd>
+              <dd>
+                {legalOperator.businessName}<br />
+                {legalOperator.ownerName}<br />
+                {legalOperator.productName} ist ein Angebot von {legalOperator.businessName}.
+              </dd>
             </div>
             <div>
               <dt>Anschrift</dt>
-              <dd>[Strasse und Hausnummer], [PLZ Ort], [Land]</dd>
+              <dd>
+                {legalOperator.street}<br />
+                {legalOperator.postalCode} {legalOperator.city}<br />
+                {legalOperator.country}
+              </dd>
             </div>
             <div>
-              <dt>Vertreten durch</dt>
-              <dd>[Vertretungsberechtigte Person ergänzen]</dd>
+              <dt>Inhaber</dt>
+              <dd>{legalOperator.ownerName}</dd>
             </div>
           </dl>
         </article>
 
         <article className="avareno-legal-card">
           <Mail size={21} />
-          <h2>Kontakt</h2>
+          <h2>Kontakt und Steuer</h2>
           <dl>
             <div>
               <dt>E-Mail</dt>
-              <dd>hello@avareno.app</dd>
+              <dd><a href={`mailto:${legalOperator.email}`}>{legalOperator.email}</a></dd>
             </div>
             <div>
-              <dt>Telefon</dt>
-              <dd>[optional ergänzen]</dd>
+              <dt>Datenschutz</dt>
+              <dd><a href={`mailto:${legalOperator.privacyEmail}`}>{legalOperator.privacyEmail}</a></dd>
             </div>
             <div>
-              <dt>Register / USt-ID</dt>
-              <dd>[falls vorhanden ergänzen]</dd>
+              <dt>Steuer</dt>
+              <dd>
+                Steuernummer: {legalOperator.taxNumber}<br />
+                {legalOperator.taxNote}
+              </dd>
             </div>
           </dl>
         </article>
@@ -282,10 +307,10 @@ export function ImpressumPage() {
           <Scale size={21} />
           <h2>Verantwortung für Inhalte</h2>
           <p>
-            Die Inhalte dieser Website werden mit Sorgfalt erstellt. Für Vollständigkeit, Richtigkeit und Aktualität kann in diesem Entwurfsstand keine Gewähr übernommen werden.
+            Die Inhalte dieser Website werden mit Sorgfalt erstellt. Für Vollständigkeit, Richtigkeit und Aktualität kann keine Gewähr übernommen werden.
           </p>
           <p>
-            Sobald Avareno öffentlich betrieben wird, sollten Haftung, Streitbeilegung, redaktionelle Verantwortung und externe Links passend zur Betreiberstruktur final formuliert werden.
+            Vor dem öffentlichen Paid Launch sollten Haftung, Streitbeilegung, Widerruf, Kündigung, AGB und externe Links passend zur Betreiberstruktur final geprüft werden.
           </p>
         </article>
       </section>
@@ -334,7 +359,7 @@ export function DatenschutzPage() {
         <article className="avareno-legal-card">
           <h2>Empfänger und Dienste</h2>
           <p>
-            Aktuell sind Supabase Auth für Login-Sessions und Cloudflare Turnstile für Bot-Schutz eingebunden. Analyse-, Marketing-, KI- oder weitere Speicheranbieter müssen vor Launch konkret benannt werden.
+            Aktuell sind Supabase Auth für Login-Sessions und Cloudflare Turnstile für Bot-Schutz eingebunden. Stripe verarbeitet Zahlungs- und Rechnungsdaten erst, wenn Nutzer einen kostenpflichtigen Plan über Checkout abschließen. Analyse-, Marketing-, KI- oder weitere Speicheranbieter müssen vor Launch konkret benannt werden.
           </p>
         </article>
         <article className="avareno-legal-card">
@@ -346,7 +371,7 @@ export function DatenschutzPage() {
         <article className="avareno-legal-card">
           <h2>Kontakt für Datenschutz</h2>
           <p>
-            Datenschutzanfragen können später über eine dedizierte Adresse wie privacy@avareno.app laufen. Die Adresse muss erreichbar und organisatorisch betreut sein.
+            Datenschutzanfragen können an <a href={`mailto:${legalOperator.privacyEmail}`}>{legalOperator.privacyEmail}</a> gerichtet werden. Verantwortlich ist {legalOperator.ownerName}, {legalOperator.businessName}, {legalOperator.street}, {legalOperator.postalCode} {legalOperator.city}.
           </p>
         </article>
       </section>

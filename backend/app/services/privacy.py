@@ -177,7 +177,7 @@ def privacy_summary(conn: sqlite3.Connection, user_id: str) -> dict[str, Any]:
             "userCorrection": "DOCUMENT_ENDPOINT_ACTIVE",
             "extractedRecordCount": extracted_count,
             "deleteAvailable": True,
-            "note": "Beleg- und Dokumentanalyse bleibt nutzerausgeloest; gespeicherte Extraktionen koennen geloescht oder korrigiert werden.",
+            "note": "Beleg- und Dokumentanalyse bleibt nutzerausgelöst; gespeicherte Extraktionen können gelöscht oder korrigiert werden.",
         },
         "privateVault": {
             "status": "PLANNED",

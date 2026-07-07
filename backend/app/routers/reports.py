@@ -26,7 +26,7 @@ def home_binder() -> dict:
         spaces: dict[str, dict] = {}
 
         for item in items:
-            documents = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ?', (item["id"],)).fetchall())
+            documents = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ? AND vaultId IS NULL', (item["id"],)).fetchall())
             item["documents"] = documents
             item["missingFields"] = missing_fields(item, documents)
             item["space"] = row_to_dict(conn.execute('SELECT * FROM "Space" WHERE id = ?', (item["spaceId"],)).fetchone()) if item.get("spaceId") else None

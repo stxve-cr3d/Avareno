@@ -80,8 +80,63 @@ def ensure_runtime_schema(conn: sqlite3.Connection) -> None:
     _ensure_product_tables(conn)
     _ensure_smart_home_tables(conn)
     _ensure_social_tables(conn)
+    _ensure_vault_and_usage_tables(conn)
     _ensure_default_product_structure(conn)
     _ensure_default_smart_home_devices(conn)
+
+
+def _ensure_vault_and_usage_tables(conn: sqlite3.Connection) -> None:
+    document_columns = {row["name"] for row in conn.execute('PRAGMA table_info("Document")').fetchall()}
+    if document_columns:
+        if "fileSize" not in document_columns:
+            conn.execute('ALTER TABLE "Document" ADD COLUMN "fileSize" INTEGER')
+        if "vaultId" not in document_columns:
+            conn.execute('ALTER TABLE "Document" ADD COLUMN "vaultId" TEXT')
+        conn.execute('CREATE INDEX IF NOT EXISTS "Document_vaultId_idx" ON "Document" ("vaultId")')
+        # Backfill sizes for documents uploaded before fileSize existed, so the
+        # storage quota counts existing files. Missing files stay NULL.
+        pending = conn.execute('SELECT id, filePath FROM "Document" WHERE fileSize IS NULL AND filePath LIKE \'/uploads/%\'').fetchall()
+        for row in pending:
+            candidate = PROJECT_ROOT / "uploads" / row["filePath"].removeprefix("/uploads/")
+            try:
+                size = candidate.stat().st_size
+            except OSError:
+                continue
+            conn.execute('UPDATE "Document" SET fileSize = ? WHERE id = ?', (int(size), row["id"]))
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS "Vault" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "userId" TEXT NOT NULL,
+          "name" TEXT NOT NULL,
+          "createdAt" TEXT NOT NULL,
+          "updatedAt" TEXT NOT NULL,
+          FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE
+        )"""
+    )
+    conn.execute('CREATE INDEX IF NOT EXISTS "Vault_userId_idx" ON "Vault" ("userId")')
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS "VaultSecurity" (
+          "userId" TEXT NOT NULL PRIMARY KEY,
+          "pinHash" TEXT NOT NULL,
+          "failedAttempts" INTEGER NOT NULL DEFAULT 0,
+          "lockedUntil" TEXT,
+          "createdAt" TEXT NOT NULL,
+          "updatedAt" TEXT NOT NULL,
+          FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS "UsageCounter" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "userId" TEXT NOT NULL,
+          "kind" TEXT NOT NULL,
+          "period" TEXT NOT NULL,
+          "count" INTEGER NOT NULL DEFAULT 0,
+          "updatedAt" TEXT NOT NULL,
+          UNIQUE ("userId", "kind", "period"),
+          FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE
+        )"""
+    )
 
 
 def _ensure_privacy_tables(conn: sqlite3.Connection) -> None:

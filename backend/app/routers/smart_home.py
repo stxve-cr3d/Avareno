@@ -15,6 +15,7 @@ from app.schemas import (
     SmartHomeCommandRequest,
     SmartHomeConnectRequest,
     SmartHomeLinkItemRequest,
+    SmartHomeRemoteKeyRequest,
 )
 from app.services.smart_home import (
     activate_smart_home_insight,
@@ -24,12 +25,14 @@ from app.services.smart_home import (
     discover_local_candidates,
     diagnose_bambu_host,
     execute_command,
+    get_device_detail,
     home_graph_connect_preview,
     import_local_candidate,
     link_device_to_item,
     pair_local_device,
     probe_local_host,
     record_bambu_print_event,
+    send_remote_key,
     setup_bambu_lab_printer,
     smart_home_payload,
     sync_provider,
@@ -120,6 +123,28 @@ def delete_smart_home_device(device_id: str) -> dict:
             return delete_device(conn, user["id"], device_id)
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/devices/{device_id}")
+def get_device(device_id: str) -> dict:
+    with db() as conn:
+        user = get_default_user(conn)
+        try:
+            return get_device_detail(conn, user["id"], device_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/devices/{device_id}/remote-key", status_code=201)
+def remote_key(device_id: str, payload: SmartHomeRemoteKeyRequest) -> dict:
+    with db() as conn:
+        user = get_default_user(conn)
+        try:
+            return send_remote_key(conn, user["id"], device_id, payload.key)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.post("/devices/{device_id}/pair", status_code=201)

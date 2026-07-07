@@ -12,8 +12,8 @@ export const mockHomeDevices: HomeDevice[] = [
     isControllable: false,
     capabilities: ["power", "brightness", "colorTemperature"],
     manualUrl: "https://www.philips-hue.com",
-    resetInstructions: "Hue-App, Bridge und Lampenmodell pruefen. Reset-Schritte spaeter am Geraetepass speichern.",
-    notes: "Als Beispiel fuer ein erkanntes, aber noch nicht steuerbares Geraet."
+    resetInstructions: "Hue-App, Bridge und Lampenmodell prüfen. Reset-Schritte später am Gerätepass speichern.",
+    notes: "Als Beispiel für ein erkanntes, aber noch nicht steuerbares Gerät."
   },
   {
     id: "home-device-passport-shelly",
@@ -26,7 +26,7 @@ export const mockHomeDevices: HomeDevice[] = [
     isControllable: false,
     capabilities: ["power", "energy"],
     resetInstructions: "Lokale IP, Shelly-App und Sicherungskreis dokumentieren.",
-    notes: "Gute Kandidatin fuer Stromverbrauch, Garantie und Care-Hinweise."
+    notes: "Gute Kandidatin für Stromverbrauch, Garantie und Care-Hinweise."
   },
   {
     id: "home-device-passport-roborock",
@@ -38,7 +38,7 @@ export const mockHomeDevices: HomeDevice[] = [
     connectionLevel: 1,
     isControllable: false,
     capabilities: ["cleaning", "battery"],
-    resetInstructions: "WLAN-Reset, Filterwechsel und Dockingstation spaeter im Geraetepass festhalten.",
-    notes: "Zeigt, dass Avareno auch ohne Steuerung Wartung und Support nuetzlich macht."
+    resetInstructions: "WLAN-Reset, Filterwechsel und Dockingstation später im Gerätepass festhalten.",
+    notes: "Zeigt, dass Avareno auch ohne Steuerung Wartung und Support nützlich macht."
   }
 ];

@@ -137,7 +137,7 @@ export function HomeGraphConnect() {
         body: JSON.stringify({ providerId: preview.providerId, acceptedCapabilities })
       });
       setConnectState("done");
-      setConnectMessage(`${result.synced} Geraete wurden als Home-Graph-Quelle vorgemerkt.`);
+      setConnectMessage(`${result.synced} Geräte wurden als Home-Graph-Quelle vorgemerkt.`);
     } catch (error) {
       setConnectState("error");
       setConnectMessage(error instanceof Error ? error.message : "Provider konnte nicht vorgemerkt werden.");
@@ -156,32 +156,32 @@ export function HomeGraphConnect() {
         <div>
           <span className="av-homegraph-kicker">Avareno Home Graph</span>
           <h1>Zuhause verbinden</h1>
-          <p>Erkannte Geraete, passende Anbieter und spaetere Steuerung an einem ruhigen Ort.</p>
+          <p>Erkannte Geräte, passende Anbieter und spätere Steuerung an einem ruhigen Ort.</p>
         </div>
       </section>
 
-      <section className="av-homegraph-live" aria-label="Echt erkannte lokale Geraete">
+      <section className="av-homegraph-live" aria-label="Echt erkannte lokale Geräte">
         <div>
           <span><Radio size={15} /> Echt erkannt</span>
-          <strong>{highlightedDevices.length ? "Lokale Geraete aus deinem Netzwerk" : "Noch keine lokalen Geraete auf dieser Seite"}</strong>
+          <strong>{highlightedDevices.length ? "Lokale Geräte aus deinem Netzwerk" : "Noch keine lokalen Geräte auf dieser Seite"}</strong>
           <p>
             {highlightedDevices.length
-              ? "Diese Eintraege kommen aus der echten LAN-Erkennung, nicht aus dem Beta-Provider-Flow."
+              ? "Diese Einträge kommen aus der echten LAN-Erkennung, nicht aus dem Beta-Provider-Flow."
               : smartHomeStatus === "loading"
                 ? "Avareno liest die aktuelle Smart-Home-Liste."
-                : "Starte im Smart-Home-Hub die lokale Suche, damit erkannte Geraete hier erscheinen."}
+                : "Starte im Smart-Home-Hub die lokale Suche, damit erkannte Geräte hier erscheinen."}
           </p>
         </div>
         <div className="av-homegraph-live-devices">
           {highlightedDevices.map((device) => (
             <article key={device.id}>
               <strong>{device.name}</strong>
-              <small>{device.itemName ? `Verbunden mit ${device.itemName}` : device.roomName ?? "Noch nicht verknuepft"}</small>
+              <small>{device.itemName ? `Verbunden mit ${device.itemName}` : device.roomName ?? "Noch nicht verknüpft"}</small>
             </article>
           ))}
         </div>
         <Link className="av-homegraph-live-link" to="/app/smart-home">
-          Geraeteliste oeffnen <ArrowRight size={14} />
+          Geräteliste öffnen <ArrowRight size={14} />
         </Link>
       </section>
 
@@ -242,8 +242,8 @@ export function HomeGraphConnect() {
       {visibleProviders.length === 0 ? (
         <section className="av-homegraph-empty">
           <strong>Dein Zuhause ist noch nicht verbunden.</strong>
-          <p>Fuege Geraete, Apps oder Anbieter hinzu. Avareno hilft dir, jedes Geraet verstaendlich zu speichern - auch wenn es noch nicht steuerbar ist.</p>
-          <button type="button">Erstes Geraet hinzufuegen</button>
+          <p>Fuege Geräte, Apps oder Anbieter hinzu. Avareno hilft dir, jedes Gerät verständlich zu speichern - auch wenn es noch nicht steuerbar ist.</p>
+          <button type="button">Erstes Gerät hinzufügen</button>
         </section>
       ) : null}
     </main>
@@ -271,7 +271,7 @@ function ConnectReview({
     return (
       <section className="av-homegraph-review">
         <strong>Connect Flow wird vorbereitet</strong>
-        <p>Avareno prueft, welche sicheren Schritte fuer diesen Anbieter moeglich sind.</p>
+        <p>Avareno prüft, welche sicheren Schritte für diesen Anbieter möglich sind.</p>
       </section>
     );
   }
@@ -350,7 +350,7 @@ function ProviderCard({ onConnect, provider }: { onConnect: () => void; provider
   const cta = providerCta(provider.connectionStatus);
   const connectionTags = [
     provider.supportsCloud ? <ConnectionTag icon={<Cloud size={13} />} label="Cloud-Verbindung" key="cloud" /> : null,
-    provider.supportsLocal ? <ConnectionTag icon={<Home size={13} />} label="Lokal moeglich" key="local" /> : null,
+    provider.supportsLocal ? <ConnectionTag icon={<Home size={13} />} label="Lokal möglich" key="local" /> : null,
     provider.supportsMatter ? <ConnectionTag icon={<Radio size={13} />} label="Matter-kompatibel" key="matter" /> : null,
     provider.category === "bridge" || provider.category === "local_bridge" ? <ConnectionTag icon={<SlidersHorizontal size={13} />} label="Bridge" key="bridge" /> : null,
     provider.supportsApiToken ? <ConnectionTag icon={<KeyRound size={13} />} label="API Token" key="token" /> : null
@@ -390,7 +390,7 @@ function ConnectionTag({ icon, label }: { icon: ReactNode; label: string }) {
 function providerStatusLabel(status: HomeProviderConnectionStatus) {
   switch (status) {
     case "available":
-      return "Verfuegbar";
+      return "Verfügbar";
     case "beta":
       return "Beta";
     case "planned":
@@ -416,5 +416,5 @@ function localDeviceRank(device: SmartHomeDevice) {
 function providerCta(status: HomeProviderConnectionStatus) {
   if (status === "available" || status === "beta") return { label: "Verbinden", kind: "primary" as const };
   if (status === "planned") return { label: "Geplant", kind: "secondary" as const };
-  return { label: "Geraet trotzdem speichern", kind: "secondary" as const };
+  return { label: "Gerät trotzdem speichern", kind: "secondary" as const };
 }

@@ -188,6 +188,10 @@ class SmartHomeCommandRequest(BaseModel):
     value: str | int | float | bool | None = None
 
 
+class SmartHomeRemoteKeyRequest(BaseModel):
+    key: str = Field(min_length=1)
+
+
 class SmartHomeLinkItemRequest(BaseModel):
     itemId: str | None = None
 
@@ -258,3 +262,24 @@ class CaptureDropRequest(BaseModel):
 
 class AssistantAskRequest(BaseModel):
     question: str = Field(min_length=1)
+
+
+class VaultPinSet(BaseModel):
+    pin: str = Field(min_length=4, max_length=8)
+    currentPin: str | None = None
+
+
+class VaultUnlock(BaseModel):
+    pin: str = Field(min_length=4, max_length=8)
+
+
+class VaultCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+
+
+class VaultRename(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+
+
+class DevPlanSetRequest(BaseModel):
+    planKey: str = Field(min_length=1, max_length=20)

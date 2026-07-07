@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, Cpu, Lightbulb, Link2, Power, Printer, Radar, RefreshCw, Router, Search, Trash2, Tv } from "lucide-react";
+import { ChevronDown, Cpu, Lightbulb, Link2, Power, Printer, Radar, RefreshCw, Router, Search, Tv } from "lucide-react";
 import { api } from "../lib/api";
 import { ConsoleSkeleton } from "../components/app/AppKit";
 import type {
@@ -86,20 +86,6 @@ export function SmartHome() {
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Gerät konnte nicht verbunden werden.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function deleteDevice(device: SmartHomeDevice) {
-    setBusy({ action: "command", deviceId: device.id });
-    setMessage("");
-    try {
-      await api(`/api/smart-home/devices/${device.id}`, { method: "DELETE" });
-      setMessage(`${device.name} wurde entfernt.`);
-      await load();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Gerät konnte nicht entfernt werden.");
     } finally {
       setBusy(null);
     }
@@ -227,7 +213,7 @@ export function SmartHome() {
             <RefreshCw size={15} /> Aktualisieren
           </button>
         </div>
-        <p className="sh-hero-sub">Steuere deine verbundenen Geräte — ohne technische Netzwerkdetails.</p>
+        <p className="sh-hero-sub">Steuere verbundene Geräte und öffne Details, ohne technische Netzwerkdaten sortieren zu müssen.</p>
         {devices.length ? (
           <div className="sh-hero-stats">
             <HeroStat label="Geräte" value={devices.length} />
@@ -253,7 +239,6 @@ export function SmartHome() {
                 device={device}
                 items={items}
                 onBrightness={(value) => void sendCommand(device, "set_brightness", value)}
-                onDelete={() => void deleteDevice(device)}
                 onLinkItem={(itemId) => void linkDevice(device, itemId)}
                 onPair={() => void pairDevice(device)}
                 onPowerOff={() => void sendCommand(device, "power_off")}
@@ -337,7 +322,6 @@ function DeviceCard({
   device,
   items,
   onBrightness,
-  onDelete,
   onLinkItem,
   onPair,
   onPowerOff,
@@ -347,13 +331,11 @@ function DeviceCard({
   device: SmartHomeDevice;
   items: Item[];
   onBrightness: (value: number) => void;
-  onDelete: () => void;
   onLinkItem: (itemId: string | null) => void;
   onPair: () => void;
   onPowerOff: () => void;
   onPowerOn: () => void;
 }) {
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const powerable = canPowerDevice(device);
   const on = device.powerState === "on";
   const canDim = device.capabilities.some((capability) => capability.toLowerCase().includes("switchlevel"));
@@ -365,7 +347,7 @@ function DeviceCard({
       <span className={`sh-device-icon${on ? " is-on" : ""}`}>{deviceIcon(device)}</span>
 
       <div className="sh-device-main">
-        <strong>{device.name}</strong>
+        <Link className="sh-device-title" to={`/app/smart-home/devices/${device.id}`}>{device.name}</Link>
         <span className="sh-device-meta">
           {deviceTypeLabel(device)}
           {device.roomName ? ` · ${device.roomName}` : ""}
@@ -432,20 +414,8 @@ function DeviceCard({
           </label>
         ) : null}
 
-        <button
-          className={confirmDelete ? "sh-device-del is-confirm" : "sh-device-del"}
-          disabled={busy}
-          onBlur={() => setConfirmDelete(false)}
-          onClick={() => {
-            if (confirmDelete) onDelete();
-            else setConfirmDelete(true);
-          }}
-          type="button"
-        >
-          <Trash2 size={12} /> {confirmDelete ? "Wirklich entfernen?" : "Entfernen"}
-        </button>
         <Link className="sh-device-details" to={`/app/home-graph/devices/${device.id}`}>
-          <Link2 size={12} /> Home Graph
+          <Link2 size={12} /> Details öffnen
         </Link>
       </div>
     </article>

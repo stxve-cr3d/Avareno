@@ -7,8 +7,10 @@ Detailed privacy release blockers live in `docs/compliance/PRIVACY_RELEASE_BLOCK
 ## 1. Public Website
 
 - [x] Impressum route exists and is reachable (`/impressum`).
-- [ ] Impressum contains final real provider/controller details.
+- [x] Impressum contains supplied real provider/controller details for SelaPrinting Studio / Stefan Weiss.
+- [ ] Impressum legally reviewed and finalized before public launch.
 - [x] Datenschutzerklaerung route exists and is reachable (`/datenschutz`).
+- [x] Datenschutzerklaerung contains supplied controller/contact details for SelaPrinting Studio / Stefan Weiss.
 - [ ] Datenschutzerklaerung finalized with actual providers, regions, legal bases, retention, contact and rights process.
 - [x] Cookie route exists (`/cookies`).
 - [ ] Cookie/consent logic reviewed against actual production scripts/providers.

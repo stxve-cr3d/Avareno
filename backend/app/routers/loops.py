@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from app.db import db, row_to_dict, rows_to_dicts
 from app.dependencies import get_default_user
 from app.schemas import LoopCreate, LoopPatch, SnoozeRequest
+from app.services.entitlements import PlanLimitExceeded, require_reminder_capacity
 from app.services.xp_service import award_xp
 from app.utils import make_id, normalize_iso, now_iso
 
@@ -61,6 +62,10 @@ def get_loop(loop_id: str) -> dict:
 def create_loop(payload: LoopCreate) -> dict:
     with db() as conn:
         user = get_default_user(conn)
+        try:
+            require_reminder_capacity(conn, user)
+        except PlanLimitExceeded as exc:
+            raise HTTPException(status_code=402, detail=exc.payload()) from exc
         now = now_iso()
         loop_id = make_id()
         due_date = normalize_iso(payload.dueDate)

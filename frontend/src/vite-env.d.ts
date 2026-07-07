@@ -15,6 +15,7 @@ interface ImportMetaEnv {
   readonly VITE_AUTH_EMAIL_FROM_NAME?: string;
   readonly VITE_AUTH_EMAIL_REPLY_TO?: string;
   readonly VITE_AUTH_SUPPORT_EMAIL?: string;
+  readonly VITE_STRIPE_PUBLISHABLE_KEY?: string;
   readonly NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?: string;
 }
 

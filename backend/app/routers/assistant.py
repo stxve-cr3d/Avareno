@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from app.db import db, row_to_dict, rows_to_dicts
 from app.dependencies import get_default_user
 from app.schemas import AssistantAskRequest
+from app.services.entitlements import PlanLimitExceeded, consume_ai_action
 from app.services.item_service import missing_fields
 from app.utils import parse_iso
 
@@ -16,7 +17,7 @@ router = APIRouter()
 def _load_items(conn, user_id: str) -> list[dict]:
     items = rows_to_dicts(conn.execute('SELECT * FROM "Item" WHERE userId = ? ORDER BY updatedAt DESC', (user_id,)).fetchall())
     for item in items:
-        item["documents"] = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ?', (item["id"],)).fetchall())
+        item["documents"] = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ? AND vaultId IS NULL', (item["id"],)).fetchall())
         item["space"] = row_to_dict(conn.execute('SELECT * FROM "Space" WHERE id = ?', (item["spaceId"],)).fetchone()) if item.get("spaceId") else None
         item["missingFields"] = missing_fields(item, item["documents"])
     return items
@@ -55,11 +56,15 @@ def ask_avareno(payload: AssistantAskRequest) -> dict:
     question = payload.question.strip().lower()
     with db() as conn:
         user = get_default_user(conn)
+        try:
+            consume_ai_action(conn, user)
+        except PlanLimitExceeded as exc:
+            raise HTTPException(status_code=402, detail=exc.payload()) from exc
         items = _load_items(conn, user["id"])
         now = datetime.now(timezone.utc)
         soon = now + timedelta(days=90)
 
-        if any(word in question for word in ["garantie", "warranty", "ablauf", "expire", "läuft", "laeuft"]):
+        if any(word in question for word in ["garantie", "warranty", "ablauf", "expire", "läuft", "läuft"]):
             warranty_items = [
                 item
                 for item in items
@@ -88,7 +93,7 @@ def ask_avareno(payload: AssistantAskRequest) -> dict:
                 "confidence": 0.86,
             }
 
-        if any(word in question for word in ["fehlt", "missing", "unvollständig", "unvollstaendig", "complete"]):
+        if any(word in question for word in ["fehlt", "missing", "unvollständig", "unvollständig", "complete"]):
             incomplete = [item for item in items if item.get("missingFields")]
             return {
                 "intent": "missing",

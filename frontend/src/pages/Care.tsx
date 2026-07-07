@@ -286,7 +286,7 @@ function CareDetail({
   }
 
   const isDone = loop.status === "DONE" || loop.status === "ARCHIVED";
-  const itemBasePath = basePath.startsWith("/app") ? "/app/items" : "/items";
+  const itemBasePath = basePath.startsWith("/app") ? "/app/dinge" : "/items";
   const overdue = dateScore(loop.dueDate ?? loop.reminderAt) < Date.now();
   const steps = buildCareSteps(loop, linkedItem, isDone, overdue);
 
@@ -380,19 +380,7 @@ function CareLoadError({ onRetry }: { onRetry: () => void }) {
 
 function CareEmpty() {
   return (
-    <div className="av-empty-rich">
-      <div className="av-empty-visual">
-        <ObjectMemoryGraph
-          title="Bosch Waschmaschine"
-          category="Beispiel · so sieht ein Care-Punkt aus"
-          icon={<PackageCheck size={14} />}
-          edges={[
-            { tone: "amber", label: "Garantie endet in 30 Tagen" },
-            { tone: "teal", label: "Erinnerung: Seriennummer nachtragen" },
-            { tone: "green", label: "Beleg gespeichert" }
-          ]}
-        />
-      </div>
+    <div className="av-empty-rich av-empty-start">
       <div className="av-empty-copy">
         <h3>Nichts steht gerade an</h3>
         <p>Care behält Garantie-Enden, Rückgaben, Reparaturen und offene Zusagen im Blick und meldet sich, bevor eine Frist verstreicht. Lege eine Erinnerung an, damit nichts untergeht.</p>
