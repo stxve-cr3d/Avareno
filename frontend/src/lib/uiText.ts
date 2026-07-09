@@ -60,7 +60,8 @@ const missingFieldLabels: Record<string, string> = {
   "driver/software": "Treiber/Software",
   "support contact": "Support-Kontakt",
   "model data": "Modelldaten",
-  "purchase data": "Kaufdaten"
+  "purchase data": "Kaufdaten",
+  room: "Raum"
 };
 
 export function missingFieldLabel(value: string) {

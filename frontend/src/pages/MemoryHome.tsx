@@ -72,6 +72,9 @@ export function MemoryHome() {
   const receiptCount = items.reduce((sum, item) => sum + (item.documents?.length ?? 0), 0);
   const reminderCount = items.reduce((sum, item) => sum + (item.loops?.length ?? 0), 0);
   const openCount = items.reduce((sum, item) => sum + openPointsOf(item), 0);
+  const memoryHealth = hasItems
+    ? Math.round(items.reduce((sum, item) => sum + (item.completenessScore ?? 0), 0) / items.length)
+    : 0;
 
   return (
     <main className="av-console mem-home">
@@ -79,7 +82,11 @@ export function MemoryHome() {
         <div className="mem-home-head-copy">
           <span className="av-page-kicker">Privater Speicher</span>
           <h1 className="av-page-title">Zuhause</h1>
-          <p className="av-page-sub">Alles, was zu deinen Objekten gehört, an einem Ort.</p>
+          <p className="av-page-sub">
+            {hasItems
+              ? "Alles, was zu deinen Objekten gehört, an einem Ort."
+              : "Avareno ist ein privates Gedächtnis für das echte Leben — es verknüpft Produkte, Dokumente, Garantien, Reparaturen, Erinnerungen und Geräte, damit alles Wichtige organisiert, auffindbar und nutzbar bleibt."}
+          </p>
         </div>
         <div className="mem-home-head-actions">
           <ActionButton to="/app/capture" icon={<Plus size={15} />}>
@@ -153,11 +160,12 @@ export function MemoryHome() {
         <section className="av-console-section">
           <div className="av-console-section-head">
             <div>
-              <span>Überblick</span>
-              <h2>Deine Übersicht</h2>
+              <span>Memory Health</span>
+              <h2>Wie vollständig dein Gedächtnis ist</h2>
             </div>
           </div>
           <div className="mem-overview-grid">
+            <StatusSummaryCard label="Vollständigkeit Ø" value={`${memoryHealth}%`} tone={memoryHealth >= 80 ? "success" : "warning"} />
             <StatusSummaryCard label="Objekte" value={items.length} />
             <StatusSummaryCard label="Belege & Dokumente" value={receiptCount} tone={receiptCount > 0 ? "neutral" : "warning"} />
             <StatusSummaryCard label="Erinnerungen" value={reminderCount} />

@@ -45,7 +45,7 @@ export function UniversalCapture() {
       method: "POST",
       body: JSON.stringify(draft.draftItem)
     });
-    navigate(`/app/dinge/${item.id}`);
+    navigate(`/app/dinge/${item.id}`, { state: { justCreated: true } });
   }
 
   return (

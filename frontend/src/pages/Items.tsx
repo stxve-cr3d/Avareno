@@ -145,7 +145,7 @@ export function Items() {
             <div className="av-console-section-head">
               <div>
                 <span>Objektgedächtnis</span>
-                <h2>{filtered.length} gespeicherte Objekte</h2>
+                <h2>{filtered.length === 1 ? "1 gespeichertes Objekt" : `${filtered.length} gespeicherte Objekte`}</h2>
               </div>
             </div>
 
@@ -260,8 +260,8 @@ function categoryBucket(item: Item): Category {
   const s = `${item.category ?? ""} ${item.itemType ?? ""} ${item.name ?? ""}`.toLowerCase();
   if (/tv|fernseh|oled|media|monitor|display|beamer/.test(s)) return "TV / Media";
   if (/audio|sound|kopfhörer|kopfhoerer|headphone|speaker|lautsprecher|hifi/.test(s)) return "Audio";
-  if (/werkstatt|tool|werkzeug|repair|printer|drucker|maschine|bike|fahrrad|garten/.test(s)) return "Werkstatt";
   if (/haushalt|kitchen|küche|kueche|wasch|appliance|staubsauger|haus/.test(s)) return "Haushalt";
+  if (/werkstatt|tool|werkzeug|repair|printer|drucker|maschine|bike|fahrrad|garten/.test(s)) return "Werkstatt";
   return "Sonstiges";
 }
 

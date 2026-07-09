@@ -10,6 +10,7 @@ import { Button } from "../components/Button";
 
 type PassportForm = {
   name: string;
+  itemType: string;
   category: string;
   manufacturer: string;
   model: string;
@@ -29,8 +30,19 @@ type PassportForm = {
   supportContact: string;
 };
 
+/* Same values the backend stores and ItemDetail labels — no new taxonomy. */
+const itemTypes: { value: string; label: string }[] = [
+  { value: "THING", label: "Objekt / Produkt" },
+  { value: "ELECTRONIC", label: "Elektronik / Gerät" },
+  { value: "FURNITURE", label: "Möbel" },
+  { value: "INFRASTRUCTURE", label: "Haus & Infrastruktur" },
+  { value: "VEHICLE", label: "Fahrzeug" },
+  { value: "COLLECTIBLE", label: "Sammlung" }
+];
+
 const initialForm: PassportForm = {
   name: "",
+  itemType: "THING",
   category: "Sonstiges",
   manufacturer: "",
   model: "",
@@ -90,12 +102,12 @@ export function CaptureItem() {
           softwareUrl: nullable(form.softwareUrl),
           supportUrl: nullable(form.supportUrl),
           supportContact: nullable(form.supportContact),
-          itemType: "THING",
+          itemType: form.itemType,
           currency: "EUR",
           visibility: "HOUSEHOLD"
         })
       });
-      navigate(`/app/items/${item.id}`);
+      navigate(`/app/dinge/${item.id}`, { state: { justCreated: true } });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Der Produktpass konnte nicht erstellt werden.");
     } finally {
@@ -142,7 +154,7 @@ export function CaptureItem() {
       setScannerOpen(false);
       const productId = parseAvarenoProductQr(value);
       if (productId) {
-        navigate(`/app/items/${productId}`);
+        navigate(`/app/dinge/${productId}`);
         return;
       }
       setForm((current) => ({ ...current, barcode: value }));
@@ -206,7 +218,7 @@ export function CaptureItem() {
                     {lookupResult.item ? (
                       <span>
                         Schon gespeichert als <strong className="text-ink">{lookupResult.item.name}</strong>.
-                        <button className="ml-2 font-black text-leaf" onClick={() => navigate(`/app/items/${lookupResult.item?.id}`)} type="button">
+                        <button className="ml-2 font-black text-leaf" onClick={() => navigate(`/app/dinge/${lookupResult.item?.id}`)} type="button">
                           Öffnen
                         </button>
                       </span>
@@ -221,6 +233,7 @@ export function CaptureItem() {
                 ) : null}
               </div>
               <Field label="Name" value={form.name} onChange={(value) => updateField("name", value)} placeholder="LG OLED C3 Wohnzimmer" required />
+              <SelectField label="Art" value={form.itemType} onChange={(value) => updateField("itemType", value)} options={itemTypes} />
               <Field label="Kategorie" value={form.category} onChange={(value) => updateField("category", value)} placeholder="TV, Airfryer, Router" />
               <Field label="Hersteller" value={form.manufacturer} onChange={(value) => updateField("manufacturer", value)} placeholder="LG" />
               <Field label="Modell" value={form.model} onChange={(value) => updateField("model", value)} placeholder="OLED65C3" />
@@ -360,6 +373,25 @@ function Field({
         required={required}
         value={value}
       />
+    </label>
+  );
+}
+
+function SelectField({ label, onChange, options, value }: { label: string; onChange: (value: string) => void; options: { value: string; label: string }[]; value: string }) {
+  return (
+    <label className="block text-sm font-bold text-ink">
+      {label}
+      <select
+        className="mt-2 w-full rounded-lg border border-line bg-[#f8faf9] p-3 text-sm font-semibold outline-none focus:border-leaf"
+        onChange={(event) => onChange(event.target.value)}
+        value={value}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }

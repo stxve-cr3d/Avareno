@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import QRCode from "qrcode";
 import {
   ArrowLeft,
@@ -115,6 +115,11 @@ const documentTypes = ["RECEIPT", "WARRANTY", "MANUAL", "DRIVER", "SOFTWARE", "O
 export function ItemDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  // First-value moment: shown once right after this object was created.
+  const [showCreatedNotice, setShowCreatedNotice] = useState<boolean>(
+    Boolean((location.state as { justCreated?: boolean } | null)?.justCreated)
+  );
   const [item, setItem] = useState<Item | null>(null);
   const [serialNumber, setSerialNumber] = useState("");
   const [ownershipForm, setOwnershipForm] = useState<OwnershipForm>({
@@ -616,6 +621,18 @@ export function ItemDetail() {
           )
         }
       />
+
+      {showCreatedNotice ? (
+        <div className="av-detail-notices">
+          <InlineNotice
+            variant="success"
+            title="Avareno merkt sich das jetzt für dich."
+            description="Beleg, Garantie, Dokumente und offene Punkte bleiben mit diesem Objekt verbunden — und du siehst hier, was noch fehlt."
+            actionLabel="Verstanden"
+            onAction={() => setShowCreatedNotice(false)}
+          />
+        </div>
+      ) : null}
 
       {!receiptPresent || warrantyNeedsAttention ? (
         <div className="av-detail-notices">
