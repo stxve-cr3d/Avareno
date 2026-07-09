@@ -79,7 +79,7 @@ export function MemoryHome() {
         <div className="mem-home-head-copy">
           <span className="av-page-kicker">Privater Speicher</span>
           <h1 className="av-page-title">Zuhause</h1>
-          <p className="av-page-sub">Alles, was zu deinen Dingen gehört, an einem Ort.</p>
+          <p className="av-page-sub">Alles, was zu deinen Objekten gehört, an einem Ort.</p>
         </div>
         <div className="mem-home-head-actions">
           <ActionButton to="/app/capture" icon={<Plus size={15} />}>
@@ -88,7 +88,7 @@ export function MemoryHome() {
         </div>
       </header>
 
-      <QuickCapture firstRun={!hasItems} />
+      {!hasItems ? <QuickCapture firstRun /> : null}
 
       <section className="av-console-section">
         <div className="av-console-section-head">
@@ -127,7 +127,7 @@ export function MemoryHome() {
                 key={item.id}
                 to={`/app/dinge/${item.id}`}
                 category={item.category || itemTypeLabel(item.itemType)}
-                name={displayName(item.name)}
+                name={item.name}
                 icon={<Package size={14} />}
                 completeness={item.completenessScore ?? 0}
                 invoicePresent={hasReceipt(item)}
@@ -146,6 +146,8 @@ export function MemoryHome() {
           </div>
         )}
       </section>
+
+      {hasItems ? <QuickCapture /> : null}
 
       {hasItems ? (
         <section className="av-console-section">
@@ -275,7 +277,7 @@ function buildAttention(items: Item[]): AttentionEntry[] {
       tone: "warranty",
       icon: <ShieldCheck size={16} />,
       label: "Garantie läuft bald ab",
-      title: displayName(warrantyItem.name),
+      title: warrantyItem.name,
       detail: `Garantie läuft in ${days} Tagen ab`,
       signal: `${days} Tage`,
       action: "Erinnerung öffnen",
@@ -290,7 +292,7 @@ function buildAttention(items: Item[]): AttentionEntry[] {
       tone: "invoice",
       icon: <ReceiptText size={16} />,
       label: "Beleg fehlt",
-      title: displayName(noReceipt.name),
+      title: noReceipt.name,
       detail: "Für dieses Objekt ist noch kein Beleg gespeichert",
       signal: "Beleg fehlt",
       action: "Beleg hinzufügen",
@@ -307,7 +309,7 @@ function buildAttention(items: Item[]): AttentionEntry[] {
       tone: "care",
       icon: <Wrench size={16} />,
       label: "Offener Punkt",
-      title: displayName(openItem.name),
+      title: openItem.name,
       detail: "Ein offener Punkt wartet bei diesem Objekt",
       signal: "Offen",
       action: "Ansehen",
@@ -316,12 +318,6 @@ function buildAttention(items: Item[]): AttentionEntry[] {
   }
 
   return out;
-}
-
-function displayName(name: string) {
-  if (name.toLowerCase().includes("3d printer")) return "Smartes Gerät";
-  if (name.toLowerCase().includes("test passport")) return "Produktpass";
-  return name;
 }
 
 function itemTypeLabel(value?: string | null) {

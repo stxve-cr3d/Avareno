@@ -49,9 +49,9 @@ const marketingCopy = {
         title: "Produkt",
         links: [
           { to: "/#dinge", label: "Objekte" },
-          { to: "/#dinge", label: "Resolve" },
-          { to: "/#dinge", label: "Care" },
-          { to: "/datenschutz", label: "Privater Vault" }
+          { to: "/#how-it-works", label: "Ablauf" },
+          { to: "/#pricing", label: "Preise" },
+          { to: "/#security", label: "Privater Vault" }
         ]
       },
       {
@@ -108,9 +108,9 @@ const marketingCopy = {
         title: "Product",
         links: [
           { to: "/#dinge", label: "Objekte" },
-          { to: "/#dinge", label: "Resolve" },
-          { to: "/#dinge", label: "Care" },
-          { to: "/datenschutz", label: "Private Vault" }
+          { to: "/#how-it-works", label: "How it works" },
+          { to: "/#pricing", label: "Pricing" },
+          { to: "/#security", label: "Private Vault" }
         ]
       },
       {

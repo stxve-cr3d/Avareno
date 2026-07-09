@@ -47,6 +47,7 @@ import {
 import { api, apiResourceUrl, dateInputValue, isoDate } from "../lib/api";
 import { getAuthAccessToken } from "../lib/authClient";
 import { productQrUrl } from "../lib/productQr";
+import { missingFieldLabel } from "../lib/uiText";
 import type { Document as MemoryDocument, Item, Loop, RepairLog, SmartHomeDevice, SupportDraft, SupportDraftAttachment } from "../lib/types";
 import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
@@ -351,7 +352,7 @@ export function ItemDetail() {
     setBusy(`document-delete-${documentId}`);
     try {
       await api(`/api/documents/${documentId}`, { method: "DELETE" });
-      setDetailMessage("Dokument gelÃ¶scht");
+      setDetailMessage("Dokument gelöscht");
       await load();
     } finally {
       setBusy("");
@@ -383,7 +384,7 @@ export function ItemDetail() {
     try {
       extractedJson = parseExtractedJson(reviewJsonText);
     } catch {
-      setReviewError("JSON ist nicht gÃ¼ltig. Bitte korrigiere die Struktur oder leere das Feld.");
+      setReviewError("JSON ist nicht gültig. Bitte korrigiere die Struktur oder leere das Feld.");
       return;
     }
 
@@ -415,7 +416,7 @@ export function ItemDetail() {
       });
       setReviewText("");
       setReviewJsonText("");
-      setDetailMessage("KI-Extraktion gelÃ¶scht");
+      setDetailMessage("KI-Extraktion gelöscht");
       await load();
     } finally {
       setBusy("");
@@ -468,7 +469,7 @@ export function ItemDetail() {
         body: JSON.stringify({
           itemId: item.id,
           title: reminderTitle,
-          description: `Offener Punkt fÃ¼r ${item.name}`,
+          description: `Offener Punkt für ${item.name}`,
           sourceType: "DEVICE",
           priority: "MEDIUM",
           dueDate: due.toISOString(),
@@ -554,7 +555,7 @@ export function ItemDetail() {
     }).catch(() => undefined);
   }
 
-  if (!item) return <div className="py-12 text-center text-sm font-semibold text-muted">Loading your item...</div>;
+  if (!item) return <div className="py-12 text-center text-sm font-semibold text-muted">Objekt wird geladen…</div>;
 
   const warranty = warrantyState(item.warrantyUntil);
   const documents = item.documents ?? [];
@@ -600,7 +601,7 @@ export function ItemDetail() {
   return (
     <main className="av-page">
       <Link className="av-back" to="/app/items">
-        <ArrowLeft size={15} /> ZurÃ¼ck zu Objekte
+        <ArrowLeft size={15} /> Zurück zu Objekte
       </Link>
 
       <AppPageHeader
@@ -609,9 +610,9 @@ export function ItemDetail() {
         subtitle={identity}
         actions={
           receiptPresent ? (
-            <ActionButton to="/app/care" icon={<BellRing size={15} />}>Erinnerung Ã¶ffnen</ActionButton>
+            <ActionButton to="/app/care" icon={<BellRing size={15} />}>Erinnerung öffnen</ActionButton>
           ) : (
-            <ActionButton to="/app/capture/receipt" icon={<Plus size={15} />}>Beleg hinzufÃ¼gen</ActionButton>
+            <ActionButton to="/app/capture/receipt" icon={<Plus size={15} />}>Beleg hinzufügen</ActionButton>
           )
         }
       />
@@ -622,8 +623,8 @@ export function ItemDetail() {
             <InlineNotice
               variant="warning"
               title="Beleg fehlt"
-              description={`FÃ¼r ${item.name} ist noch kein Kaufnachweis gespeichert.`}
-              actionLabel="Beleg hinzufÃ¼gen"
+              description={`Für ${item.name} ist noch kein Kaufnachweis gespeichert.`}
+              actionLabel="Beleg hinzufügen"
               actionTo="/app/capture/receipt"
             />
           ) : null}
@@ -633,9 +634,9 @@ export function ItemDetail() {
               title="Garantie endet bald"
               description={`${item.name} ${warrantyCountdownLabel(wDays ?? 0)}. Du kannst eine Erinnerung anlegen.`}
               actionLabel="Erinnerung anlegen"
-              secondaryActionLabel="SpÃ¤ter"
+              secondaryActionLabel="Später"
               onAction={() => {
-                setReminderTitle((current) => current || "Garantie prÃ¼fen");
+                setReminderTitle((current) => current || "Garantie prüfen");
                 document.getElementById("item-care-reminder")?.scrollIntoView({ behavior: "smooth", block: "center" });
               }}
               onDismiss={() => setDismissedWarrantyItemId(item.id)}
@@ -666,7 +667,7 @@ export function ItemDetail() {
               </div>
               <ProgressLine value={item.completenessScore} tone={missing.length ? "amber" : "teal"} />
               <p className={`av-profile-missing ${missing.length ? "av-th-amber" : "av-th-ok"}`}>
-                {missing.length ? `Fehlt noch: ${missing.join(", ")}` : "Alles Wichtige ist verbunden."}
+                {missing.length ? `Fehlt noch: ${missing.map(missingFieldLabel).join(", ")}` : "Alles Wichtige ist verbunden."}
               </p>
             </div>
             <dl className="av-metalist">
@@ -681,7 +682,7 @@ export function ItemDetail() {
 
         <div className="av-profile-side">
           <div className="av-profile-block">
-            <span className="av-label-sm">Object Memory Graph</span>
+            <span className="av-label-sm">Objektgedächtnis</span>
             <ObjectMemoryGraph title={item.name} category={item.category || "Produkt"} icon={<Package size={14} />} edges={profileEdges} />
           </div>
           <div className="av-profile-block">
@@ -689,8 +690,8 @@ export function ItemDetail() {
             <WarrantyTimeline
               elapsedPct={warrantyElapsedPct(item.purchaseDate, item.warrantyUntil)}
               daysLeft={wDays}
-              purchaseLabel={`Kauf Â· ${formatDate(item.purchaseDate)}`}
-              endLabel={`Ende Â· ${formatDate(item.warrantyUntil)}`}
+              purchaseLabel={`Kauf · ${formatDate(item.purchaseDate)}`}
+              endLabel={`Ende · ${formatDate(item.warrantyUntil)}`}
             />
           </div>
         </div>
@@ -885,7 +886,7 @@ export function ItemDetail() {
                       disabled={busy === `document-open-${document.id}`}
                       onClick={() => void openPassportDocument(document)}
                       type="button"
-                      aria-label={`${document.fileName} Ã¶ffnen`}
+                      aria-label={`${document.fileName} öffnen`}
                     >
                       <ReceiptText size={19} />
                     </button>
@@ -899,14 +900,14 @@ export function ItemDetail() {
                       onClick={() => void openPassportDocument(document)}
                       type="button"
                     >
-                      Ã–ffnen
+                      Öffnen
                     </button>
                     <button
                       className="rounded-md border border-line px-3 py-2 text-xs font-black text-ink transition hover:border-leaf hover:text-leaf"
                       onClick={() => openDocumentReview(document)}
                       type="button"
                     >
-                      PrÃ¼fen
+                      Prüfen
                     </button>
                     {documentsEditing ? (
                       <button
@@ -929,16 +930,16 @@ export function ItemDetail() {
               <div className="mt-4 rounded-lg border border-line bg-white p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <span className="text-[0.68rem] font-black uppercase tracking-[0.08em] text-muted">KI-Extraktion prÃ¼fen</span>
+                    <span className="text-[0.68rem] font-black uppercase tracking-[0.08em] text-muted">KI-Extraktion prüfen</span>
                     <h3 className="mt-1 text-base font-black text-ink">{reviewDocument.fileName}</h3>
-                    <p className="mt-1 text-sm font-semibold leading-6 text-muted">Korrigiere nur die gespeicherten Extraktionsdaten. Die Originaldatei bleibt unverÃ¤ndert.</p>
+                    <p className="mt-1 text-sm font-semibold leading-6 text-muted">Korrigiere nur die gespeicherten Extraktionsdaten. Die Originaldatei bleibt unverändert.</p>
                   </div>
                   <button
                     className="rounded-md border border-line px-3 py-2 text-xs font-black text-muted transition hover:border-leaf hover:text-leaf"
                     onClick={() => setReviewDocumentId(null)}
                     type="button"
                   >
-                    SchlieÃŸen
+                    Schließen
                   </button>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -1038,7 +1039,7 @@ export function ItemDetail() {
               </label>
               <div className="flex items-end">
                 <Button className="w-full" onClick={addRepairLog} icon={<Plus size={18} />} disabled={!repairDraft.problem.trim()}>
-                  Reparatur hinzufÃ¼gen
+                  Reparatur hinzufügen
                 </Button>
               </div>
             </div>
@@ -1052,7 +1053,7 @@ export function ItemDetail() {
           </section>
 
           <section className="object-panel rounded-lg p-4 md:p-5">
-            <SectionTitle eyebrow="Verlauf" title="AktivitÃ¤t" icon={<CheckCircle2 size={19} />} />
+            <SectionTitle eyebrow="Verlauf" title="Aktivität" icon={<CheckCircle2 size={19} />} />
             <div className="mt-5 grid gap-3">
               {item.activities?.length ? (
                 item.activities.map((activity) => (
@@ -1071,7 +1072,7 @@ export function ItemDetail() {
 
         <aside className="space-y-5 lg:sticky lg:top-28 lg:self-start">
           <section className="object-panel rounded-lg p-4" id="item-care-reminder">
-            <SectionTitle eyebrow="Smart-GerÃ¤t" title="GerÃ¤testeuerung" icon={<RadioTower size={19} />} />
+            <SectionTitle eyebrow="Smart-Gerät" title="Gerätesteuerung" icon={<RadioTower size={19} />} />
             <div className="mt-5 grid gap-3">
               {item.smartHomeDevices?.length ? (
                 item.smartHomeDevices.map((device) => (
@@ -1130,7 +1131,7 @@ export function ItemDetail() {
                 ))
               ) : (
                 <div className="rounded-lg border border-dashed border-line bg-white/70 p-4 text-sm font-bold text-muted">
-                  Noch kein Smart-Home-GerÃ¤t verbunden.
+                  Noch kein Smart-Home-Gerät verbunden.
                 </div>
               )}
               <Link className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-ink px-4 text-sm font-black text-white" to="/app/smart-home">
@@ -1166,7 +1167,7 @@ export function ItemDetail() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Shop Ã¶ffnen <ExternalLink size={16} />
+                  Shop öffnen <ExternalLink size={16} />
                 </a>
               ) : (
                 <div className="rounded-lg border border-dashed border-line bg-white/70 p-4 text-sm font-bold text-muted">Kein Nachkauf-Link verbunden.</div>
@@ -1295,7 +1296,7 @@ export function ItemDetail() {
                     {supportDraft.attachments.length ? (
                       supportDraft.attachments.map((attachment) => <SupportAttachmentLine attachment={attachment} key={attachment.id} />)
                     ) : (
-                      <div className="rounded-lg border border-dashed border-line bg-white/70 p-3 text-xs font-black text-muted">Noch keine AnhÃ¤nge vorbereitet.</div>
+                      <div className="rounded-lg border border-dashed border-line bg-white/70 p-3 text-xs font-black text-muted">Noch keine Anhänge vorbereitet.</div>
                     )}
                   </div>
 
@@ -1326,7 +1327,7 @@ export function ItemDetail() {
                 value={reminderTitle}
                 onChange={(event) => setReminderTitle(event.target.value)}
                 className="min-w-0 flex-1 rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
-                placeholder="z.B. Garantie prÃ¼fen"
+                placeholder="z.B. Garantie prüfen"
               />
               <Button disabled={!reminderTitle.trim() || busy === "care-create"} onClick={addReminder} icon={<Plus size={18} />}>
                 Care anlegen
@@ -1348,9 +1349,9 @@ function warrantyDaysLeft(value?: string | null): number | null {
 }
 
 function warrantyCountdownLabel(daysLeft: number) {
-  if (daysLeft <= 0) return "lÃ¤uft heute aus";
-  if (daysLeft === 1) return "lÃ¤uft morgen aus";
-  return `lÃ¤uft in ${daysLeft} Tagen aus`;
+  if (daysLeft <= 0) return "läuft heute aus";
+  if (daysLeft === 1) return "läuft morgen aus";
+  return `läuft in ${daysLeft} Tagen aus`;
 }
 
 function warrantyElapsedPct(purchase?: string | null, end?: string | null): number {
@@ -1416,7 +1417,7 @@ function itemTypeLabel(value?: string | null) {
   const labels: Record<string, string> = {
     THING: "Objekt",
     ELECTRONIC: "Elektronik",
-    FURNITURE: "MÃ¶bel",
+    FURNITURE: "Möbel",
     INFRASTRUCTURE: "Infrastruktur",
     VEHICLE: "Fahrzeug",
     COLLECTIBLE: "Sammlung"
@@ -1489,16 +1490,16 @@ function ProductRecommendationPanel({
   const activeRecommendations = recommendations.filter((recommendation) => recommendation.tab === tab);
   const tabItems: { id: RecommendationTab; label: string; helper: string }[] = [
     { id: "spare", label: "Ersatzteile", helper: "Teile und Reparatur" },
-    { id: "buy", label: "ZubehÃ¶r", helper: "Kaufen oder nachbestellen" },
+    { id: "buy", label: "Zubehör", helper: "Kaufen oder nachbestellen" },
     { id: "print", label: "Druckdateien", helper: "Nur einfache, nicht kritische Teile" },
-    { id: "check", label: "PrÃ¼fen", helper: "Unsichere Treffer" }
+    { id: "check", label: "Prüfen", helper: "Unsichere Treffer" }
   ];
 
   return (
     <section className="object-panel rounded-lg p-4 md:p-5">
-      <SectionTitle eyebrow="Empfehlungen" title="Passendes fÃ¼r dieses Objekt" icon={<Package size={19} />} />
+      <SectionTitle eyebrow="Empfehlungen" title="Passendes für dieses Objekt" icon={<Package size={19} />} />
       <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-muted">
-        Avareno zeigt hier kuratierte Beispiel-Links zu erkannten Produkten â€“ noch keine automatische Teilesuche. PrÃ¼fe jeden Treffer vor dem Kauf; was nicht eindeutig zum Modell passt, bleibt in â€žPrÃ¼fenâ€œ.
+        Avareno zeigt hier kuratierte Beispiel-Links zu erkannten Produkten â€“ noch keine automatische Teilesuche. Prüfe jeden Treffer vor dem Kauf; was nicht eindeutig zum Modell passt, bleibt in â€žPrüfenâ€œ.
       </p>
 
       <div className="item-rec-tabs" role="tablist" aria-label="Empfehlungen">
@@ -1521,7 +1522,7 @@ function ProductRecommendationPanel({
           <div className="item-rec-empty">
             <ShieldAlert size={19} />
             <strong>Noch nichts Sicheres gefunden</strong>
-            <p>FÃ¼r dieses Produkt braucht Avareno zuerst ein eindeutiges Modell, eine Seriennummer oder eine verlÃ¤ssliche Quelle.</p>
+            <p>Für dieses Produkt braucht Avareno zuerst ein eindeutiges Modell, eine Seriennummer oder eine verlässliche Quelle.</p>
           </div>
         )}
       </div>
@@ -1532,7 +1533,7 @@ function ProductRecommendationPanel({
 function ProductRecommendationCard({ recommendation }: { recommendation: ProductRecommendation }) {
   return (
     <article className="item-rec-card">
-      <a className="item-rec-image" href={recommendation.sourceUrl} target="_blank" rel="noreferrer" aria-label={`${recommendation.title} Ã¶ffnen`}>
+      <a className="item-rec-image" href={recommendation.sourceUrl} target="_blank" rel="noreferrer" aria-label={`${recommendation.title} öffnen`}>
         <img src={recommendation.imageUrl} alt="" loading="lazy" />
       </a>
       <div className="item-rec-body">
@@ -1607,7 +1608,7 @@ function ProductQrPanel({ item }: { item: Item }) {
           {qrDataUrl ? <img src={qrDataUrl} alt={`QR-Code für ${item.name}`} /> : <QrCode size={56} />}
         </div>
         <div className="product-qr-copy">
-          <p>Der Code Ã¶ffnet diesen Produktpass in Avareno. Er enthÃ¤lt keine Seriennummer, keinen Preis und keine Dokumentdaten.</p>
+          <p>Der Code öffnet diesen Produktpass in Avareno. Er enthält keine Seriennummer, keinen Preis und keine Dokumentdaten.</p>
           <span>{qrUrl}</span>
         </div>
       </div>
@@ -1715,57 +1716,57 @@ function productRecommendationsFor(item: Item): ProductRecommendation[] {
     {
       id: "lg-c3-parts-search",
       tab: "spare",
-      title: "LG Ersatzteile fÃ¼r OLED65C3 suchen",
+      title: "LG Ersatzteile für OLED65C3 suchen",
       subtitle: "Ersatzteile",
       imageUrl,
       sourceName: "LG Parts",
       sourceUrl: "https://lgparts.com/search?q=OLED65C3",
       actionLabel: "Teile suchen",
-      availabilityLabel: "Modellsuche geÃ¶ffnet",
+      availabilityLabel: "Modellsuche geöffnet",
       confidenceLabel: "Quelle: Teilekatalog",
-      note: "Direkte Suche nach deinem Modell. Avareno empfiehlt noch kein einzelnes Teil als final passend, bevor Seriennummer und Teilenummer bestÃ¤tigt sind.",
+      note: "Direkte Suche nach deinem Modell. Avareno empfiehlt noch kein einzelnes Teil als final passend, bevor Seriennummer und Teilenummer bestätigt sind.",
       verification: "check"
     },
     {
       id: "lg-c3-power-board-check",
       tab: "check",
-      title: "Power Supply Board EAY65689424 prÃ¼fen",
+      title: "Power Supply Board EAY65689424 prüfen",
       subtitle: "Unsicheres Ersatzteil",
       imageUrl: "https://www.lg.com/content/dam/channel/wcms/mx/images/accesorios/eay65689424_awmxlat_ecom_s_ecom_s_1100x730.jpg",
-      sourceName: "LG ZubehÃ¶rseite",
+      sourceName: "LG Zubehörseite",
       sourceUrl: "https://www.lg.com/mx/accesorios-para-tv/eay65689424/",
-      actionLabel: "Quelle prÃ¼fen",
+      actionLabel: "Quelle prüfen",
       availabilityLabel: "Nicht final empfohlen",
-      confidenceLabel: "ModellprÃ¼fung nÃ¶tig",
-      note: "Reales LG-Ersatzteil mit Produktbild, aber nicht als sicherer Match fÃ¼r OLED65C3 markiert. Vor Kauf muss die exakte Modell-/Seriennummer passen.",
+      confidenceLabel: "Modellprüfung nötig",
+      note: "Reales LG-Ersatzteil mit Produktbild, aber nicht als sicherer Match für OLED65C3 markiert. Vor Kauf muss die exakte Modell-/Seriennummer passen.",
       verification: "check"
     },
     {
       id: "lg-c3-magic-remote",
       tab: "buy",
       title: "LG Magic Remote",
-      subtitle: "ZubehÃ¶r",
+      subtitle: "Zubehör",
       imageUrl: "https://www.lg.com/us/images/tv-audio-video-accessories/md08003585/gallery/medium01.jpg",
       sourceName: "LG",
       sourceUrl: "https://www.lg.com/us/magic-remote",
       actionLabel: "Ansehen",
-      availabilityLabel: "Offizielle ZubehÃ¶rseite",
-      confidenceLabel: "KompatibilitÃ¤t im Shop prÃ¼fen",
-      note: "Sinnvolles ZubehÃ¶r fÃ¼r LG TVs. Avareno zeigt es hier als Kaufvorschlag, aber finaler Kauf erst nach ModellprÃ¼fung im LG-Shop.",
+      availabilityLabel: "Offizielle Zubehörseite",
+      confidenceLabel: "Kompatibilität im Shop prüfen",
+      note: "Sinnvolles Zubehör für LG TVs. Avareno zeigt es hier als Kaufvorschlag, aber finaler Kauf erst nach Modellprüfung im LG-Shop.",
       verification: "check"
     },
     {
       id: "lg-c3-remote-holder-print",
       tab: "print",
-      title: "LG C3 Wandhalter fÃ¼r Magic Remote",
+      title: "LG C3 Wandhalter für Magic Remote",
       subtitle: "Druckdatei",
       imageUrl: "https://www.lg.com/us/images/tv-audio-video-accessories/md08003585/gallery/medium01.jpg",
       sourceName: "MakerWorld",
       sourceUrl: "https://makerworld.com/en/models/448222-lg-c3-wall-mounted-magic-remote-holder",
-      actionLabel: "Druckdatei Ã¶ffnen",
+      actionLabel: "Druckdatei öffnen",
       availabilityLabel: "3D-Datei",
       confidenceLabel: "Nicht sicherheitskritisch",
-      note: "Ein einfacher Halter fÃ¼r die Fernbedienung ist ein gutes Beispiel fÃ¼r Druckdateien: praktisch, niedriges Risiko, kein sicherheitskritisches Ersatzteil.",
+      note: "Ein einfacher Halter für die Fernbedienung ist ein gutes Beispiel für Druckdateien: praktisch, niedriges Risiko, kein sicherheitskritisches Ersatzteil.",
       verification: "exact"
     },
     {
@@ -1776,7 +1777,7 @@ function productRecommendationsFor(item: Item): ProductRecommendation[] {
       imageUrl,
       sourceName: "LG Support",
       sourceUrl: item.supportUrl || "https://www.lg.com/support/product/lg-OLED65C3",
-      actionLabel: "Support Ã¶ffnen",
+      actionLabel: "Support öffnen",
       availabilityLabel: "Offizielle Quelle",
       confidenceLabel: "Modellquelle gespeichert",
       note: "Handbuch, Firmware und Support bleiben direkt am Objekt. Das ist oft hilfreicher als sofort ein Kaufteil vorzuschlagen.",
@@ -2075,5 +2076,5 @@ function warrantyState(value?: string | null): { label: string; tone: "green" | 
   const days = Math.ceil((new Date(value).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   if (days < 0) return { label: "Garantie abgelaufen", tone: "red" };
   if (days < 60) return { label: `${days} Tage`, tone: "amber" };
-  return { label: "GeschÃ¼tzt", tone: "green" };
+  return { label: "Geschützt", tone: "green" };
 }

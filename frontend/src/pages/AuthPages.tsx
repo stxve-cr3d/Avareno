@@ -38,10 +38,10 @@ declare global {
 }
 
 const onboardingOptions = [
-  "Produkte & Rechnungen merken",
+  "Produkte & Geräte",
+  "Dokumente & Rechnungen",
   "Garantien & Erinnerungen",
-  "Hilfe Über Resolve",
-  "3D-Druck / Ersatzteile später"
+  "Smart Home"
 ];
 const phoneCountries = [
   { code: "DE", dialCode: "+49", flag: "🇩🇪", label: "Deutschland" },
@@ -244,7 +244,7 @@ export function OnboardingPage() {
   const [privateProfile, setPrivateProfile] = useState(true);
   const [motivationEnabled, setMotivationEnabled] = useState(true);
   const [leaderboardEnabled, setLeaderboardEnabled] = useState(false);
-  const [interests, setInterests] = useState<string[]>(["Produkte & Rechnungen merken", "Garantien & Erinnerungen"]);
+  const [interests, setInterests] = useState<string[]>(["Produkte & Geräte", "Garantien & Erinnerungen"]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (auth.status === "loading") {

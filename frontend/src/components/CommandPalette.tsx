@@ -7,6 +7,7 @@ import {
   BellRing,
   Box,
   FileText,
+  FolderLock,
   Home,
   LifeBuoy,
   ListChecks,
@@ -43,6 +44,7 @@ const NAV_COMMANDS: Command[] = [
   { label: "Resolve", hint: "Offene Anfragen", icon: <LifeBuoy size={16} />, to: "/app/resolve", keywords: "support tickets hilfe" },
   { label: "Dokumente", hint: "Hausakte", icon: <FileText size={16} />, to: "/app/reports/home-binder", keywords: "documents belege nachweise" },
   { label: "Verbunden", hint: "Geräte & Quellen", icon: <Router size={16} />, to: "/app/smart-home", keywords: "smart home geraete quellen" },
+  { label: "Private Vault", hint: "Sensible Dokumente mit PIN", icon: <FolderLock size={16} />, to: "/app/vault", keywords: "vault tresor pin sensibel dokumente" },
   { label: "Ich", hint: "Profil & Datenschutz", icon: <UserRound size={16} />, to: "/app/ich", keywords: "profil privacy freunde konto" }
 ];
 

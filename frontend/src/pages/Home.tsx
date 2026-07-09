@@ -34,7 +34,8 @@ function getHomeContent(language: "de" | "en") {
         body: "Save products, receipts, warranties, documents and reminders so you can actually find them again later.",
         primary: "Start for free",
         secondary: "See an example",
-        actionsAria: "Primary actions"
+        actionsAria: "Primary actions",
+        trust: "Private by default · Export anytime · No ads"
       },
       gallery: {
         eyebrow: "Examples",
@@ -121,7 +122,8 @@ function getHomeContent(language: "de" | "en") {
       body: "Speichere Produkte, Belege, Garantien, Dokumente und Erinnerungen so, dass du sie später wirklich wiederfindest.",
       primary: "Kostenlos starten",
       secondary: "Beispiel ansehen",
-      actionsAria: "Wichtigste Aktionen"
+      actionsAria: "Wichtigste Aktionen",
+      trust: "Privat als Standard · Export jederzeit · keine Werbung"
     },
     gallery: {
       eyebrow: "Beispiele",
@@ -239,6 +241,9 @@ export function Home() {
                 <a className="site-secondary-button" href="#memory-gallery">
                   {copy.hero.secondary}
                 </a>
+              </Reveal>
+              <Reveal as="p" className="site-hero-trust" delay={380}>
+                <ShieldCheck size={14} /> {copy.hero.trust}
               </Reveal>
             </div>
 

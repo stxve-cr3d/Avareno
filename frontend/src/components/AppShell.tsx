@@ -1,5 +1,5 @@
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Archive, ChevronDown, FileText, Home, LifeBuoy, LogOut, MessageSquareText, Package, PenLine, Plus, ReceiptText, Search, ShieldCheck, UserRound, UsersRound, X } from "lucide-react";
+import { Archive, ChevronDown, FileText, FolderLock, Home, LifeBuoy, LogOut, MessageSquareText, Package, PenLine, Plus, ReceiptText, Search, ShieldCheck, UserRound, UsersRound, X } from "lucide-react";
 import { Suspense, useEffect, useRef, useState } from "react";
 import avarenoMark from "../assets/avareno-test-logo.png";
 import { useAuth } from "../lib/authProvider";
@@ -255,6 +255,10 @@ export function AppShell() {
                   <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" tabIndex={-1} to="/app/ich/privacy">
                     <ShieldCheck size={15} />
                     Privatsphäre
+                  </Link>
+                  <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" tabIndex={-1} to="/app/vault">
+                    <FolderLock size={15} />
+                    Private Vault
                   </Link>
                   <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" tabIndex={-1} to="/">
                     <Home size={15} />

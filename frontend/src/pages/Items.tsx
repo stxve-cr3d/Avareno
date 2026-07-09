@@ -82,7 +82,7 @@ export function Items() {
     <main className="av-console av-library">
       <section className="av-console-top">
         <div className="av-dashboard-header">
-          <span className="av-console-kicker">Object Memory Library</span>
+          <span className="av-console-kicker">Objektbibliothek</span>
           <div className="av-dashboard-title-row">
             <div>
               <h1>Objekte</h1>
@@ -92,7 +92,7 @@ export function Items() {
               Objekt erfassen <Plus size={14} />
             </Link>
           </div>
-          <div className="av-status-grid av-status-grid-4" aria-label="Objekte status summary">
+          <div className="av-status-grid av-status-grid-4" aria-label="Objekt-Statusübersicht">
             <StatusSummaryCard label="Objekte" value={items.length} />
             <StatusSummaryCard label="Dokumente" value={documentCount} />
             <StatusSummaryCard label="Offen" value={openTotal} tone={openTotal > 0 ? "warning" : "neutral"} />
@@ -106,7 +106,7 @@ export function Items() {
           <article className="av-console-section av-library-tools">
             <div className="av-console-section-head">
               <div>
-                <span>Object Memory Filter</span>
+                <span>Filter</span>
                 <h2>Objekte eingrenzen</h2>
               </div>
               <Link to="/app/capture/receipt">Rechnung scannen</Link>
@@ -144,7 +144,7 @@ export function Items() {
           <article className="av-console-section">
             <div className="av-console-section-head">
               <div>
-                <span>Object memory</span>
+                <span>Objektgedächtnis</span>
                 <h2>{filtered.length} gespeicherte Objekte</h2>
               </div>
             </div>

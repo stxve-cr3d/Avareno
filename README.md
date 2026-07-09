@@ -24,6 +24,8 @@ Frontend: http://localhost:5173
 Backend: http://localhost:4000
 API docs: http://localhost:4000/docs
 
+The Vite dev server proxies `/api` and `/uploads` to `VITE_API_ORIGIN` (default `http://localhost:4000`). If you run the backend elsewhere — e.g. the Docker image, which defaults to port 4001 — set `VITE_API_ORIGIN` in `frontend/.env.local`.
+
 Local auth expects `frontend/.env.local` and `backend/.env.local`. The frontend uses the Supabase publishable key; the backend verifies Supabase access tokens through Supabase Auth before serving `/api/*` routes.
 
 ## Cloudflare Pages

@@ -48,3 +48,21 @@ export function formatUiText(value: string) {
 export function formatUiTextList(values: string[]) {
   return values.map(formatUiText);
 }
+
+/* The backend reports missing passport fields as stable English tokens
+   (see backend/app/services/item_service.py missing_fields). Translate
+   them at the display layer only. */
+const missingFieldLabels: Record<string, string> = {
+  receipt: "Beleg",
+  "serial number": "Seriennummer",
+  "warranty date": "Garantiedatum",
+  manual: "Anleitung",
+  "driver/software": "Treiber/Software",
+  "support contact": "Support-Kontakt",
+  "model data": "Modelldaten",
+  "purchase data": "Kaufdaten"
+};
+
+export function missingFieldLabel(value: string) {
+  return missingFieldLabels[value] ?? value;
+}

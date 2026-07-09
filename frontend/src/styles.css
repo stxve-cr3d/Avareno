@@ -21102,6 +21102,16 @@ a:focus-visible {
   padding: 0 1.1rem;
 }
 
+.site-hero-trust {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 1.1rem 0 0;
+  font-size: 0.8rem;
+  color: var(--av-text-muted, rgba(237, 237, 237, 0.6));
+}
+.site-hero-trust svg { color: #3ecf8e; flex-shrink: 0; }
+
 .site-hero-preview {
   min-width: 0;
 }

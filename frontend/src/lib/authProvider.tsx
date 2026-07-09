@@ -85,7 +85,7 @@ const defaultDevProfile: UserProfile = {
   motivationEnabled: true,
   leaderboardEnabled: false,
   privateProfile: true,
-  onboardingInterests: ["Produkte & Rechnungen merken", "Garantien & Erinnerungen"],
+  onboardingInterests: ["Produkte & Geräte", "Garantien & Erinnerungen"],
   weeklyXp: 180,
   totalXp: 2840,
   currentStreakDays: 6,

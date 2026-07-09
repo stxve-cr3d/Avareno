@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, Camera, CheckCircle2, FileText, PackagePlus, ScanLine, Sparkles, Wand2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
+import { missingFieldLabel } from "../lib/uiText";
 import type { Item, ProductStructure, UniversalCaptureDraft } from "../lib/types";
 
 const examples = [
@@ -15,7 +16,8 @@ export function UniversalCapture() {
   const navigate = useNavigate();
   const [structure, setStructure] = useState<ProductStructure | null>(null);
   const [text, setText] = useState("");
-  const [inputType, setInputType] = useState("TEXT");
+  // Photo capture is planned; until it exists, text is the only real input mode.
+  const inputType = "TEXT";
   const [spaceId, setSpaceId] = useState("");
   const [draft, setDraft] = useState<UniversalCaptureDraft | null>(null);
   const [busy, setBusy] = useState(false);
@@ -43,7 +45,7 @@ export function UniversalCapture() {
       method: "POST",
       body: JSON.stringify(draft.draftItem)
     });
-    navigate(`/app/items/${item.id}`);
+    navigate(`/app/dinge/${item.id}`);
   }
 
   return (
@@ -55,13 +57,13 @@ export function UniversalCapture() {
             ein Eingang für alles
           </h1>
           <p className="mt-5 max-w-2xl text-base font-semibold leading-7 text-white/62">
-            Schreib, fotografiere oder scanne. Avareno macht daraus ein Objektprofil, ohne dass du in Datenbankfeldern denken musst.
+            Beschreib in einem Satz, was da ist. Avareno macht daraus ein Objektprofil, ohne dass du in Datenbankfeldern denken musst.
           </p>
         </div>
         <div className="capture-mode-grid">
-          <ModeButton active={inputType === "TEXT"} icon={<FileText size={17} />} label="Text" onClick={() => setInputType("TEXT")} />
-          <ModeButton active={inputType === "PHOTO"} icon={<Camera size={17} />} label="Foto" onClick={() => setInputType("PHOTO")} />
-          <ModeButton active={inputType === "RECEIPT"} icon={<ScanLine size={17} />} label="Beleg" onClick={() => setInputType("RECEIPT")} />
+          <ModeButton active icon={<FileText size={17} />} label="Text" onClick={() => {}} />
+          <ModeButton active={false} icon={<ScanLine size={17} />} label="Beleg hochladen" onClick={() => navigate("/app/capture/receipt")} />
+          <ModeButton active={false} disabled icon={<Camera size={17} />} label="Foto (geplant)" onClick={() => {}} />
         </div>
       </section>
 
@@ -104,7 +106,7 @@ export function UniversalCapture() {
           </div>
 
           <button className="capture-primary" disabled={!text || busy} onClick={generateDraft} type="button">
-            {busy ? "Avareno denkt..." : "Entwurf erstellen"}
+            {busy ? "Entwurf wird erstellt…" : "Entwurf erstellen"}
             <ArrowRight size={16} />
           </button>
         </div>
@@ -142,7 +144,7 @@ export function UniversalCapture() {
                 ))}
               </div>
 
-              <p className="text-sm font-semibold text-muted">Fehlt als Nächstes: {draft.missing.join(", ")}</p>
+              <p className="text-sm font-semibold text-muted">Fehlt als Nächstes: {draft.missing.map(missingFieldLabel).join(", ")}</p>
 
               <button className="capture-primary" onClick={createItem} type="button">
                 Objektprofil erstellen <ArrowRight size={16} />
@@ -159,9 +161,9 @@ export function UniversalCapture() {
   );
 }
 
-function ModeButton({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
+function ModeButton({ active, disabled = false, icon, label, onClick }: { active: boolean; disabled?: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
   return (
-    <button className={`capture-mode-button ${active ? "capture-mode-button-active" : ""}`} onClick={onClick} type="button">
+    <button className={`capture-mode-button ${active ? "capture-mode-button-active" : ""}`} disabled={disabled} onClick={onClick} type="button">
       {icon}
       {label}
     </button>
