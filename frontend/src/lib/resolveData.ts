@@ -202,7 +202,7 @@ export const resolveTickets: ResolveTicket[] = [
       "Wahrscheinlich ein instabiler HDMI-Handshake nach dem Firmware-Wechsel. Am besten passen S95C-Besitzer mit One-Connect- oder Receiver-Erfahrung.",
     categorySuggestion: "Signal / Firmware / HDMI-Handshake",
     matchFactors: [
-      { label: "Gleiches Produkt", score: 35, detail: "Samsung OLED S95C im Inventar verifiziert" },
+      { label: "Gleiches Produkt", score: 35, detail: "Samsung OLED S95C im Objektgedächtnis verifiziert" },
       { label: "Gleiches Modell", score: 20, detail: "QE65S95C passt exakt" },
       { label: "Ähnlich gelöst", score: 15, detail: "HDMI-Aussetzer bereits gelöst" },
       { label: "Besitz bestätigt", score: 10, detail: "Rechnung und Seriennummer gespeichert" },
@@ -256,7 +256,7 @@ export const resolveTickets: ResolveTicket[] = [
     aiSummary: "Wahrscheinlich ein Multipoint-Prioritätskonflikt. Passende Helfer haben XM5-Erfahrung mit macOS/iOS.",
     categorySuggestion: "Bluetooth / Multipoint",
     matchFactors: [
-      { label: "Gleiches Produkt", score: 35, detail: "WH-1000XM5 im Inventar" },
+      { label: "Gleiches Produkt", score: 35, detail: "WH-1000XM5 im Objektgedächtnis" },
       { label: "Gleiche Firmware", score: 10, detail: "2.1.x Generation" },
       { label: "Ähnlich gelöst", score: 15, detail: "Multipoint-Reset bereits erfolgreich" },
       { label: "Besitz bestätigt", score: 10, detail: "Besitznachweis gespeichert" },

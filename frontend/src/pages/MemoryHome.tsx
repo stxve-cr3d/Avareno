@@ -145,8 +145,8 @@ export function MemoryHome() {
           </div>
         ) : (
           <div className="av-empty">
-            <p className="av-empty-title">Noch nichts gespeichert.</p>
-            <div className="av-empty-body">Füge dein erstes Objekt oder einen Beleg hinzu.</div>
+            <p className="av-empty-title">Dein Gedächtnis ist noch leer.</p>
+            <div className="av-empty-body">Füge dein erstes Objekt oder einen Beleg hinzu — Avareno verbindet Beleg, Garantie, Dokumente und offene Punkte damit und meldet sich, wenn etwas Aufmerksamkeit braucht.</div>
             <div className="av-empty-actions">
               <SecondaryAction to="/app/capture/item">Objekt hinzufügen</SecondaryAction>
             </div>
