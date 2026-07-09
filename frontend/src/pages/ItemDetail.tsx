@@ -679,7 +679,7 @@ export function ItemDetail() {
           <div className="av-profile-facts">
             <div className="av-profile-complete">
               <div className="av-profile-complete-head">
-                <span>Gespeicherte Details</span>
+                <span>Was Avareno kennt</span>
                 <strong>{item.completenessScore}%</strong>
               </div>
               <ProgressLine value={item.completenessScore} tone={missing.length ? "amber" : "teal"} />

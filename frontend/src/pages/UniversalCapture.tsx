@@ -54,10 +54,10 @@ export function UniversalCapture() {
         <div>
           <p className="text-xs font-black uppercase text-leaf">Smart erfassen</p>
           <h1 className="mt-3 max-w-4xl text-[clamp(3rem,7vw,7rem)] font-black leading-[0.9] text-white">
-            ein Eingang für alles
+            Ein Eingang für alles
           </h1>
           <p className="mt-5 max-w-2xl text-base font-semibold leading-7 text-white/62">
-            Beschreib in einem Satz, was da ist. Avareno macht daraus ein Objektprofil, ohne dass du in Datenbankfeldern denken musst.
+            Beschreib in einem Satz, was da ist. Avareno merkt es sich als Objektprofil — mit allem, was dazugehört.
           </p>
         </div>
         <div className="capture-mode-grid">
@@ -74,7 +74,7 @@ export function UniversalCapture() {
               <p className="text-xs font-black uppercase text-muted">Eingabe</p>
               <h2 className="mt-1 text-3xl font-black text-ink">Sag Avareno was da ist.</h2>
             </div>
-            <span className="grid h-11 w-11 place-items-center rounded-full bg-ink text-white">
+            <span className="grid h-11 w-11 place-items-center rounded-full bg-leaf/10 text-leaf">
               <Wand2 size={18} />
             </span>
           </div>

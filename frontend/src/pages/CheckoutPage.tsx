@@ -267,7 +267,7 @@ const checkoutCopy = {
     providerNote: "Payment, payment methods and billing details are handled by Stripe. Avareno does not store payment details here.",
     savings: (value: string) => `Save ${value} per year`,
     limits: {
-      items: "Items",
+      items: "Objects",
       storage: "Documents",
       reminders: "Reminders",
       ai: "AI actions / month",

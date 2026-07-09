@@ -755,7 +755,7 @@ function PrivacyCenterPanel({
     void runAction("export", async () => {
       const result = await apiBlob("/api/privacy/export/bundle", { method: "POST" });
       downloadBlob(result.fileName ?? `avareno-export-${new Date().toISOString().slice(0, 10)}.zip`, result.blob);
-      return "ZIP-Export mit Datenbankdaten, Manifest und lokalen Dokumentdateien wurde erstellt.";
+      return "ZIP-Export mit deinen gespeicherten Daten, Manifest und lokalen Dokumentdateien wurde erstellt.";
     });
   }
 
@@ -900,7 +900,7 @@ function PrivacyCenterPanel({
             ))}
           </div>
           <div className="privacy-action-pair">
-            <Link className="profile-secondary-action" to="/app/vault">Vault verwalten</Link>
+            <Link className="profile-secondary-action" to="/app/vault">Vault öffnen</Link>
           </div>
         </PrivacySection>
 

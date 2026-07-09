@@ -200,7 +200,7 @@ function LibraryEmpty() {
     <div className="av-empty-rich av-empty-start">
       <div className="av-empty-copy">
         <h3>Noch keine Objekte gespeichert</h3>
-        <p>Füge dein erstes echtes Objekt hinzu. Danach kannst du Belege, Garantie, Dokumente, Smart-Home-Verknüpfungen und offene Punkte an einem Ort verwalten.</p>
+        <p>Füge dein erstes echtes Objekt hinzu. Danach bleiben Belege, Garantie, Dokumente, Smart-Home-Verknüpfungen und offene Punkte damit verbunden.</p>
         <div className="av-empty-actions">
           <ActionButton to="/app/capture/item" icon={<Plus size={15} />}>Objekt erfassen</ActionButton>
           <SecondaryAction to="/app/capture/receipt" icon={<ScanLine size={15} />}>Rechnung scannen</SecondaryAction>

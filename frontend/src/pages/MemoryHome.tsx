@@ -161,11 +161,15 @@ export function MemoryHome() {
           <div className="av-console-section-head">
             <div>
               <span>Memory Health</span>
-              <h2>Wie vollständig dein Gedächtnis ist</h2>
+              <h2>Was dein Gedächtnis schon kennt</h2>
             </div>
           </div>
           <div className="mem-overview-grid">
-            <StatusSummaryCard label="Vollständigkeit Ø" value={`${memoryHealth}%`} tone={memoryHealth >= 80 ? "success" : "warning"} />
+            <StatusSummaryCard
+              label="Gedächtnis-Stand"
+              value={`${memoryHealth}%`}
+              tone={memoryHealth >= 80 ? "success" : memoryHealth >= 40 ? "neutral" : "warning"}
+            />
             <StatusSummaryCard label="Objekte" value={items.length} />
             <StatusSummaryCard label="Belege & Dokumente" value={receiptCount} tone={receiptCount > 0 ? "neutral" : "warning"} />
             <StatusSummaryCard label="Erinnerungen" value={reminderCount} />
