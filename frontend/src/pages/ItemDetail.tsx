@@ -730,7 +730,7 @@ export function ItemDetail() {
                 {ownershipEditing ? <Lock size={15} /> : <Pencil size={15} />} {ownershipEditing ? "Sperren" : "Bearbeiten"}
               </button>
             </div>
-            <div className="mt-5 grid gap-3 rounded-lg border border-line bg-white p-3">
+            <div className="mt-5 grid gap-3 rounded-lg border border-line av-surface p-3">
               {ownershipEditing ? (
                 <>
                   <EditableDetailField icon={<Store size={18} />} label="Gekauft bei" value={ownershipForm.merchant} onChange={(value) => updateOwnershipField("merchant", value)} placeholder="Händler oder Shop" />
@@ -829,7 +829,7 @@ export function ItemDetail() {
                 </div>
               </>
             ) : (
-              <div className="mt-4 rounded-lg border border-line bg-white/70 p-3 text-sm font-bold text-muted">
+              <div className="mt-4 rounded-lg border border-line av-surface p-3 text-sm font-bold text-muted">
                 {passportLinkCount}/5 Hilfen gespeichert. Zum Ändern zuerst entsperren.
               </div>
             )}
@@ -852,11 +852,11 @@ export function ItemDetail() {
               </button>
             </div>
             {documentsEditing ? (
-              <div className="mt-5 rounded-lg border border-line bg-white p-3">
+              <div className="mt-5 rounded-lg border border-line av-surface p-3">
                 <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem_auto] md:items-end">
                   <label className="block text-sm font-bold text-ink">
                     Dokument hinzufügen
-                    <span className="mt-2 flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line bg-[#f8faf9] px-3 text-sm font-black text-muted transition hover:border-leaf hover:bg-leaf/5">
+                    <span className="mt-2 flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line av-surface-soft px-3 text-sm font-black text-muted transition hover:border-leaf hover:bg-leaf/5">
                       <UploadCloud className="shrink-0 text-leaf" size={18} />
                       <span className="min-w-0 truncate">{documentFile ? documentFile.name : "Datei wählen"}</span>
                       <input
@@ -870,7 +870,7 @@ export function ItemDetail() {
                   <label className="block text-sm font-bold text-ink">
                     Typ
                     <select
-                      className="mt-2 h-12 w-full rounded-lg border border-line bg-[#f8faf9] px-3 text-sm font-black text-ink outline-none focus:border-leaf"
+                      className="mt-2 h-12 w-full rounded-lg border border-line av-surface-soft px-3 text-sm font-black text-ink outline-none focus:border-leaf"
                       value={documentType}
                       onChange={(event) => setDocumentType(event.target.value as (typeof documentTypes)[number])}
                     >
@@ -887,7 +887,7 @@ export function ItemDetail() {
                 </div>
               </div>
             ) : (
-              <div className="mt-5 rounded-lg border border-line bg-white/70 p-3 text-sm font-bold text-muted">
+              <div className="mt-5 rounded-lg border border-line av-surface p-3 text-sm font-bold text-muted">
                 Upload und Löschen sind gesperrt. Dokumente können weiterhin geöffnet oder geprüft werden.
               </div>
             )}
@@ -895,11 +895,11 @@ export function ItemDetail() {
               {documents.length ? (
                 documents.map((document) => (
                   <div
-                    className="group flex items-center gap-3 rounded-lg border border-line bg-white p-3 text-sm font-bold text-ink transition hover:border-leaf hover:bg-leaf/5"
+                    className="group flex items-center gap-3 rounded-lg border border-line av-surface p-3 text-sm font-bold text-ink transition hover:border-leaf hover:bg-leaf/5"
                     key={document.id}
                   >
                     <button
-                      className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-[#eef2f0] text-leaf"
+                      className="grid h-12 w-12 shrink-0 place-items-center rounded-md av-accent-soft text-leaf"
                       disabled={busy === `document-open-${document.id}`}
                       onClick={() => void openPassportDocument(document)}
                       type="button"
@@ -940,11 +940,11 @@ export function ItemDetail() {
                   </div>
                 ))
               ) : (
-                <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">Noch kein Beleg oder Handbuch verbunden.</div>
+                <div className="rounded-lg border border-dashed border-line av-surface p-5 text-sm font-bold text-muted">Noch kein Beleg oder Handbuch verbunden.</div>
               )}
             </div>
             {reviewDocument ? (
-              <div className="mt-4 rounded-lg border border-line bg-white p-4">
+              <div className="mt-4 rounded-lg border border-line av-surface p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <span className="text-[0.68rem] font-black uppercase tracking-[0.08em] text-muted">KI-Extraktion prüfen</span>
@@ -963,7 +963,7 @@ export function ItemDetail() {
                   <label className="text-sm font-bold text-ink">
                     Extrahierter Text
                     <textarea
-                      className="mt-2 min-h-36 w-full resize-y rounded-lg border border-line bg-[#f8faf9] p-3 text-sm font-semibold leading-6 text-ink outline-none focus:border-leaf"
+                      className="mt-2 min-h-36 w-full resize-y rounded-lg border border-line av-surface-soft p-3 text-sm font-semibold leading-6 text-ink outline-none focus:border-leaf"
                       onChange={(event) => setReviewText(event.target.value)}
                       placeholder="Noch keine gespeicherte Textextraktion."
                       value={reviewText}
@@ -972,7 +972,7 @@ export function ItemDetail() {
                   <label className="text-sm font-bold text-ink">
                     Strukturierte Daten
                     <textarea
-                      className="mt-2 min-h-36 w-full resize-y rounded-lg border border-line bg-[#f8faf9] p-3 font-mono text-xs leading-5 text-ink outline-none focus:border-leaf"
+                      className="mt-2 min-h-36 w-full resize-y rounded-lg border border-line av-surface-soft p-3 font-mono text-xs leading-5 text-ink outline-none focus:border-leaf"
                       onChange={(event) => setReviewJsonText(event.target.value)}
                       placeholder='{"merchant":"...","warrantyUntil":"..."}'
                       value={reviewJsonText}
@@ -1004,7 +1004,7 @@ export function ItemDetail() {
 
           <section className="object-panel rounded-lg p-4 md:p-5">
             <SectionTitle eyebrow="Reparaturen" title="Was passiert ist" icon={<Hammer size={19} />} />
-            <div className="mt-5 grid gap-3 rounded-lg border border-line bg-white p-3 md:grid-cols-[9rem_minmax(0,1fr)]">
+            <div className="mt-5 grid gap-3 rounded-lg border border-line av-surface p-3 md:grid-cols-[9rem_minmax(0,1fr)]">
               <label className="text-sm font-bold text-ink">
                 Datum
                 <input
@@ -1064,7 +1064,7 @@ export function ItemDetail() {
               {repairLogs.length ? (
                 repairLogs.map((repair) => <RepairLogCard key={repair.id} repair={repair} currency={item.currency} />)
               ) : (
-                <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">Noch keine Reparaturhistorie.</div>
+                <div className="rounded-lg border border-dashed border-line av-surface p-5 text-sm font-bold text-muted">Noch keine Reparaturhistorie.</div>
               )}
             </div>
           </section>
@@ -1074,14 +1074,14 @@ export function ItemDetail() {
             <div className="mt-5 grid gap-3">
               {item.activities?.length ? (
                 item.activities.map((activity) => (
-                  <div className="rounded-lg border border-line bg-white p-4" key={activity.id}>
+                  <div className="rounded-lg border border-line av-surface p-4" key={activity.id}>
                     <p className="text-xs font-black uppercase text-muted">{activity.type}</p>
                     <p className="mt-1 text-sm font-black text-ink">{activity.message}</p>
                     <p className="mt-2 text-xs font-semibold text-muted">{formatDate(activity.createdAt)}</p>
                   </div>
                 ))
               ) : (
-                <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">Noch kein Verlauf vorhanden.</div>
+                <div className="rounded-lg border border-dashed border-line av-surface p-5 text-sm font-bold text-muted">Noch kein Verlauf vorhanden.</div>
               )}
             </div>
           </section>
@@ -1147,7 +1147,7 @@ export function ItemDetail() {
                   </div>
                 ))
               ) : (
-                <div className="rounded-lg border border-dashed border-line bg-white/70 p-4 text-sm font-bold text-muted">
+                <div className="rounded-lg border border-dashed border-line av-surface p-4 text-sm font-bold text-muted">
                   Noch kein Smart-Home-Gerät verbunden.
                 </div>
               )}
@@ -1187,7 +1187,7 @@ export function ItemDetail() {
                   Shop öffnen <ExternalLink size={16} />
                 </a>
               ) : (
-                <div className="rounded-lg border border-dashed border-line bg-white/70 p-4 text-sm font-bold text-muted">Kein Nachkauf-Link verbunden.</div>
+                <div className="rounded-lg border border-dashed border-line av-surface p-4 text-sm font-bold text-muted">Kein Nachkauf-Link verbunden.</div>
               )}
               {commerceEditing ? (
                 <>
@@ -1214,12 +1214,12 @@ export function ItemDetail() {
                   </Button>
                 </>
               ) : (
-                <div className="rounded-lg border border-line bg-white/70 p-3 text-sm font-bold text-muted">
+                <div className="rounded-lg border border-line av-surface p-3 text-sm font-bold text-muted">
                   Links sind geschützt. Zum Ändern zuerst entsperren.
                 </div>
               )}
               {detailMessage ? <p className="rounded-full bg-leaf/10 px-3 py-2 text-xs font-black text-leaf">{detailMessage}</p> : null}
-              <div className="grid gap-2 rounded-lg bg-white p-3 ring-1 ring-line">
+              <div className="grid gap-2 rounded-lg av-surface p-3 ring-1 ring-line">
                 <SmallFact icon={<Users size={16} />} label="Sichtbar" value={visibilityLabel(item.visibility)} />
                 <SmallFact icon={<Home size={16} />} label="Raum" value={item.space?.name ?? item.location ?? "Unbekannt"} />
                 <SmallFact icon={<Package size={16} />} label="Typ" value={itemTypeLabel(item.itemType)} />
@@ -1270,7 +1270,7 @@ export function ItemDetail() {
                 {busy === "support-draft" ? "Wird vorbereitet..." : "Support vorbereiten"}
               </Button>
               {supportDraft ? (
-                <div className="rounded-lg border border-line bg-white p-3">
+                <div className="rounded-lg border border-line av-surface p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-black uppercase text-muted">Supportpaket</p>
@@ -1284,7 +1284,7 @@ export function ItemDetail() {
                     <ProgressBar value={supportReadyScore} />
                   </div>
 
-                  <div className="mt-4 grid gap-3 rounded-lg bg-[#f8faf9] p-3">
+                  <div className="mt-4 grid gap-3 rounded-lg av-surface-soft p-3">
                     <div>
                       <p className="text-xs font-black uppercase text-muted">An</p>
                       <p className="mt-1 break-words text-sm font-black text-ink">{supportDraft.to}</p>
@@ -1313,12 +1313,12 @@ export function ItemDetail() {
                     {supportDraft.attachments.length ? (
                       supportDraft.attachments.map((attachment) => <SupportAttachmentLine attachment={attachment} key={attachment.id} />)
                     ) : (
-                      <div className="rounded-lg border border-dashed border-line bg-white/70 p-3 text-xs font-black text-muted">Noch keine Anhänge vorbereitet.</div>
+                      <div className="rounded-lg border border-dashed border-line av-surface p-3 text-xs font-black text-muted">Noch keine Anhänge vorbereitet.</div>
                     )}
                   </div>
 
                   <textarea
-                    className="mt-4 min-h-56 w-full resize-y rounded-lg border border-line bg-[#f8faf9] p-3 text-sm font-semibold leading-6 text-ink outline-none focus:border-leaf"
+                    className="mt-4 min-h-56 w-full resize-y rounded-lg border border-line av-surface-soft p-3 text-sm font-semibold leading-6 text-ink outline-none focus:border-leaf"
                     value={supportDraft.body}
                     onChange={(event) => setSupportDraft((current) => (current ? { ...current, body: event.target.value } : current))}
                   />
@@ -1327,7 +1327,7 @@ export function ItemDetail() {
                   </div>
                 </div>
               ) : (
-                <div className="rounded-lg border border-dashed border-line bg-white/70 p-4 text-sm font-bold text-muted">
+                <div className="rounded-lg border border-dashed border-line av-surface p-4 text-sm font-bold text-muted">
                   Nutzt Produktpass, Garantie, Seriennummer und Reparaturhistorie.
                 </div>
               )}
@@ -1351,7 +1351,7 @@ export function ItemDetail() {
               </Button>
             </div>
             <div className="mt-4 grid gap-3">
-              {loops.length ? loops.map((loop) => <LoopCard key={loop.id} loop={loop} />) : <div className="rounded-lg border border-dashed border-line bg-white/70 p-5 text-sm font-bold text-muted">Noch keine Care-Punkte für dieses Produkt.</div>}
+              {loops.length ? loops.map((loop) => <LoopCard key={loop.id} loop={loop} />) : <div className="rounded-lg border border-dashed border-line av-surface p-5 text-sm font-bold text-muted">Noch keine Care-Punkte für dieses Produkt.</div>}
             </div>
           </section>
         </aside>
@@ -1446,7 +1446,7 @@ function PassportLink({ icon, label, saved = false, url }: { icon: ReactNode; la
   const isSaved = Boolean(url || saved);
   const content = (
     <>
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-[#eef2f0] text-leaf">{icon}</span>
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md av-accent-soft text-leaf">{icon}</span>
       <span className="min-w-0 flex-1">
         <span className="block text-xs font-black uppercase text-muted">{label}</span>
         <span className="mt-1 block truncate text-sm font-black text-ink">{isSaved ? "Gespeichert" : "Fehlt"}</span>
@@ -1457,14 +1457,14 @@ function PassportLink({ icon, label, saved = false, url }: { icon: ReactNode; la
 
   if (!url) {
     return (
-      <div className={`flex min-h-16 items-center gap-3 rounded-lg border p-3 ${isSaved ? "border-line bg-white" : "border-dashed border-line bg-white/70"}`}>
+      <div className={`flex min-h-16 items-center gap-3 rounded-lg border p-3 ${isSaved ? "border-line av-surface" : "border-dashed border-line av-surface"}`}>
         {content}
       </div>
     );
   }
 
   return (
-    <a className="flex min-h-16 items-center gap-3 rounded-lg border border-line bg-white p-3 transition hover:border-leaf hover:bg-leaf/5" href={url} target="_blank" rel="noreferrer">
+    <a className="flex min-h-16 items-center gap-3 rounded-lg border border-line av-surface p-3 transition hover:border-leaf hover:bg-leaf/5" href={url} target="_blank" rel="noreferrer">
       {content}
     </a>
   );
@@ -1807,7 +1807,7 @@ function SupportAttachmentLine({ attachment }: { attachment: SupportDraftAttachm
   const [opening, setOpening] = useState(false);
   const content = (
     <>
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-[#eef2f0] text-leaf">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md av-accent-soft text-leaf">
         <FileText size={16} />
       </span>
       <span className="min-w-0 flex-1">
@@ -1819,7 +1819,7 @@ function SupportAttachmentLine({ attachment }: { attachment: SupportDraftAttachm
   );
 
   if (!attachment.filePath) {
-    return <div className="flex min-h-12 items-center gap-3 rounded-lg border border-line bg-white p-2">{content}</div>;
+    return <div className="flex min-h-12 items-center gap-3 rounded-lg border border-line av-surface p-2">{content}</div>;
   }
 
   async function openAttachment() {
@@ -1837,7 +1837,7 @@ function SupportAttachmentLine({ attachment }: { attachment: SupportDraftAttachm
 
   return (
     <button
-      className="flex min-h-12 w-full items-center gap-3 rounded-lg border border-line bg-white p-2 text-left transition hover:border-leaf hover:bg-leaf/5 disabled:opacity-50"
+      className="flex min-h-12 w-full items-center gap-3 rounded-lg border border-line av-surface p-2 text-left transition hover:border-leaf hover:bg-leaf/5 disabled:opacity-50"
       disabled={opening}
       onClick={() => void openAttachment()}
       type="button"
@@ -1850,7 +1850,7 @@ function SupportAttachmentLine({ attachment }: { attachment: SupportDraftAttachm
 function SupportChecklistLine({ entry }: { entry: { detail: string; label: string; status: string } }) {
   const ready = entry.status === "ready";
   return (
-    <div className="grid gap-1 rounded-lg border border-line bg-white p-3">
+    <div className="grid gap-1 rounded-lg border border-line av-surface p-3">
       <div className="flex items-center justify-between gap-2">
         <span className="flex min-w-0 items-center gap-2 text-xs font-black text-ink">
           {ready ? <ClipboardCheck className="shrink-0 text-leaf" size={15} /> : <FileText className="shrink-0 text-amber" size={15} />}
@@ -1867,7 +1867,7 @@ function SupportChecklistLine({ entry }: { entry: { detail: string; label: strin
 
 function RepairLogCard({ currency, repair }: { currency: string; repair: RepairLog }) {
   return (
-    <div className="rounded-lg border border-line bg-white p-4">
+    <div className="rounded-lg border border-line av-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-black uppercase text-muted">{formatDate(repair.date)}</p>
@@ -1954,7 +1954,7 @@ function printerMetrics(device: SmartHomeDevice) {
 
 function SmallFact({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <div className="flex min-w-0 items-center gap-2 rounded-full bg-white/75 px-3 py-2 ring-1 ring-white/80">
+    <div className="flex min-w-0 items-center gap-2 rounded-full av-surface px-3 py-2 ring-1 ring-white/80">
       <span className="shrink-0 text-leaf">{icon}</span>
       <span className="min-w-0">
         <span className="block text-[10px] font-black uppercase text-muted">{label}</span>
@@ -1966,8 +1966,8 @@ function SmallFact({ icon, label, value }: { icon: ReactNode; label: string; val
 
 function HeroFact({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-line bg-white p-3">
-      <div className="mb-3 grid h-9 w-9 place-items-center rounded-md bg-[#eef2f0] text-leaf">{icon}</div>
+    <div className="rounded-lg border border-line av-surface p-3">
+      <div className="mb-3 grid h-9 w-9 place-items-center rounded-md av-accent-soft text-leaf">{icon}</div>
       <p className="text-[11px] font-black uppercase text-muted">{label}</p>
       <p className="mt-1 truncate text-sm font-black text-ink">{value}</p>
     </div>
@@ -2002,11 +2002,11 @@ function EditableDetailField({
   value: string;
 }) {
   return (
-    <label className="grid gap-3 rounded-lg border border-line bg-white p-3 sm:grid-cols-[2.5rem_11rem_1fr] sm:items-center">
-      <span className="grid h-10 w-10 place-items-center rounded-md bg-[#eef2f0] text-leaf">{icon}</span>
+    <label className="grid gap-3 rounded-lg border border-line av-surface p-3 sm:grid-cols-[2.5rem_11rem_1fr] sm:items-center">
+      <span className="grid h-10 w-10 place-items-center rounded-md av-accent-soft text-leaf">{icon}</span>
       <span className="text-xs font-black uppercase text-muted">{label}</span>
       <input
-        className="min-h-10 min-w-0 rounded-md border border-line bg-[#f8faf9] px-3 text-sm font-black text-ink outline-none transition focus:border-leaf focus:bg-white"
+        className="min-h-10 min-w-0 rounded-md border border-line av-surface-soft px-3 text-sm font-black text-ink outline-none transition focus:border-leaf"
         onChange={(event) => onChange(event.currentTarget.value)}
         placeholder={placeholder}
         step={type === "number" ? "0.01" : undefined}
@@ -2020,7 +2020,7 @@ function EditableDetailField({
 function DetailRow({ icon, label, onClick, value }: { icon: ReactNode; label: string; onClick: () => void; value: string }) {
   const content = (
     <>
-      <span className="grid h-10 w-10 place-items-center rounded-md bg-[#eef2f0] text-leaf">{icon}</span>
+      <span className="grid h-10 w-10 place-items-center rounded-md av-accent-soft text-leaf">{icon}</span>
       <span className="text-xs font-black uppercase text-muted">{label}</span>
       <span className="min-w-0 break-words text-base font-black text-ink">{value}</span>
     </>

@@ -68,7 +68,7 @@ export function CaptureReceipt() {
 
   return (
     <div className="capture-receipt-page space-y-5">
-      <div className="rounded-3xl border border-white/80 bg-paper p-5 shadow-soft ring-1 ring-line/60">
+      <div className="rounded-3xl border border-white/80 av-surface p-5 ring-1 ring-line/60">
         <div className="flex items-start gap-3">
           <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-leaf/10 text-leaf">
             <ReceiptText size={22} />
@@ -82,7 +82,7 @@ export function CaptureReceipt() {
       </div>
 
       <Card>
-        <label className="flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-3xl border border-dashed border-line bg-wash p-5 text-center transition hover:border-leaf hover:bg-leaf/5">
+        <label className="flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-3xl border border-dashed border-line av-surface p-5 text-center transition hover:border-leaf hover:bg-leaf/5">
           <UploadCloud className="text-leaf" />
           <span className="mt-3 text-sm font-black text-ink">{file ? file.name : "Belegbild oder PDF auswählen"}</span>
           <span className="mt-1 text-xs font-semibold text-muted">Bild oder PDF</span>
@@ -91,7 +91,7 @@ export function CaptureReceipt() {
         <textarea
           value={manualText}
           onChange={(event) => setManualText(event.target.value)}
-          className="mt-4 min-h-28 w-full rounded-2xl border border-line bg-white p-4 text-sm font-semibold leading-6 outline-none focus:border-leaf"
+          className="mt-4 min-h-28 w-full rounded-2xl border border-line av-surface p-4 text-sm font-semibold leading-6 outline-none focus:border-leaf"
           placeholder="Optionaler Text für die Vorschau-Extraktion"
         />
         <Button className="mt-4 w-full" onClick={extract} disabled={busy || (!file && !manualText.trim())} icon={<Wand2 size={18} />}>

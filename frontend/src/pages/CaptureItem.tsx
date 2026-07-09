@@ -167,7 +167,7 @@ export function CaptureItem() {
     <form className="capture-item-page mx-auto max-w-6xl space-y-5" onSubmit={createItem}>
       <BarcodeScannerDialog onClose={() => setScannerOpen(false)} onDetected={handleBarcodeDetected} open={scannerOpen} />
 
-      <section className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
+      <section className="overflow-hidden rounded-lg border border-line av-surface">
         <div className="grid gap-5 bg-[#101111] p-5 text-white md:grid-cols-[minmax(0,1fr)_18rem] md:p-7">
           <div>
             <p className="text-xs font-bold uppercase text-white/50">Produktpass</p>
@@ -194,7 +194,7 @@ export function CaptureItem() {
                 <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                   <Field label="Barcode / GTIN" value={form.barcode} onChange={(value) => updateField("barcode", value)} placeholder="EAN, UPC oder GTIN" inputMode="numeric" />
                   <button
-                    className="mt-7 inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 text-sm font-bold text-ink transition hover:border-leaf hover:text-leaf"
+                    className="mt-7 inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-line av-surface px-4 text-sm font-bold text-ink transition hover:border-leaf hover:text-leaf"
                     data-testid="barcode-scan-open"
                     onClick={() => setScannerOpen(true)}
                     type="button"
@@ -214,7 +214,7 @@ export function CaptureItem() {
                   </button>
                 </div>
                 {lookupResult ? (
-                  <div className="mt-2 rounded-lg border border-line bg-[#f8faf9] p-3 text-sm font-semibold text-muted">
+                  <div className="mt-2 rounded-lg border border-line av-surface-soft p-3 text-sm font-semibold text-muted">
                     {lookupResult.item ? (
                       <span>
                         Schon gespeichert als <strong className="text-ink">{lookupResult.item.name}</strong>.
@@ -268,7 +268,7 @@ export function CaptureItem() {
         </div>
 
         <aside className="space-y-5 lg:sticky lg:top-28 lg:self-start">
-          <section className="rounded-lg border border-line bg-white p-4 shadow-soft">
+          <section className="rounded-lg border border-line av-surface p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-black uppercase text-muted">Bereit zum Speichern</p>
@@ -333,7 +333,7 @@ function PassportSection({
   );
 
   return (
-    <section className="rounded-lg border border-line bg-white p-4 shadow-soft md:p-5">
+    <section className="rounded-lg border border-line av-surface p-4 md:p-5">
       {collapsible ? (
         <button aria-controls={bodyId} aria-expanded={open} className={open ? "mb-5 w-full" : "w-full"} onClick={() => setOpen((value) => !value)} type="button">
           {heading}
@@ -365,7 +365,7 @@ function Field({
     <label className="block text-sm font-bold text-ink">
       {label}
       <input
-        className="mt-2 w-full rounded-lg border border-line bg-[#f8faf9] p-3 text-sm font-semibold outline-none focus:border-leaf"
+        className="mt-2 w-full rounded-lg border border-line av-surface-soft p-3 text-sm font-semibold outline-none focus:border-leaf"
         inputMode={inputMode}
         onChange={(event) => onChange(event.target.value)}
         onInput={(event) => onChange(event.currentTarget.value)}
@@ -382,7 +382,7 @@ function SelectField({ label, onChange, options, value }: { label: string; onCha
     <label className="block text-sm font-bold text-ink">
       {label}
       <select
-        className="mt-2 w-full rounded-lg border border-line bg-[#f8faf9] p-3 text-sm font-semibold outline-none focus:border-leaf"
+        className="mt-2 w-full rounded-lg border border-line av-surface-soft p-3 text-sm font-semibold outline-none focus:border-leaf"
         onChange={(event) => onChange(event.target.value)}
         value={value}
       >
@@ -401,7 +401,7 @@ function DateField({ label, onChange, value }: { label: string; onChange: (value
     <label className="block text-sm font-bold text-ink">
       {label}
       <input
-        className="mt-2 w-full rounded-lg border border-line bg-[#f8faf9] p-3 text-sm font-semibold outline-none focus:border-leaf"
+        className="mt-2 w-full rounded-lg border border-line av-surface-soft p-3 text-sm font-semibold outline-none focus:border-leaf"
         onChange={(event) => onChange(event.target.value)}
         onInput={(event) => onChange(event.currentTarget.value)}
         type="date"
@@ -414,7 +414,7 @@ function DateField({ label, onChange, value }: { label: string; onChange: (value
 function PassportSignal({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="flex min-h-16 items-center gap-3 rounded-lg border border-white/10 bg-white/10 p-3">
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-white text-ink">{icon}</span>
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md av-surface text-ink">{icon}</span>
       <span className="min-w-0">
         <span className="block text-xs font-black uppercase text-white/50">{label}</span>
         <span className="mt-1 block truncate text-sm font-black text-white">{value}</span>
@@ -425,7 +425,7 @@ function PassportSignal({ icon, label, value }: { icon: ReactNode; label: string
 
 function PreviewLine({ label, ready }: { label: string; ready: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-[#f8faf9] px-3 py-2">
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-line av-surface-soft px-3 py-2">
       <span className="text-sm font-black text-ink">{label}</span>
       <span className={`rounded-full px-2.5 py-1 text-xs font-black ${ready ? "bg-leaf/10 text-leaf" : "bg-amber/10 text-amber"}`}>
         {ready ? "gespeichert" : "später"}

@@ -18595,6 +18595,13 @@ a:focus-visible {
    the Avareno dark identity through these overrides.
    ============================================================ */
 
+/* Stable surface tokens. Markup migrated away from legacy light
+   utilities (bg-white, bg-[#f8faf9], …) uses these instead; values
+   mirror the override mappings below so rendering is identical. */
+.av-surface { background-color: var(--av-bg-panel); }
+.av-surface-soft { background-color: var(--av-bg-base); }
+.av-accent-soft { background-color: var(--av-accent-bg); }
+
 /* Legacy Tailwind text colors → dark theme */
 .avareno-app-shell .text-ink { color: var(--av-text-primary); }
 .avareno-app-shell .text-muted { color: var(--av-text-muted); }
@@ -18612,29 +18619,16 @@ a:focus-visible {
 .avareno-app-shell .text-ink\/28,
 .avareno-app-shell .text-ink\/25 { color: var(--av-text-secondary); }
 
-/* Legacy light panel backgrounds → dark panels */
-.avareno-app-shell .bg-white,
-.avareno-app-shell .bg-paper,
-.avareno-app-shell .bg-wash,
-.avareno-app-shell .bg-mist,
-.avareno-app-shell .bg-white\/70,
-.avareno-app-shell .bg-white\/75,
-.avareno-app-shell .bg-white\/78,
-.avareno-app-shell .bg-white\/80 { background-color: var(--av-bg-panel) !important; }
-
-/* Legacy borders + shadows */
+/* Legacy borders */
 .avareno-app-shell .border-line { border-color: var(--av-border-subtle); }
 .avareno-app-shell .border-white\/80,
 .avareno-app-shell .border-white\/70 { border-color: var(--av-border-subtle); }
-.avareno-app-shell .shadow-soft { box-shadow: none; }
 
 /* Legacy icon-tile and accent/warning tinted backgrounds */
 .avareno-app-shell .bg-leaf\/10,
 .avareno-app-shell .bg-leaf\/5  { background-color: var(--av-accent-bg) !important; }
 .avareno-app-shell .bg-amber\/10,
 .avareno-app-shell .bg-amber\/12 { background-color: var(--av-warning-bg) !important; }
-.avareno-app-shell .bg-\[\#eef2f0\] { background-color: var(--av-accent-bg) !important; }
-.avareno-app-shell .bg-\[\#f8faf9\] { background-color: var(--av-bg-base) !important; }
 
 /* Legacy hover/focus accent states */
 .avareno-app-shell .hover\:border-leaf:hover { border-color: var(--av-border-accent) !important; }

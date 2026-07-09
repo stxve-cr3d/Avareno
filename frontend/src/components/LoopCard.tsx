@@ -25,7 +25,7 @@ export function LoopCard({ loop, onComplete }: { loop: Loop; onComplete?: (id: s
           <Badge tone={priorityTone[loop.priority]}>{loop.priority === "MEDIUM" ? "easy" : loop.priority.toLowerCase()}</Badge>
         </div>
         <p className="mt-1 line-clamp-2 text-sm font-semibold leading-6 text-muted">{loop.description ?? loop.sourceType}</p>
-        <span className="mt-3 inline-flex items-center gap-2 rounded-full bg-wash px-3 py-1.5 text-xs font-black text-muted">
+        <span className="mt-3 inline-flex items-center gap-2 rounded-full av-surface px-3 py-1.5 text-xs font-black text-muted">
           <Clock3 size={14} />
           {isoDate(loop.dueDate)}
         </span>

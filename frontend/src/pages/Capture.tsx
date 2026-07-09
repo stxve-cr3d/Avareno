@@ -49,7 +49,7 @@ export function Capture() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-5 md:px-8 md:py-10">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_315px]">
-        <section className="rounded-[2rem] bg-white p-5 shadow-[0_24px_80px_rgba(17,21,19,0.11)] md:p-7">
+        <section className="rounded-[2rem] av-surface p-5 shadow-[0_24px_80px_rgba(17,21,19,0.11)] md:p-7">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-black text-moss">Universal-Einwurf</p>
@@ -68,7 +68,7 @@ export function Capture() {
                 <button
                   key={item.value}
                   className={`rounded-2xl border p-3 text-left transition ${
-                    selected ? "border-leaf bg-mint text-moss shadow-soft" : "border-line bg-paper text-ink hover:border-leaf hover:bg-white"
+                    selected ? "border-leaf av-accent-soft text-moss" : "border-line av-surface text-ink hover:border-leaf"
                   }`}
                   onClick={() => setKind(item.value)}
                 >
@@ -99,7 +99,7 @@ export function Capture() {
               <input
                 value={contactName}
                 onChange={(event) => setContactName(event.target.value)}
-                className="mt-2 h-12 w-full rounded-2xl border border-line bg-paper px-4 text-sm font-bold outline-none focus:border-leaf"
+                className="mt-2 h-12 w-full rounded-2xl border border-line av-surface px-4 text-sm font-bold outline-none focus:border-leaf"
                 placeholder="Miesa"
               />
             </label>
@@ -120,7 +120,7 @@ export function Capture() {
           </div>
 
           {result ? (
-            <div className="soft-pop mt-6 rounded-[1.5rem] border border-emerald-200 bg-mint p-4 text-moss">
+            <div className="soft-pop mt-6 rounded-[1.5rem] border border-emerald-200 av-accent-soft p-4 text-moss">
               <div className="flex items-start gap-3">
                 <CheckCircle2 size={22} className="mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
@@ -137,20 +137,20 @@ export function Capture() {
         </section>
 
         <aside className="mt-20 space-y-4 lg:mt-0">
-          <div className="rounded-[1.5rem] bg-[#fffaf2] p-5 shadow-soft">
+          <div className="rounded-[1.5rem] bg-[#fffaf2] p-5">
             <h2 className="font-serif text-3xl italic leading-tight">Ein Satz reicht.</h2>
             <p className="mt-3 text-sm font-bold leading-6 text-ink/58">
               avareno erkennt erstmal lokal und regelbasiert, was du meinst. Später hängt hier echte AI dran.
             </p>
           </div>
 
-          <div className="rounded-[1.5rem] bg-white p-4 shadow-soft">
+          <div className="rounded-[1.5rem] av-surface p-4">
             <h2 className="text-lg font-black">Beispiele</h2>
             <div className="mt-3 grid gap-2">
               {examples.map((example) => (
                 <button
                   key={example}
-                  className="rounded-2xl border border-line bg-paper p-3 text-left text-sm font-bold text-ink/68 hover:border-leaf hover:bg-white"
+                  className="rounded-2xl border border-line av-surface p-3 text-left text-sm font-bold text-ink/68 hover:border-leaf"
                   onClick={() => setText(example)}
                 >
                   {example}

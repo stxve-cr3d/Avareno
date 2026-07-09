@@ -24,7 +24,7 @@ export function CaptureMessage() {
 
   return (
     <div className="capture-message-page space-y-5">
-      <div className="rounded-3xl border border-white/80 bg-paper p-5 shadow-soft ring-1 ring-line/60">
+      <div className="rounded-3xl border border-white/80 av-surface p-5 ring-1 ring-line/60">
         <div className="flex items-start gap-3">
           <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-sky-50 text-sky">
             <MessageSquareText size={22} />

@@ -132,7 +132,7 @@ export function BarcodeScannerDialog({ onClose, onDetected, open }: Props) {
 
         <div className="p-4">
           <div className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/8 p-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-white text-ink">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md av-surface text-ink">
               <ScanBarcode size={18} />
             </span>
             <div>
@@ -142,7 +142,7 @@ export function BarcodeScannerDialog({ onClose, onDetected, open }: Props) {
               </p>
             </div>
           </div>
-          {error ? <p className="mt-3 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-ink">{error}</p> : null}
+          {error ? <p className="mt-3 rounded-lg av-surface px-3 py-2 text-sm font-semibold text-ink">{error}</p> : null}
         </div>
       </div>
     </div>

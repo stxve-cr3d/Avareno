@@ -151,7 +151,7 @@ export function UniversalCapture() {
               </button>
             </div>
           ) : (
-            <div className="mt-5 rounded-lg border border-dashed border-line bg-white/70 p-6 text-sm font-bold text-muted">
+            <div className="mt-5 rounded-lg border border-dashed border-line av-surface p-6 text-sm font-bold text-muted">
               Der Entwurf erscheint hier, sobald Avareno deine Eingabe gelesen hat.
             </div>
           )}
