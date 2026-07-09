@@ -155,11 +155,11 @@ Provider-specific draft entries live in `SUBPROCESSORS_DRAFT.md`. Implementation
 ### Object Memory
 
 - Purpose: store and manage real-life product/object memory.
-- Data categories: product names, model, serial, location, purchase info, notes, warranty dates.
-- Recipients: app database.
+- Data categories: product names, model, serial, location, purchase info, notes, warranty dates, manual/software/support links.
+- Recipients: app database; Product Support Link Resolver MVP does not call external providers and only constructs official support URLs locally where possible.
 - Retention: until user deletion/account deletion.
 - Security: user ownership/RLS.
-- Open: export format and deletion behavior.
+- Open: export format and deletion behavior; future manufacturer APIs, GS1/catalog calls or search-provider fallback need provider review, user-facing disclosure and safe logging before production.
 
 ### Billing And Subscriptions
 

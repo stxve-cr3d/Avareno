@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Archive, ChevronRight, FileCheck2, Home, Package, Plus, ScanLine, ShieldCheck } from "lucide-react";
+import { Archive, ChevronRight, FileCheck2, Home, Package, Plus, ReceiptText, ScanLine, ShieldCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api, isoDate } from "../lib/api";
 import type { HomeBinderReport } from "../lib/types";
@@ -79,6 +79,15 @@ export function HomeBinder() {
                   <small>
                     {item.space?.name ?? item.location ?? "Kein Raum"} / {displayDate(item.warrantyUntil)}
                   </small>
+                  <span className="documents-row-signals">
+                    <em className={item.binderStatus.hasProof ? "is-ready" : ""}>
+                      <ReceiptText size={12} /> {item.binderStatus.hasProof ? `${item.documents?.length ?? 0} Dokumente` : "Beleg fehlt"}
+                    </em>
+                    <em className={item.binderStatus.warrantySoon ? "is-warn" : item.binderStatus.warrantyActive ? "is-ready" : ""}>
+                      <ShieldCheck size={12} /> {item.binderStatus.warrantySoon ? "Garantie bald" : item.binderStatus.warrantyActive ? "Garantie aktiv" : "Garantie offen"}
+                    </em>
+                    {item.missingFields?.length ? <em>{item.missingFields.length} fehlende Daten</em> : null}
+                  </span>
                 </span>
                 <span className={item.binderStatus.insuranceReady ? "documents-pill is-ready" : "documents-pill"}>
                   {item.binderStatus.insuranceReady ? "Bereit" : "Fehlt"}

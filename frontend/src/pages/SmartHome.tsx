@@ -4,6 +4,8 @@ import { Link } from "react-router-dom";
 import { ChevronDown, Cpu, Lightbulb, Link2, Power, Printer, Radar, RefreshCw, Router, Search, Tv } from "lucide-react";
 import { api } from "../lib/api";
 import { ConsoleSkeleton } from "../components/app/AppKit";
+import { ProviderLogo } from "../features/home-graph/components/ProviderLogo";
+import { homeProviders } from "../features/home-graph/providers/homeProviders";
 import type {
   Item,
   LocalDiscoveryCandidate,
@@ -225,6 +227,43 @@ export function SmartHome() {
 
       {message ? <p className="sh-message">{message}</p> : null}
 
+      <section className="sh-provider-map" aria-label="Smart Home Connect Überblick">
+        <div className="sh-provider-column">
+          <h2>Connected providers</h2>
+          <div className="sh-provider-rows">
+            {payload.providers.filter((provider) => provider.status === "CONNECTED").length ? (
+              payload.providers.filter((provider) => provider.status === "CONNECTED").map((provider) => (
+                <ProviderRow key={provider.id} label={provider.name} meta={`${providerDeviceCount(provider.id, devices)} Geräte`} status="Verbunden" />
+              ))
+            ) : (
+              <ProviderRow label="Noch kein Provider" meta="Geräte können trotzdem manuell angelegt werden." status="Offen" />
+            )}
+          </div>
+        </div>
+        <div className="sh-provider-column">
+          <h2>Available integrations</h2>
+          <div className="sh-provider-tiles">
+            {homeProviders.slice(0, 4).map((provider) => (
+              <Link className="sh-provider-tile" key={provider.id} to="/app/home-graph/connect">
+                <ProviderLogo provider={provider} size="sm" />
+                <span>
+                  <strong>{provider.name}</strong>
+                  <small>{provider.connectionStatus === "planned" ? "Geplant" : "Vorbereitet"}</small>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+        <div className="sh-provider-column is-wide">
+          <h2>Manual device passports</h2>
+          <p>{linkedCount ? `${linkedCount} Geräte sind mit einer Produktakte verbunden.` : "Verbinde Geräte mit Produktakten, damit Beleg, Garantie und Support sichtbar bleiben."}</p>
+        </div>
+        <div className="sh-provider-column is-wide">
+          <h2>Local bridge / future connectors</h2>
+          <p>{payload.localDiscovery.note || "Lokale Suche startet nur auf Aktion. Unsichere Netzwerkfunde bleiben ausgeblendet."}</p>
+        </div>
+      </section>
+
       {devices.length ? (
         <section className="sh-section">
           <div className="sh-section-head">
@@ -308,6 +347,19 @@ export function SmartHome() {
   );
 }
 
+function ProviderRow({ label, meta, status }: { label: string; meta: string; status: string }) {
+  return (
+    <div className="sh-provider-row">
+      <span>{providerInitials(label)}</span>
+      <div>
+        <strong>{label}</strong>
+        <small>{meta}</small>
+      </div>
+      <em>{status}</em>
+    </div>
+  );
+}
+
 function HeroStat({ label, value, tone }: { label: string; value: number; tone?: "accent" }) {
   return (
     <div className={tone === "accent" ? "sh-stat is-accent" : "sh-stat"}>
@@ -315,6 +367,23 @@ function HeroStat({ label, value, tone }: { label: string; value: number; tone?:
       <small>{label}</small>
     </div>
   );
+}
+
+function providerDeviceCount(providerId: string, devices: SmartHomeDevice[]) {
+  const normalized = providerId.toLowerCase();
+  return devices.filter((device) => device.provider.toLowerCase() === normalized).length;
+}
+
+function providerInitials(name: string) {
+  return name
+    .replace(/[!/+]/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase();
 }
 
 function DeviceCard({

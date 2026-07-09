@@ -9676,6 +9676,304 @@ a:focus-visible {
   }
 }
 
+/* App refinement pass: compact operational scan states */
+.avareno-current-section {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  border: 1px solid var(--av-border-subtle);
+  border-radius: 999px;
+  background: var(--av-subtle-panel-bg);
+  padding: 0 0.7rem;
+  color: var(--av-text-secondary);
+  font-size: 0.74rem;
+  font-weight: 520;
+  white-space: nowrap;
+}
+
+.object-section-nav {
+  position: sticky;
+  top: 4.25rem;
+  z-index: 8;
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  margin: -0.25rem 0 1rem;
+  padding: 0.35rem;
+  border: 1px solid var(--av-border-subtle);
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--av-bg-panel) 86%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.object-section-nav a {
+  flex: 0 0 auto;
+  min-height: 2rem;
+  border-radius: 0.55rem;
+  padding: 0.42rem 0.7rem;
+  color: var(--av-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 540;
+  text-decoration: none;
+}
+
+.object-section-nav a:hover {
+  background: var(--av-subtle-panel-hover);
+  color: var(--av-text-primary);
+}
+
+.av-thing-subline {
+  display: block;
+  margin-top: 0.16rem;
+  overflow: hidden;
+  color: var(--av-text-muted);
+  font-size: 0.72rem;
+  font-weight: 480;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.av-sort-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid var(--av-border-subtle);
+  border-radius: 0.75rem;
+  background: var(--av-surface-1);
+  padding: 0.45rem 0.55rem 0.45rem 0.75rem;
+}
+
+.av-sort-control > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--av-text-muted);
+  font-size: 0.76rem;
+  font-weight: 560;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.av-sort-control select {
+  min-height: 2.15rem;
+  border-radius: 0.55rem;
+  padding: 0 0.7rem;
+  font-size: 0.82rem;
+}
+
+.capture-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.capture-step {
+  display: grid;
+  grid-template-columns: 1.6rem minmax(0, 1fr);
+  gap: 0.65rem;
+  min-width: 0;
+  border: 1px solid var(--av-border-subtle);
+  border-radius: 0.75rem;
+  background: var(--av-subtle-panel-bg);
+  padding: 0.75rem;
+}
+
+.capture-step > span {
+  display: grid;
+  width: 1.6rem;
+  height: 1.6rem;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--av-surface-2);
+  color: var(--av-text-muted);
+}
+
+.capture-step.is-done > span {
+  background: var(--av-accent-bg);
+  color: var(--av-accent);
+}
+
+.capture-step strong,
+.capture-step small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.capture-step strong {
+  color: var(--av-text-primary);
+  font-size: 0.82rem;
+  font-weight: 560;
+}
+
+.capture-step small {
+  margin-top: 0.1rem;
+  color: var(--av-text-muted);
+  font-size: 0.72rem;
+}
+
+.documents-row-signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+.documents-row-signals em {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid var(--av-border-subtle);
+  border-radius: 999px;
+  background: var(--av-surface-2);
+  padding: 0.2rem 0.48rem;
+  color: var(--av-text-muted);
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 540;
+}
+
+.documents-row-signals em.is-ready {
+  border-color: var(--av-border-accent);
+  background: var(--av-accent-bg);
+  color: var(--av-accent);
+}
+
+.documents-row-signals em.is-warn {
+  border-color: rgba(232,197,110,0.28);
+  background: var(--av-warning-bg);
+  color: var(--av-warning);
+}
+
+.resolve-card-status {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.sh-provider-map {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.sh-provider-column {
+  display: grid;
+  align-content: start;
+  gap: 0.6rem;
+  border: 1px solid var(--av-border-subtle);
+  border-radius: 0.8rem;
+  background: var(--av-surface-1);
+  padding: 0.9rem;
+}
+
+.sh-provider-column.is-wide p {
+  margin: 0;
+  color: var(--av-text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.sh-provider-column h2 {
+  margin: 0;
+  color: var(--av-text-primary);
+  font-size: 0.92rem;
+  font-weight: 560;
+}
+
+.sh-provider-rows,
+.sh-provider-tiles {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.sh-provider-row,
+.sh-provider-tile {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  border: 1px solid var(--av-border-subtle);
+  border-radius: 0.65rem;
+  background: var(--av-bg-panel);
+  padding: 0.58rem;
+  text-decoration: none;
+}
+
+.sh-provider-row > span {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 0.5rem;
+  background: var(--av-accent-bg);
+  color: var(--av-accent);
+  font-size: 0.72rem;
+  font-weight: 620;
+}
+
+.sh-provider-row > div,
+.sh-provider-tile > span {
+  min-width: 0;
+  flex: 1;
+}
+
+.sh-provider-row strong,
+.sh-provider-row small,
+.sh-provider-tile strong,
+.sh-provider-tile small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sh-provider-row strong,
+.sh-provider-tile strong {
+  color: var(--av-text-primary);
+  font-size: 0.83rem;
+  font-weight: 560;
+}
+
+.sh-provider-row small,
+.sh-provider-tile small {
+  margin-top: 0.08rem;
+  color: var(--av-text-muted);
+  font-size: 0.72rem;
+}
+
+.sh-provider-row em {
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--av-surface-2);
+  padding: 0.22rem 0.5rem;
+  color: var(--av-text-muted);
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 560;
+}
+
+@media (max-width: 860px) {
+  .sh-provider-map,
+  .capture-steps {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .avareno-current-section {
+    display: none;
+  }
+
+  .object-section-nav {
+    top: 3.8rem;
+  }
+}
+
 .compatibility-panel {
   display: grid;
   gap: 1rem;

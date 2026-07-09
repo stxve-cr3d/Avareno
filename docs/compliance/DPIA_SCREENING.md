@@ -125,6 +125,27 @@ High-risk trigger notes:
 
 Screening outcome: medium risk for foundation; high review requirement before paid launch. Proceed only with no card data stored, no raw webhook payload logging, signature-verified Stripe webhooks and no public claims of legal/tax certainty.
 
+## Screening: Product Support Link Resolver MVP
+
+- Feature name: Product Support Link Resolver MVP
+- Description: local resolver that suggests official manual, firmware/software and support URLs from existing product manufacturer/model fields.
+- Data categories: product/object data, model code/model name, support links; serial number presence may exist on the item but is not sent externally or used by MVP.
+- Users affected: registered/local MVP users with object profiles.
+- Third parties: none called by backend in MVP; user may open manufacturer links in their browser.
+- Launch state: MVP/internal.
+
+High-risk trigger notes:
+
+- Sensitive/highly personal documents: no direct document processing.
+- Large-volume processing: no.
+- Connected accounts/imports: no.
+- AI analysis/profiling: no.
+- Exposure to other users: no.
+- Third-country transfer/new provider: none in MVP because links are constructed locally; future search/manufacturer APIs require review.
+- Breach harm: low-to-medium because model/serial fields can reveal owned devices, but this feature adds no new storage or backend sharing.
+
+Screening outcome: low risk for local/static MVP suggestions; medium before enabling any external API, search fallback or serial-number lookup because those can disclose product ownership to third parties.
+
 ## Screening: MVP Privacy Controls Foundation
 
 - Feature name: MVP Privacy Controls Foundation

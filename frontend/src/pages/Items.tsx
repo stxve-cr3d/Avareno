@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  ArrowDownAZ,
   House,
   Monitor,
   Package,
@@ -13,6 +14,7 @@ import {
 import { Link } from "react-router-dom";
 import { api, isoDate } from "../lib/api";
 import type { Item, ProductStructure } from "../lib/types";
+import { missingFieldLabel } from "../lib/uiText";
 import {
   ActionButton,
   ConsoleSkeleton,
@@ -23,6 +25,7 @@ import {
 } from "../components/app/AppKit";
 
 type StatusFilter = "ALL" | "MISSING_RECEIPT" | "WARRANTY_SOON" | "OPEN" | "COMPLETE";
+type SortMode = "UPDATED" | "NAME" | "OPEN" | "COMPLETE";
 
 const statusFilters: { id: StatusFilter; label: string }[] = [
   { id: "ALL", label: "Alle" },
@@ -35,11 +38,19 @@ const statusFilters: { id: StatusFilter; label: string }[] = [
 const categories = ["TV / Media", "Audio", "Werkstatt", "Haushalt", "Sonstiges"] as const;
 type Category = (typeof categories)[number];
 
+const sortOptions: { id: SortMode; label: string }[] = [
+  { id: "UPDATED", label: "Zuletzt aktualisiert" },
+  { id: "OPEN", label: "Offene Punkte" },
+  { id: "COMPLETE", label: "Vollständigkeit" },
+  { id: "NAME", label: "Name" }
+];
+
 export function Items() {
   const [items, setItems] = useState<Item[]>([]);
   const [, setStructure] = useState<ProductStructure | null>(null);
   const [status, setStatus] = useState<StatusFilter>("ALL");
   const [category, setCategory] = useState<"ALL" | Category>("ALL");
+  const [sort, setSort] = useState<SortMode>("UPDATED");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -55,7 +66,7 @@ export function Items() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return items.filter((item) => {
+    const result = items.filter((item) => {
       if (category !== "ALL" && categoryBucket(item) !== category) return false;
       if (status === "MISSING_RECEIPT" && hasReceipt(item)) return false;
       if (status === "WARRANTY_SOON" && !warrantySoon(item)) return false;
@@ -67,11 +78,12 @@ export function Items() {
       }
       return true;
     });
-  }, [category, items, query, status]);
+    return [...result].sort((a, b) => sortItems(a, b, sort));
+  }, [category, items, query, sort, status]);
 
   const documentCount = items.reduce((sum, item) => sum + (item.documents?.length ?? 0), 0);
   const openTotal = items.reduce((sum, item) => sum + openPointsOf(item), 0);
-  const warrantyRiskCount = items.filter(warrantySoon).length;
+  const needsAttentionCount = items.filter((item) => openPointsOf(item) > 0 || warrantySoon(item)).length;
   const hasItems = items.length > 0;
 
   if (loading) {
@@ -95,8 +107,7 @@ export function Items() {
           <div className="av-status-grid av-status-grid-4" aria-label="Objekt-Statusübersicht">
             <StatusSummaryCard label="Objekte" value={items.length} />
             <StatusSummaryCard label="Dokumente" value={documentCount} />
-            <StatusSummaryCard label="Offen" value={openTotal} tone={openTotal > 0 ? "warning" : "neutral"} />
-            <StatusSummaryCard label="Garantie-Risiken" value={warrantyRiskCount} tone={warrantyRiskCount > 0 ? "warning" : "neutral"} />
+            <StatusSummaryCard label="Aufmerksamkeit" value={needsAttentionCount} tone={needsAttentionCount > 0 ? "warning" : "neutral"} />
           </div>
         </div>
       </section>
@@ -138,6 +149,14 @@ export function Items() {
                   </FilterChip>
                 ))}
               </FilterRow>
+              <label className="av-sort-control">
+                <span><ArrowDownAZ size={14} /> Sortieren</span>
+                <select value={sort} onChange={(event) => setSort(event.target.value as SortMode)}>
+                  {sortOptions.map((option) => (
+                    <option key={option.id} value={option.id}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
             </div>
           </article>
 
@@ -158,6 +177,10 @@ export function Items() {
                     category={categoryBucket(item)}
                     name={item.name}
                     icon={categoryIcon(categoryBucket(item))}
+                    identityLine={identityLine(item)}
+                    locationLine={item.space?.name ?? item.location ?? item.category}
+                    smartHomeStatus={smartHomeStatus(item)}
+                    missingLabel={missingLabel(item)}
                     completeness={item.completenessScore ?? 0}
                     invoicePresent={hasReceipt(item)}
                     warranty={warrantyShort(item)}
@@ -254,6 +277,35 @@ function warrantyShort(item: Item): { text: string; urgent?: boolean } {
   if (days < 0) return { text: "Abgelaufen", urgent: true };
   if (days < 60) return { text: `${days} Tage`, urgent: true };
   return { text: `bis ${isoDate(item.warrantyUntil)}` };
+}
+
+function sortItems(a: Item, b: Item, sort: SortMode) {
+  if (sort === "NAME") return a.name.localeCompare(b.name, "de");
+  if (sort === "OPEN") return openPointsOf(b) - openPointsOf(a) || (b.completenessScore ?? 0) - (a.completenessScore ?? 0);
+  if (sort === "COMPLETE") return (b.completenessScore ?? 0) - (a.completenessScore ?? 0) || a.name.localeCompare(b.name, "de");
+  return 0;
+}
+
+function identityLine(item: Item) {
+  return [item.manufacturer, item.model].filter(Boolean).join(" / ") || item.itemType || "Objekt";
+}
+
+function smartHomeStatus(item: Item) {
+  const devices = item.smartHomeDevices ?? [];
+  if (!devices.length) return "Nicht verbunden";
+  const controllable = devices.some((device) => {
+    const text = `${device.name} ${device.deviceType}`.toLowerCase();
+    const capabilities = device.capabilities.map((capability) => capability.toLowerCase());
+    return text.includes("tv") || text.includes("samsung") || capabilities.includes("switch") || capabilities.includes("switchlevel");
+  });
+  return controllable ? "Steuerbar" : "Verbunden";
+}
+
+function missingLabel(item: Item) {
+  const missing = item.missingFields ?? [];
+  if (!missing.length) return "Keine";
+  const first = missingFieldLabel(missing[0]);
+  return missing.length === 1 ? first : `${first} +${missing.length - 1}`;
 }
 
 function categoryBucket(item: Item): Category {

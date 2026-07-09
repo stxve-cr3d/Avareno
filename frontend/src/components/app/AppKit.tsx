@@ -750,6 +750,10 @@ export function ObjectMemoryCard({
   category,
   name,
   icon,
+  identityLine,
+  locationLine,
+  smartHomeStatus,
+  missingLabel,
   completeness,
   invoicePresent,
   warranty,
@@ -759,6 +763,10 @@ export function ObjectMemoryCard({
   category: string;
   name: string;
   icon: ReactNode;
+  identityLine?: string;
+  locationLine?: string;
+  smartHomeStatus?: string;
+  missingLabel?: string;
   completeness: number;
   invoicePresent: boolean;
   warranty: { text: string; urgent?: boolean };
@@ -771,6 +779,11 @@ export function ObjectMemoryCard({
         <div className="av-thing-info">
           <span className="av-thing-cat">{category}</span>
           <span className="av-thing-name">{name}</span>
+          {identityLine || locationLine ? (
+            <span className="av-thing-subline">
+              {[identityLine, locationLine].filter(Boolean).join(" / ")}
+            </span>
+          ) : null}
         </div>
         <span className="av-thing-pct">{completeness}%</span>
       </div>
@@ -791,9 +804,15 @@ export function ObjectMemoryCard({
         <div className="av-thing-layer">
           <span className="av-layer-label">Offen</span>
           <span className={`av-layer-val ${openPoints > 0 ? "av-th-amber" : "av-th-ok"}`}>
-            {openPoints > 0 ? `${openPoints} Punkt${openPoints === 1 ? "" : "e"}` : "Keine"}
+            {missingLabel ?? (openPoints > 0 ? `${openPoints} Punkt${openPoints === 1 ? "" : "e"}` : "Keine")}
           </span>
         </div>
+        {smartHomeStatus ? (
+          <div className="av-thing-layer">
+            <span className="av-layer-label">Smart Home</span>
+            <span className="av-layer-val">{smartHomeStatus}</span>
+          </div>
+        ) : null}
       </div>
     </Link>
   );

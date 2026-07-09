@@ -32,6 +32,7 @@ import {
   Repeat2,
   Save,
   ScanBarcode,
+  Search,
   Send,
   ShieldAlert,
   ShieldCheck,
@@ -110,6 +111,36 @@ type OwnershipForm = {
   supportContact: string;
 };
 
+type PassportLinksForm = {
+  manualUrl: string;
+  driverUrl: string;
+  softwareUrl: string;
+  supportUrl: string;
+  supportContact: string;
+};
+
+type PassportUrlField = Exclude<keyof PassportLinksForm, "supportContact">;
+
+type ProductSupportSuggestionLink = {
+  field: string;
+  label: string;
+  url: string;
+  sourceName: string;
+  sourceUrl: string;
+  confidence: number;
+  reason: string;
+};
+
+type ProductSupportSuggestion = {
+  provider: string;
+  model?: string | null;
+  serialNumberUsed: boolean;
+  confidence: number;
+  links: ProductSupportSuggestionLink[];
+  supportContact?: string | null;
+  privacyNote: string;
+};
+
 const documentTypes = ["RECEIPT", "WARRANTY", "MANUAL", "DRIVER", "SOFTWARE", "OTHER"] as const;
 
 export function ItemDetail() {
@@ -134,7 +165,7 @@ export function ItemDetail() {
     location: "",
     supportContact: ""
   });
-  const [passportLinks, setPassportLinks] = useState({
+  const [passportLinks, setPassportLinks] = useState<PassportLinksForm>({
     manualUrl: "",
     driverUrl: "",
     softwareUrl: "",
@@ -159,6 +190,7 @@ export function ItemDetail() {
     status: "OPEN"
   });
   const [supportDraft, setSupportDraft] = useState<SupportDraft | null>(null);
+  const [supportSuggestion, setSupportSuggestion] = useState<ProductSupportSuggestion | null>(null);
   const [detailMessage, setDetailMessage] = useState("");
   const [busy, setBusy] = useState("");
   const [recommendationTab, setRecommendationTab] = useState<RecommendationTab>("spare");
@@ -195,6 +227,7 @@ export function ItemDetail() {
     });
     setReorderUrl(result.reorderUrl ?? "");
     setAffiliateUrl(result.affiliateUrl ?? "");
+    setSupportSuggestion(null);
   }
 
   useEffect(() => {
@@ -330,6 +363,38 @@ export function ItemDetail() {
     resetPassportLinks(updated);
     setDetailMessage("Produktpass gespeichert");
     setPassportEditing(false);
+  }
+
+  async function suggestProductSupportLinks() {
+    if (!item) return;
+    setBusy("support-links-resolve");
+    setSupportSuggestion(null);
+    try {
+      const suggestion = await api<ProductSupportSuggestion>(`/api/items/${item.id}/support-links/resolve`, { method: "POST" });
+      setSupportSuggestion(suggestion);
+      if (!suggestion.links.length) {
+        setDetailMessage("Keine sichere offizielle Quelle gefunden");
+        return;
+      }
+      setPassportEditing(true);
+      setPassportLinks((current) => {
+        const next = { ...current };
+        suggestion.links.forEach((link) => {
+          if (isPassportUrlField(link.field) && !next[link.field]) {
+            next[link.field] = link.url;
+          }
+        });
+        if (suggestion.supportContact && !next.supportContact) {
+          next.supportContact = suggestion.supportContact;
+        }
+        return next;
+      });
+      setDetailMessage(`${suggestion.links.length} offizielle Quellen vorgeschlagen`);
+    } catch (error) {
+      setDetailMessage(error instanceof Error ? error.message : "Quellen konnten nicht vorgeschlagen werden");
+    } finally {
+      setBusy("");
+    }
   }
 
   async function uploadPassportDocument() {
@@ -622,6 +687,15 @@ export function ItemDetail() {
         }
       />
 
+      <nav className="object-section-nav" aria-label="Produktpass Bereiche">
+        <a href="#object-overview">Übersicht</a>
+        <a href="#object-documents">Dokumente</a>
+        <a href="#object-warranty">Garantie</a>
+        <a href="#object-service">Service</a>
+        <a href="#object-smart-home">Smart Home</a>
+        <a href="#object-notes">Notizen</a>
+      </nav>
+
       {showCreatedNotice ? (
         <div className="av-detail-notices">
           <InlineNotice
@@ -698,7 +772,7 @@ export function ItemDetail() {
         </div>
 
         <div className="av-profile-side">
-          <div className="av-profile-block">
+          <div className="av-profile-block" id="object-warranty">
             <span className="av-label-sm">Objektgedächtnis</span>
             <ObjectMemoryGraph title={item.name} category={item.category || "Produkt"} icon={<Package size={14} />} edges={profileEdges} />
           </div>
@@ -716,7 +790,7 @@ export function ItemDetail() {
 
       <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_23rem]">
         <div className="space-y-5">
-          <section className="object-panel rounded-lg p-4 md:p-5">
+          <section className="object-panel rounded-lg p-4 md:p-5" id="object-overview">
             <div className="flex items-start justify-between gap-3">
               <SectionTitle eyebrow="Grunddaten" title="Besitz und Kauf" icon={<FileText size={19} />} />
               <button
@@ -765,7 +839,7 @@ export function ItemDetail() {
             </div>
           </section>
 
-          <section className="object-panel rounded-lg p-4 md:p-5">
+          <section className="object-panel rounded-lg p-4 md:p-5" id="object-support">
             <div className="flex items-start justify-between gap-3">
               <SectionTitle eyebrow="Produktpass" title="Handbuch, Software, Support" icon={<BookOpen size={19} />} />
               <button
@@ -821,6 +895,50 @@ export function ItemDetail() {
                     />
                   </div>
                 </div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line av-surface p-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-ink">Offizielle Quellen</p>
+                    <p className="mt-1 text-xs font-bold text-muted">Nutzt Modell und Hersteller; Seriennummern bleiben in dieser Version lokal.</p>
+                  </div>
+                  <Button
+                    disabled={busy === "support-links-resolve"}
+                    icon={<Search size={18} />}
+                    onClick={suggestProductSupportLinks}
+                    type="button"
+                    variant="secondary"
+                  >
+                    {busy === "support-links-resolve" ? "Suche läuft..." : "Quellen vorschlagen"}
+                  </Button>
+                </div>
+                {supportSuggestion ? (
+                  <div className="mt-3 rounded-lg border border-line av-surface p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-black text-ink">
+                        {supportSuggestion.provider} {supportSuggestion.model ? `· ${supportSuggestion.model}` : ""}
+                      </p>
+                      <span className="rounded-full av-accent-soft px-2 py-1 text-xs font-black text-leaf">
+                        {Math.round(supportSuggestion.confidence * 100)}% Treffer
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs font-bold text-muted">{supportSuggestion.privacyNote}</p>
+                    {supportSuggestion.links.length ? (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {supportSuggestion.links.map((link) => (
+                          <a
+                            className="flex min-h-11 items-center justify-between gap-3 rounded-md border border-line px-3 py-2 text-sm font-bold text-ink transition hover:border-leaf hover:bg-leaf/5"
+                            href={link.url}
+                            key={`${link.field}-${link.url}`}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            <span className="truncate">{link.label}</span>
+                            <ExternalLink className="shrink-0 text-leaf" size={15} />
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <p className="text-sm font-bold text-muted">{passportLinkCount}/5 Hilfen gespeichert</p>
                   <Button onClick={savePassportLinks} icon={<Save size={18} />}>
@@ -837,7 +955,7 @@ export function ItemDetail() {
 
           <ProductRecommendationPanel item={item} tab={recommendationTab} setTab={setRecommendationTab} />
 
-          <section className="object-panel rounded-lg p-4 md:p-5">
+          <section className="object-panel rounded-lg p-4 md:p-5" id="object-documents">
             <div className="flex items-start justify-between gap-3">
               <SectionTitle eyebrow="Nachweise" title="Belege und Dokumente" icon={<ReceiptText size={19} />} />
               <button
@@ -1002,7 +1120,7 @@ export function ItemDetail() {
             ) : null}
           </section>
 
-          <section className="object-panel rounded-lg p-4 md:p-5">
+          <section className="object-panel rounded-lg p-4 md:p-5" id="object-service">
             <SectionTitle eyebrow="Reparaturen" title="Was passiert ist" icon={<Hammer size={19} />} />
             <div className="mt-5 grid gap-3 rounded-lg border border-line av-surface p-3 md:grid-cols-[9rem_minmax(0,1fr)]">
               <label className="text-sm font-bold text-ink">
@@ -1069,7 +1187,7 @@ export function ItemDetail() {
             </div>
           </section>
 
-          <section className="object-panel rounded-lg p-4 md:p-5">
+          <section className="object-panel rounded-lg p-4 md:p-5" id="object-notes">
             <SectionTitle eyebrow="Verlauf" title="Aktivität" icon={<CheckCircle2 size={19} />} />
             <div className="mt-5 grid gap-3">
               {item.activities?.length ? (
@@ -1088,7 +1206,7 @@ export function ItemDetail() {
         </div>
 
         <aside className="space-y-5 lg:sticky lg:top-28 lg:self-start">
-          <section className="object-panel rounded-lg p-4" id="item-care-reminder">
+          <section className="object-panel rounded-lg p-4" id="object-smart-home">
             <SectionTitle eyebrow="Smart-Gerät" title="Gerätesteuerung" icon={<RadioTower size={19} />} />
             <div className="mt-5 grid gap-3">
               {item.smartHomeDevices?.length ? (
@@ -1157,7 +1275,7 @@ export function ItemDetail() {
             </div>
           </section>
 
-          <section className="object-panel rounded-lg p-4">
+          <section className="object-panel rounded-lg p-4" id="item-care-reminder">
             <ProductQrPanel item={item} />
           </section>
 
@@ -1392,6 +1510,10 @@ function formatDate(value?: string | null) {
 function nullableText(value: string) {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function isPassportUrlField(field: string): field is PassportUrlField {
+  return ["manualUrl", "driverUrl", "softwareUrl", "supportUrl"].includes(field);
 }
 
 function powerStateLabel(device: SmartHomeDevice) {

@@ -200,6 +200,42 @@ Decision:
 - Needs lawyer/DSB review first: yes before production enablement
 - Notes: verify Supabase project region, Twilio DPA/AVV, SMS retention/deletion, and Datenschutzerklaerung disclosure before setting `VITE_AUTH_PHONE_ENABLED=true` in production.
 
+## Completed Review: Product Support Link Resolver MVP
+
+- Feature name: Product Support Link Resolver MVP
+- Owner: Engineering/Product
+- Route/module: `backend/app/services/product_support.py`, `backend/app/routers/items.py`, `frontend/src/pages/ItemDetail.tsx`
+- Backend/API changes: `POST /api/items/{item_id}/support-links/resolve` returns official support-link suggestions for the current item
+- Database/storage changes: none; suggestions are not stored until the user reviews and saves existing product-pass fields
+- Third-party providers: none called by the MVP resolver; Samsung URLs are constructed locally from a model code
+- Launch state: MVP/internal; real manufacturer APIs and search fallback remain blocked until provider review
+
+Required questions:
+
+1. Personal data: product/object data such as manufacturer, model name/model code, existing support links and whether a serial number exists.
+2. Purpose: help the user attach official manual, firmware/software and support links to an object profile.
+3. Avoid collection: yes; the resolver reuses existing item fields and adds no new required data.
+4. Data minimization: only manufacturer/model are used for MVP suggestions; serial number is explicitly not sent or used externally.
+5. Storage: no new storage; saved links remain in existing `Item` fields only after user confirmation.
+6. Retention: same as Object Memory item data; until user deletion/account deletion.
+7. Export: existing item export must include saved support links.
+8. Deletion: deleting/editing the item removes or changes saved links; no provider-side data is created by MVP.
+9. Third-party sharing: none by backend in MVP; opening suggested links in the browser takes the user to the manufacturer site.
+10. AI: no.
+11. Consent/legal basis: no separate consent for local suggestions; explicit user action required before any future external lookup.
+12. Connected accounts: no.
+13. Sensitive/private documents: no direct document processing; linked manuals/support pages may relate to owned products.
+14. Tokens/secrets/API credentials: none in MVP; future Dell/HP/Lenovo/Search APIs require server-side secrets and provider documentation.
+15. Logs: implementation does not log model, serial number, raw provider payloads or generated URLs.
+16. Abuse/security risks: model/serial lookups can reveal product ownership; future external lookups need rate limits, safe logs, provider DPA/AVV review and clear user disclosure.
+
+Decision:
+
+- Privacy review complete: yes for local/static MVP suggestions
+- Safe to implement now: yes for no-external-call suggestions
+- Needs lawyer/DSB review first: yes before enabling real manufacturer APIs, GS1/catalog calls or search-provider fallback
+- Notes: Keep serial-number lookups disabled until the user sees the provider, purpose and data sent. Do not claim warranty/support data is guaranteed.
+
 ## Completed Review: Supabase Email Magic Link Auth
 
 - Feature name: Supabase Email Magic Link Auth

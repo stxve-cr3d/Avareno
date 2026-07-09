@@ -11,6 +11,7 @@ from app.schemas import ItemCreate, ItemPatch, RepairLogCreate
 from app.services.barcode_lookup import barcode_format, lookup_barcode, normalize_barcode
 from app.services.entitlements import PlanLimitExceeded, require_item_capacity
 from app.services.item_service import calculate_completeness_score, missing_fields
+from app.services.product_support import build_product_support_suggestion
 from app.services.product_images import suggest_product_image
 from app.services.providers.compatibility_provider import build_provider_preview
 from app.services.xp_service import award_xp
@@ -349,6 +350,18 @@ def get_compatibility_provider_preview(item_id: str) -> dict:
         if not item:
             raise HTTPException(status_code=404, detail="Item not found")
         return build_provider_preview(item, user["id"])
+
+
+@router.post("/{item_id}/support-links/resolve")
+def resolve_item_support_links(item_id: str) -> dict:
+    with db() as conn:
+        user = get_default_user(conn)
+        item = row_to_dict(
+            conn.execute('SELECT * FROM "Item" WHERE id = ? AND userId = ?', (item_id, user["id"])).fetchone()
+        )
+        if not item:
+            raise HTTPException(status_code=404, detail="Item not found")
+        return build_product_support_suggestion(item)
 
 
 @router.patch("/{item_id}")

@@ -181,6 +181,7 @@ export function AppShell() {
     location.pathname.startsWith("/app/home/") ||
     location.pathname === "/app/home-graph" ||
     location.pathname.startsWith("/app/home-graph/");
+  const currentSection = currentSectionLabel(location.pathname);
 
   return (
     <div className="avareno-app-shell min-h-screen">
@@ -216,6 +217,7 @@ export function AppShell() {
           </nav>
 
           <div className="avareno-app-actions">
+            <span className="avareno-current-section">{currentSection}</span>
             <button className="avareno-app-search" onClick={() => setPaletteOpen(true)} type="button" aria-label="Suche (⌘K)" title="Suche · ⌘K">
               <Search size={17} />
             </button>
@@ -342,6 +344,19 @@ export function AppShell() {
       ) : null}
     </div>
   );
+}
+
+function currentSectionLabel(pathname: string) {
+  if (pathname === "/app") return "Zuhause";
+  if (pathname.startsWith("/app/dinge") || pathname.startsWith("/app/items")) return "Objekte";
+  if (pathname.startsWith("/app/resolve")) return "Offene Punkte";
+  if (pathname.startsWith("/app/care")) return "Erinnerungen";
+  if (pathname.startsWith("/app/smart-home") || pathname.startsWith("/app/home-graph")) return "Smart Home";
+  if (pathname.startsWith("/app/capture")) return "Erfassen";
+  if (pathname.startsWith("/app/reports/home-binder")) return "Dokumente";
+  if (pathname.startsWith("/app/vault")) return "Private Vault";
+  if (pathname.startsWith("/app/ich") || pathname.startsWith("/app/profile")) return "Profil";
+  return "Avareno";
 }
 
 function ProfileAvatar({ name, src }: { name: string; src?: string | null }) {

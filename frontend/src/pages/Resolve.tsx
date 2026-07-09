@@ -53,6 +53,13 @@ const statusLabels: Record<ResolveTicketStatus, string> = {
   SOLVED: "gelöst"
 };
 
+const priorityLabels: Record<ResolveTicket["priority"], string> = {
+  LOW: "ruhig",
+  MEDIUM: "normal",
+  HIGH: "wichtig",
+  URGENT: "dringend"
+};
+
 const riskLabels: Record<SolutionProposal["risk"], string> = {
   LOW: "gering",
   MEDIUM: "mittel",
@@ -195,8 +202,8 @@ export function Resolve() {
 
   return (
     <ResolveShell
-      title="Resolve"
-      subtitle="Kein Forum. Keine Zufallsantworten. Nur Tickets, bei denen Besitz und Erfahrung wirklich passen."
+      title="Offene Punkte"
+      subtitle="Alles, was Aufmerksamkeit braucht: Garantie, Beleg, Service, Verbindung oder ein ungelöstes Produktproblem."
     >
       <ResolveHome metrics={metrics} tickets={tickets} />
     </ResolveShell>
@@ -220,6 +227,7 @@ function ResolveHome({ metrics, tickets }: { metrics: ReturnType<typeof resolveM
         <div className="resolve-next-meta">
           <small>{nextProduct.name}</small>
           <StatusPill status={nextTicket.status} />
+          <PriorityPill priority={nextTicket.priority} />
           <span>{nextTicket.matchScore}% passend</span>
         </div>
         <Link className="resolve-primary-action" to={`/app/resolve/tickets/${nextTicket.id}`}>
@@ -232,19 +240,19 @@ function ResolveHome({ metrics, tickets }: { metrics: ReturnType<typeof resolveM
         <div className="resolve-home-menu-head">
           <h2>Bereiche</h2>
           <Link to="/app/resolve/create">
-            Neues Ticket
+            Punkt erfassen
             <ArrowRight size={16} />
           </Link>
         </div>
         <HomeChoice
-          label="Meine Tickets"
-          body="Eigene offene Probleme"
+          label="Eigene Punkte"
+          body="Offene Produkt- und Servicefälle"
           to="/app/resolve/tickets"
           value={metrics.openOwn.toString()}
         />
         <HomeChoice
-          label="Helfen"
-          body="Anfragen mit echter Erfahrung"
+          label="Passende Erfahrung"
+          body="Nur wenn dein Objektkontext passt"
           to={`/app/resolve/tickets/${helpTicket.id}`}
           value={metrics.qualified.toString()}
         />
@@ -318,7 +326,10 @@ function TicketCard({ onClick, ticket }: { onClick: () => void; ticket: ResolveT
     <button className="resolve-ticket-card" onClick={onClick} type="button">
       <div className="resolve-ticket-topline">
         <span>{product.name}</span>
-        <StatusPill status={ticket.status} />
+        <span className="resolve-card-status">
+          <PriorityPill priority={ticket.priority} />
+          <StatusPill status={ticket.status} />
+        </span>
       </div>
       <h3>{ticket.problemTitle}</h3>
       <div className="resolve-product-line">
@@ -701,6 +712,10 @@ function MatchScore({ compact, value }: { compact?: boolean; value: number }) {
 
 function StatusPill({ status }: { status: ResolveTicketStatus }) {
   return <span className={`resolve-status-pill is-${status.toLowerCase()}`}>{statusLabels[status]}</span>;
+}
+
+function PriorityPill({ priority }: { priority: ResolveTicket["priority"] }) {
+  return <span className={`resolve-priority-pill is-${priority.toLowerCase()}`}>{priorityLabels[priority]}</span>;
 }
 
 function ResolveEmptyState({ body, title }: { body: string; title: string }) {
