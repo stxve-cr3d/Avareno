@@ -1,6 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { api } from "../lib/api";
+import { missingFieldLabel } from "../lib/uiText";
+import type { Item } from "../lib/types";
+import { AttentionRow, ConsoleSkeleton, StatusSummaryCard } from "../components/app/AppKit";
 import {
   ArrowRight,
   BadgeCheck,
@@ -88,7 +92,6 @@ export function Resolve() {
   const isCreate = location.pathname.endsWith("/create");
   const isTicketList = location.pathname.endsWith("/tickets");
   const isTicketDetail = Boolean(ticketId);
-  const metrics = useMemo(() => resolveMetrics(tickets), [tickets]);
   const filteredTickets = useMemo(() => {
     return tickets.filter((ticket) => {
       const product = getProduct(ticket.productId);
@@ -205,65 +208,190 @@ export function Resolve() {
       title="Offene Punkte"
       subtitle="Alles, was Aufmerksamkeit braucht: Garantie, Beleg, Service, Verbindung oder ein ungelöstes Produktproblem."
     >
-      <ResolveHome metrics={metrics} tickets={tickets} />
+      <OpenLoopsHome />
     </ResolveShell>
   );
 }
 
-function ResolveHome({ metrics, tickets }: { metrics: ReturnType<typeof resolveMetrics>; tickets: ResolveTicket[] }) {
-  const ownTicket = tickets.find((ticket) => ticket.mode === "OWN" && ticket.status !== "SOLVED") ?? tickets[0];
-  const helpTicket = tickets.find((ticket) => ticket.mode === "HELP") ?? tickets[1];
-  const nextTicket = ownTicket ?? helpTicket;
-  const nextProduct = getProduct(nextTicket.productId);
+/* ── Open-loops center: derived from real object data (/api/items).
+     Same signals the dashboard uses, grouped and complete. ── */
+
+type OpenLoop = {
+  key: string;
+  group: "URGENT" | "DOCUMENTS" | "MISSING" | "CARE";
+  tone: "warranty" | "invoice" | "care";
+  icon: ReactNode;
+  label: string;
+  title: string;
+  detail: string;
+  signal: string;
+  action: string;
+  to: string;
+  progress: number;
+  sortValue: number;
+};
+
+const loopGroups: { id: OpenLoop["group"]; title: string; kicker: string; emptyText: string }[] = [
+  { id: "URGENT", title: "Garantie & Fristen", kicker: "Dringend", emptyText: "Keine Garantie-Risiken brauchen gerade Aufmerksamkeit." },
+  { id: "DOCUMENTS", title: "Belege & Dokumente", kicker: "Nachweise", emptyText: "Jedes Objekt hat einen Nachweis. Fehlende Belege erscheinen hier." },
+  { id: "MISSING", title: "Fehlende Informationen", kicker: "Objektprofil", emptyText: "Alle Objektprofile sind vollständig genug." },
+  { id: "CARE", title: "Service & offene Punkte", kicker: "Care", emptyText: "Keine offenen Service- oder Reparaturpunkte." }
+];
+
+function warrantyDaysLeft(item: Item): number | null {
+  if (!item.warrantyUntil) return null;
+  return Math.ceil((new Date(item.warrantyUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+function buildOpenLoops(items: Item[]): OpenLoop[] {
+  const loops: OpenLoop[] = [];
+
+  for (const item of items) {
+    const to = `/app/dinge/${item.id}`;
+    const progress = item.completenessScore ?? 0;
+    const days = warrantyDaysLeft(item);
+
+    if (days !== null && days < 0) {
+      loops.push({
+        key: `${item.id}-warranty-expired`, group: "URGENT", tone: "warranty", icon: <ShieldCheck size={16} />,
+        label: "Garantie abgelaufen", title: item.name,
+        detail: "Die Garantie ist abgelaufen — prüfe, ob Service oder Ersatz nötig ist.",
+        signal: "Abgelaufen", action: "Objekt öffnen", to, progress, sortValue: days
+      });
+    } else if (days !== null && days < 60) {
+      loops.push({
+        key: `${item.id}-warranty-soon`, group: "URGENT", tone: "warranty", icon: <ShieldCheck size={16} />,
+        label: "Garantie endet bald", title: item.name,
+        detail: `Garantie läuft in ${days} Tagen ab — jetzt ist der beste Zeitpunkt für Prüfung oder Reklamation.`,
+        signal: `${days} Tage`, action: "Objekt öffnen", to, progress, sortValue: days
+      });
+    }
+
+    if ((item.documents?.length ?? 0) === 0) {
+      loops.push({
+        key: `${item.id}-receipt`, group: "DOCUMENTS", tone: "invoice", icon: <FileText size={16} />,
+        label: "Beleg fehlt", title: item.name,
+        detail: "Ohne Kaufnachweis wird Garantie oder Rückgabe später schwierig.",
+        signal: "Kein Nachweis", action: "Beleg hinzufügen", to, progress, sortValue: progress
+      });
+    }
+
+    const missing = (item.missingFields ?? []).filter((field) => field !== "receipt");
+    if (missing.length) {
+      loops.push({
+        key: `${item.id}-missing`, group: "MISSING", tone: "care", icon: <PackageCheck size={16} />,
+        label: "Profil unvollständig", title: item.name,
+        detail: `Fehlt noch: ${missing.map(missingFieldLabel).join(", ")}`,
+        signal: `${missing.length} ${missing.length === 1 ? "Feld" : "Felder"}`, action: "Ergänzen", to, progress, sortValue: -missing.length
+      });
+    }
+
+    const openLoops = (item.loops ?? []).filter((loop) => loop.status === "OPEN");
+    const openRepairs = (item.repairLogs ?? []).filter((repair) => repair.status !== "RESOLVED");
+    if (openLoops.length + openRepairs.length > 0) {
+      const count = openLoops.length + openRepairs.length;
+      loops.push({
+        key: `${item.id}-care`, group: "CARE", tone: "care", icon: <Wrench size={16} />,
+        label: openRepairs.length ? "Reparatur offen" : "Offener Punkt", title: item.name,
+        detail: openLoops[0]?.title ?? openRepairs[0]?.problem ?? "Offener Care-Punkt",
+        signal: count === 1 ? "1 offen" : `${count} offen`, action: "Ansehen", to, progress, sortValue: -count
+      });
+    }
+  }
+
+  return loops;
+}
+
+function OpenLoopsHome() {
+  const [items, setItems] = useState<Item[]>([]);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
+
+  async function load() {
+    setLoadState("loading");
+    try {
+      setItems(await api<Item[]>("/api/items"));
+      setLoadState("ready");
+    } catch {
+      setLoadState("error");
+    }
+  }
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const loops = useMemo(() => buildOpenLoops(items), [items]);
+
+  if (loadState === "loading") return <ConsoleSkeleton label="Offene Punkte werden geprüft…" />;
+  if (loadState === "error") {
+    return (
+      <ResolveEmptyState title="Offene Punkte konnten nicht geladen werden" body="Die Verbindung ist gerade nicht erreichbar. Deine Daten sind sicher — versuch es gleich noch einmal.">
+        <button className="resolve-secondary-action" onClick={() => void load()} type="button">Erneut versuchen</button>
+      </ResolveEmptyState>
+    );
+  }
+
+  const urgentCount = loops.filter((loop) => loop.group === "URGENT").length;
+  const documentCount = loops.filter((loop) => loop.group === "DOCUMENTS").length;
+  const infoCount = loops.filter((loop) => loop.group === "MISSING").length;
 
   return (
-    <section className="resolve-home-layout">
-      <article className="resolve-next-card">
-        <div>
-          <span>Nächster Schritt</span>
-          <h2>{nextTicket.problemTitle}</h2>
-          <p>{nextTicket.permissionReason}</p>
-        </div>
-        <div className="resolve-next-meta">
-          <small>{nextProduct.name}</small>
-          <StatusPill status={nextTicket.status} />
-          <PriorityPill priority={nextTicket.priority} />
-          <span>{nextTicket.matchScore}% passend</span>
-        </div>
-        <Link className="resolve-primary-action" to={`/app/resolve/tickets/${nextTicket.id}`}>
-          Ticket ansehen
-          <ArrowRight size={16} />
-        </Link>
-      </article>
+    <div className="space-y-5">
+      <div className="av-status-grid av-status-grid-4" aria-label="Zusammenfassung offener Punkte">
+        <StatusSummaryCard label="Offene Punkte" value={loops.length} tone={loops.length > 0 ? "warning" : "success"} />
+        <StatusSummaryCard label="Dringend" value={urgentCount} tone={urgentCount > 0 ? "warning" : "neutral"} />
+        <StatusSummaryCard label="Belege" value={documentCount} />
+        <StatusSummaryCard label="Fehlende Infos" value={infoCount} />
+      </div>
 
-      <aside className="resolve-home-menu" aria-label="Resolve Bereiche">
-        <div className="resolve-home-menu-head">
-          <h2>Bereiche</h2>
-          <Link to="/app/resolve/create">
-            Punkt erfassen
-            <ArrowRight size={16} />
-          </Link>
-        </div>
-        <HomeChoice
-          label="Eigene Punkte"
-          body="Offene Produkt- und Servicefälle"
-          to="/app/resolve/tickets"
-          value={metrics.openOwn.toString()}
-        />
-        <HomeChoice
-          label="Passende Erfahrung"
-          body="Nur wenn dein Objektkontext passt"
-          to={`/app/resolve/tickets/${helpTicket.id}`}
-          value={metrics.qualified.toString()}
-        />
-        <HomeChoice
-          label="Gelöst"
-          body="Abgeschlossene Tickets"
-          to="/app/resolve/tickets"
-          value={metrics.solved.toString()}
-        />
-      </aside>
-    </section>
+      {loops.length === 0 ? (
+        <ResolveEmptyState title="Alles erledigt." body="Nichts braucht gerade Aufmerksamkeit. Wenn ein Beleg fehlt, eine Garantie abläuft oder ein Punkt offen ist, erscheint es hier." />
+      ) : (
+        loopGroups.map((group) => {
+          const entries = loops.filter((loop) => loop.group === group.id).sort((a, b) => a.sortValue - b.sortValue);
+          return (
+            <section className="av-console-section" key={group.id}>
+              <div className="av-console-section-head">
+                <div>
+                  <span>{group.kicker}</span>
+                  <h2>{group.title}</h2>
+                </div>
+              </div>
+              {entries.length ? (
+                <div className="av-attention-list">
+                  {entries.map((loop, index) => (
+                    <AttentionRow
+                      key={loop.key}
+                      to={loop.to}
+                      tone={loop.tone}
+                      icon={loop.icon}
+                      label={loop.label}
+                      title={loop.title}
+                      detail={loop.detail}
+                      signal={loop.signal}
+                      action={loop.action}
+                      progress={loop.progress}
+                      primary={group.id === "URGENT" && index === 0}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="av-empty">
+                  <div className="av-empty-body">{group.emptyText}</div>
+                </div>
+              )}
+            </section>
+          );
+        })
+      )}
+
+      <HomeChoice
+        label="Resolve Tickets · Vorschau"
+        body="Produktprobleme gemeinsam mit passenden Besitzern lösen — Demo-Bereich, noch nicht mit echten Nutzern verbunden."
+        to="/app/resolve/tickets"
+        value="Ansehen"
+      />
+    </div>
   );
 }
 
@@ -718,12 +846,13 @@ function PriorityPill({ priority }: { priority: ResolveTicket["priority"] }) {
   return <span className={`resolve-priority-pill is-${priority.toLowerCase()}`}>{priorityLabels[priority]}</span>;
 }
 
-function ResolveEmptyState({ body, title }: { body: string; title: string }) {
+function ResolveEmptyState({ body, children, title }: { body: string; children?: ReactNode; title: string }) {
   return (
     <div className="resolve-empty-state">
       <LifeBuoy size={28} />
       <h3>{title}</h3>
       <p>{body}</p>
+      {children}
     </div>
   );
 }
