@@ -8,6 +8,7 @@ from app.schemas import (
     BambuHostDiagnosticRequest,
     BambuLabSetupRequest,
     BambuPrintEventRequest,
+    HomeAssistantSetupRequest,
     HomeGraphConnectConfirmRequest,
     HomeGraphConnectPreviewRequest,
     LocalDiscoveryImportRequest,
@@ -57,6 +58,44 @@ def get_smart_home() -> dict:
         return smart_home_payload(conn, user["id"])
 
 
+@router.get("/providers/registry")
+def get_provider_registry() -> dict:
+    """Backend source of truth for Connect providers: capabilities,
+    implementation status and configured flags only — never credentials."""
+    from app.services.connectors.registry import public_registry
+
+    with db() as conn:
+        get_default_user(conn)
+    return {"providers": public_registry()}
+
+
+@router.post("/home-assistant/setup", status_code=201)
+def post_home_assistant_setup(payload: HomeAssistantSetupRequest) -> dict:
+    """Validate + store a direct Home Assistant connection.
+
+    The token is validated live against /api/config, stored only encrypted,
+    and never appears in this response or in logs."""
+    from app.services.connectors.home_assistant import HomeAssistantError
+    from app.services.smart_home import setup_home_assistant
+
+    with db() as conn:
+        user = get_default_user(conn)
+        household = _default_household(conn, user["id"])
+        try:
+            return setup_home_assistant(conn, user["id"], household["id"], payload.baseUrl, payload.token)
+        except HomeAssistantError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from None
+
+
+@router.post("/home-assistant/disconnect")
+def post_home_assistant_disconnect() -> dict:
+    from app.services.smart_home import disconnect_home_assistant
+
+    with db() as conn:
+        user = get_default_user(conn)
+        return disconnect_home_assistant(conn, user["id"])
+
+
 @router.post("/providers/connect", status_code=201)
 def connect(payload: SmartHomeConnectRequest) -> dict:
     with db() as conn:
@@ -103,6 +142,19 @@ def command(device_id: str, payload: SmartHomeCommandRequest) -> dict:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except RuntimeError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.get("/devices/{device_id}/link-suggestions")
+def get_link_suggestions(device_id: str) -> dict:
+    """Local, rule-based match suggestions. Never links anything."""
+    from app.services.smart_home import link_suggestions_for_device
+
+    with db() as conn:
+        user = get_default_user(conn)
+        try:
+            return link_suggestions_for_device(conn, user["id"], device_id)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from None
 
 
 @router.patch("/devices/{device_id}/link")

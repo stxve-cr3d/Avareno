@@ -174,6 +174,11 @@ class SmartHomeConnectRequest(BaseModel):
     provider: str = "HOME_ASSISTANT"
 
 
+class HomeAssistantSetupRequest(BaseModel):
+    baseUrl: str = Field(min_length=1)
+    token: str = Field(min_length=8)
+
+
 class HomeGraphConnectPreviewRequest(BaseModel):
     providerId: str = Field(min_length=1)
 

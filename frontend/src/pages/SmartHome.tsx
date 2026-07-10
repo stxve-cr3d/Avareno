@@ -28,6 +28,8 @@ export function SmartHome() {
   const [items, setItems] = useState<Item[]>([]);
   const [localCandidates, setLocalCandidates] = useState<LocalDiscoveryCandidate[]>([]);
   const [probeHost, setProbeHost] = useState("");
+  const [haUrl, setHaUrl] = useState("");
+  const [haToken, setHaToken] = useState("");
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState<BusyAction>({ action: "load" });
@@ -84,7 +86,11 @@ export function SmartHome() {
         method: "PATCH",
         body: JSON.stringify({ itemId })
       });
-      setMessage(itemId ? `${device.name} wurde mit einer Produktakte verbunden.` : `${device.name} wurde von der Produktakte gelöst.`);
+      setMessage(
+        itemId
+          ? `${device.name} wurde mit einer Produktakte verbunden.`
+          : `${device.name}: Nur die Live-Verbindung wurde entfernt. Die Produktakte und das Gerät bleiben gespeichert.`
+      );
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Gerät konnte nicht verbunden werden.");
@@ -108,6 +114,43 @@ export function SmartHome() {
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Freigabe konnte nicht gestartet werden.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function setupHomeAssistant() {
+    if (!haUrl.trim() || !haToken.trim()) {
+      setMessage("Bitte Instanz-URL und Long-Lived Access Token angeben.");
+      return;
+    }
+    setBusy({ action: "discover" });
+    setMessage("");
+    try {
+      const result = await api<{ instance?: { instanceName?: string }; synced?: number }>("/api/smart-home/home-assistant/setup", {
+        method: "POST",
+        body: JSON.stringify({ baseUrl: haUrl.trim(), token: haToken.trim() })
+      });
+      // Token stays server-side; clear it from component state right away.
+      setHaToken("");
+      setMessage(`${result.instance?.instanceName ?? "Home Assistant"} verbunden — ${result.synced ?? 0} Geräte importiert.`);
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Home Assistant konnte nicht verbunden werden.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function disconnectHomeAssistant() {
+    setBusy({ action: "discover" });
+    setMessage("");
+    try {
+      await api("/api/smart-home/home-assistant/disconnect", { method: "POST" });
+      setMessage("Home Assistant wurde getrennt. Importierte Geräte und Verknüpfungen bleiben erhalten.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Trennen ist fehlgeschlagen.");
     } finally {
       setBusy(null);
     }
@@ -202,6 +245,12 @@ export function SmartHome() {
 
   const linkedCount = devices.filter((device) => device.itemId).length;
   const onCount = devices.filter((device) => canPowerDevice(device) && device.powerState === "on").length;
+  // Device passports: electronics stored in memory without a live connection.
+  const linkedItemIds = new Set(devices.map((device) => device.itemId).filter(Boolean));
+  const manualPassports = items.filter((item) => (item.itemType ?? "").toUpperCase() === "ELECTRONIC" && !linkedItemIds.has(item.id));
+  const homeAssistantLive = (payload?.providers ?? []).some(
+    (provider) => provider.id === "HOME_ASSISTANT" && (provider as { mode?: string }).mode === "LIVE"
+  );
 
   return (
     <main className="sh-page">
@@ -215,7 +264,9 @@ export function SmartHome() {
             <RefreshCw size={15} /> Aktualisieren
           </button>
         </div>
-        <p className="sh-hero-sub">Steuere verbundene Geräte und öffne Details, ohne technische Netzwerkdaten sortieren zu müssen.</p>
+        <p className="sh-hero-sub">
+          Jedes Gerät hat hier zwei Seiten: das Objektgedächtnis mit Beleg, Garantie und Service — und, wo möglich, Status und Steuerung dazu.
+        </p>
         {devices.length ? (
           <div className="sh-hero-stats">
             <HeroStat label="Geräte" value={devices.length} />
@@ -229,7 +280,7 @@ export function SmartHome() {
 
       <section className="sh-provider-map" aria-label="Smart Home Connect Überblick">
         <div className="sh-provider-column">
-          <h2>Connected providers</h2>
+          <h2>Verbundene Quellen</h2>
           <div className="sh-provider-rows">
             {payload.providers.filter((provider) => provider.status === "CONNECTED").length ? (
               payload.providers.filter((provider) => provider.status === "CONNECTED").map((provider) => (
@@ -241,7 +292,7 @@ export function SmartHome() {
           </div>
         </div>
         <div className="sh-provider-column">
-          <h2>Available integrations</h2>
+          <h2>Verfügbare Integrationen</h2>
           <div className="sh-provider-tiles">
             {homeProviders.slice(0, 4).map((provider) => (
               <Link className="sh-provider-tile" key={provider.id} to="/app/home-graph/connect">
@@ -255,11 +306,26 @@ export function SmartHome() {
           </div>
         </div>
         <div className="sh-provider-column is-wide">
-          <h2>Manual device passports</h2>
-          <p>{linkedCount ? `${linkedCount} Geräte sind mit einer Produktakte verbunden.` : "Verbinde Geräte mit Produktakten, damit Beleg, Garantie und Support sichtbar bleiben."}</p>
+          <h2>Geräte-Pässe ohne Verbindung</h2>
+          {manualPassports.length ? (
+            <div className="sh-provider-rows">
+              {manualPassports.slice(0, 3).map((item) => (
+                <Link className="sh-provider-row" key={item.id} to={`/app/dinge/${item.id}`}>
+                  <span>{providerInitials(item.name)}</span>
+                  <div>
+                    <strong>{item.name}</strong>
+                    <small>Als Geräte-Pass gespeichert · Steuerung optional</small>
+                  </div>
+                  <em>Gedächtnis</em>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p>Nicht jedes Gerät braucht Steuerung. Geräte ohne Verbindung bleiben als vollständige Pässe mit Beleg, Garantie und Service gespeichert.</p>
+          )}
         </div>
         <div className="sh-provider-column is-wide">
-          <h2>Local bridge / future connectors</h2>
+          <h2>Lokale Suche</h2>
           <p>{payload.localDiscovery.note || "Lokale Suche startet nur auf Aktion. Unsichere Netzwerkfunde bleiben ausgeblendet."}</p>
         </div>
       </section>
@@ -343,6 +409,61 @@ export function SmartHome() {
           </div>
         ) : null}
       </details>
+
+      <details className="sh-connect">
+        <summary>
+          <span className="sh-connect-summary">
+            <strong>{homeAssistantLive ? "Home Assistant verbunden" : "Home Assistant verbinden"}</strong>
+            <small>Eigene Instanz mit Long-Lived Access Token. Der Token bleibt auf dem Server und wird verschlüsselt gespeichert.</small>
+          </span>
+          <ChevronDown className="sh-connect-chevron" size={16} />
+        </summary>
+
+        {homeAssistantLive ? (
+          <div className="sh-connect-actions">
+            <p className="sh-connect-note">Verbunden. Geräte kommen über „Aktualisieren“ oder den Provider-Sync auf den neuesten Stand.</p>
+            <button className="sh-ghost" disabled={busy?.action === "discover"} onClick={() => void disconnectHomeAssistant()} type="button">
+              Verbindung trennen
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="sh-connect-note">
+              Erstelle in Home Assistant unter Profil → Sicherheit einen Long-Lived Access Token. LAN-Adressen wie http://homeassistant.local:8123 sind erlaubt.
+            </p>
+            <form
+              className="sh-connect-actions"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void setupHomeAssistant();
+              }}
+            >
+              <input
+                aria-label="Home Assistant URL"
+                className="sh-ha-input"
+                disabled={busy?.action === "discover"}
+                onChange={(event) => setHaUrl(event.currentTarget.value)}
+                placeholder="http://homeassistant.local:8123"
+                type="text"
+                value={haUrl}
+              />
+              <input
+                aria-label="Long-Lived Access Token"
+                autoComplete="off"
+                className="sh-ha-input"
+                disabled={busy?.action === "discover"}
+                onChange={(event) => setHaToken(event.currentTarget.value)}
+                placeholder="Long-Lived Access Token"
+                type="password"
+                value={haToken}
+              />
+              <button className="sh-primary" disabled={busy?.action === "discover" || !haUrl.trim() || !haToken.trim()} type="submit">
+                Verbinden & importieren
+              </button>
+            </form>
+          </>
+        )}
+      </details>
     </main>
   );
 }
@@ -356,6 +477,91 @@ function ProviderRow({ label, meta, status }: { label: string; meta: string; sta
         <small>{meta}</small>
       </div>
       <em>{status}</em>
+    </div>
+  );
+}
+
+type LinkSuggestion = { itemId: string; name: string; location?: string | null; reasons: string[]; alreadyLinked: boolean };
+
+/* Object selector for an unlinked device: rule-based suggestions (labeled
+   as such, never auto-linked) plus name search over the user's objects. */
+function DeviceLinkPicker({
+  busy,
+  device,
+  items,
+  onLinkItem
+}: {
+  busy: boolean;
+  device: SmartHomeDevice;
+  items: Item[];
+  onLinkItem: (itemId: string | null) => void;
+}) {
+  const [suggestions, setSuggestions] = useState<LinkSuggestion[]>([]);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    api<{ suggestions: LinkSuggestion[] }>(`/api/smart-home/devices/${device.id}/link-suggestions`)
+      .then((result) => {
+        if (!cancelled) setSuggestions((result.suggestions ?? []).filter((entry) => !entry.alreadyLinked));
+      })
+      .catch(() => {
+        /* suggestions are optional; search still works */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [device.id]);
+
+  const listId = `sh-link-options-${device.id}`;
+  const matchedItem = items.find((item) => item.name === query.trim());
+
+  return (
+    <div className="sh-device-select">
+      {suggestions.length ? (
+        <span className="sh-suggest-row">
+          <span className="sh-suggest-label">Vorschlag</span>
+          {suggestions.map((suggestion) => (
+            <button
+              className="sh-suggest-chip"
+              disabled={busy}
+              key={suggestion.itemId}
+              onClick={() => onLinkItem(suggestion.itemId)}
+              title={suggestion.reasons.join(" · ")}
+              type="button"
+            >
+              {suggestion.name}
+              <em>{suggestion.reasons[0] ?? "Möglicher Treffer"}</em>
+            </button>
+          ))}
+        </span>
+      ) : null}
+      <label className="sh-link-search">
+        <span>Mit Objekt verbinden</span>
+        <input
+          aria-label={`${device.name} mit Objekt verbinden`}
+          disabled={busy}
+          list={listId}
+          onChange={(event) => setQuery(event.currentTarget.value)}
+          placeholder="Objekt suchen…"
+          value={query}
+        />
+        <datalist id={listId}>
+          {items.map((item) => (
+            <option key={item.id} value={item.name}>
+              {[item.location, item.manufacturer].filter(Boolean).join(" · ")}
+            </option>
+          ))}
+        </datalist>
+        <button
+          className="sh-suggest-confirm"
+          disabled={busy || !matchedItem}
+          onClick={() => matchedItem && onLinkItem(matchedItem.id)}
+          type="button"
+        >
+          Verbinden
+        </button>
+      </label>
     </div>
   );
 }
@@ -423,21 +629,22 @@ function DeviceCard({
         </span>
 
         {device.itemId ? (
-          <Link className="sh-device-link" to={`/app/dinge/${device.itemId}`}>
-            <Link2 size={13} /> {device.itemName || "Produktakte"}
-          </Link>
+          <span className="sh-device-linkrow">
+            <Link className="sh-device-link" to={`/app/dinge/${device.itemId}`}>
+              <Link2 size={13} /> {device.itemName || "Produktakte"}
+            </Link>
+            <button
+              className="sh-device-unlink"
+              disabled={busy}
+              onClick={() => onLinkItem(null)}
+              title="Entfernt nur die Live-Verbindung. Die Produktakte bleibt gespeichert."
+              type="button"
+            >
+              Trennen
+            </button>
+          </span>
         ) : (
-          <label className="sh-device-select">
-            <span>Produktakte</span>
-            <select disabled={busy} defaultValue="" onChange={(event) => onLinkItem(event.currentTarget.value || null)}>
-              <option value="">Verbinden…</option>
-              {items.slice(0, 24).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <DeviceLinkPicker busy={busy} device={device} items={items} onLinkItem={onLinkItem} />
         )}
       </div>
 
@@ -643,9 +850,12 @@ function mainSmartHomeDevices(devices: SmartHomeDevice[]) {
 }
 
 function isSmartHomeCapableDevice(device: SmartHomeDevice) {
+  // Home Assistant imports are already domain-filtered server-side.
+  if (device.provider === "HOME_ASSISTANT") return true;
   const text = `${device.name} ${device.deviceType}`.toLowerCase();
   const capabilities = device.capabilities.map((capability) => capability.toLowerCase());
   return (
+    capabilities.includes("power") ||
     text.includes("tv") ||
     text.includes("samsung") ||
     text.includes("cast") ||

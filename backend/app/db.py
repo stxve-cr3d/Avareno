@@ -421,6 +421,12 @@ def _ensure_smart_home_tables(conn: sqlite3.Connection) -> None:
           FOREIGN KEY ("deviceId") REFERENCES "SmartHomeDevice" ("id") ON DELETE CASCADE
         )"""
     )
+    # Provider connection config (e.g. Home Assistant base URL + encrypted
+    # token envelope). Nullable; secrets inside are Fernet-encrypted by
+    # app.services.connectors.security before they are written here.
+    connection_columns = {row["name"] for row in conn.execute('PRAGMA table_info("SmartHomeConnection")').fetchall()}
+    if connection_columns and "configJson" not in connection_columns:
+        conn.execute('ALTER TABLE "SmartHomeConnection" ADD COLUMN "configJson" TEXT')
 
 
 def _ensure_social_tables(conn: sqlite3.Connection) -> None:

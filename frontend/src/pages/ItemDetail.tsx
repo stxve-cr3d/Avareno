@@ -1266,11 +1266,12 @@ export function ItemDetail() {
                 ))
               ) : (
                 <div className="rounded-lg border border-dashed border-line av-surface p-4 text-sm font-bold text-muted">
-                  Noch kein Smart-Home-Gerät verbunden.
+                  <p className="text-ink">Als Geräte-Pass gespeichert — noch keine Live-Verbindung.</p>
+                  <p className="mt-1 font-semibold">Dokumente, Garantie und Service-Historie bleiben auch ohne Steuerung vollständig verfügbar.</p>
                 </div>
               )}
               <Link className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-ink px-4 text-sm font-black text-white" to="/app/smart-home">
-                <Link2 size={16} /> {item.smartHomeDevices?.length ? "Smart-Home öffnen" : "Smart-Gerät verbinden"}
+                <Link2 size={16} /> {item.smartHomeDevices?.length ? "Smart-Home öffnen" : "Live-Status verbinden"}
               </Link>
             </div>
           </section>

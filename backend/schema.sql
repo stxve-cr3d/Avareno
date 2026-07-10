@@ -180,6 +180,7 @@ CREATE TABLE "SmartHomeConnection" (
   "householdId" TEXT,
   "provider" TEXT NOT NULL,
   "status" TEXT NOT NULL DEFAULT 'AVAILABLE',
+  "configJson" TEXT,
   "lastSyncAt" TEXT,
   "createdAt" TEXT NOT NULL,
   "updatedAt" TEXT NOT NULL,

@@ -27370,6 +27370,81 @@ html[data-theme="light"] .avareno-app-shell {
   color: var(--av-text-muted);
 }
 .sh-probe input { flex: 1; min-width: 0; background: none; border: 0; outline: none; color: var(--av-text-primary); font: inherit; font-size: 0.84rem; }
+
+.sh-ha-input {
+  flex: 1 1 14rem;
+  min-width: 0;
+  min-height: 2.4rem;
+  padding: 0 0.7rem;
+  border-radius: 0.55rem;
+  border: 1px solid var(--av-border-subtle);
+  background: var(--av-bg-base);
+  color: var(--av-text-primary);
+  font: inherit;
+  font-size: 0.84rem;
+  outline: none;
+}
+.sh-ha-input:focus { border-color: var(--av-border-accent); }
+
+/* Device → object linking */
+.sh-device-linkrow { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.sh-device-unlink {
+  border: 1px solid var(--av-border-subtle);
+  background: none;
+  color: var(--av-text-muted);
+  border-radius: 0.4rem;
+  padding: 0.1rem 0.5rem;
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.sh-device-unlink:hover { color: var(--av-text-primary); border-color: var(--av-border-accent); }
+.sh-suggest-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-bottom: 0.45rem; }
+.sh-suggest-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--av-text-muted); }
+.sh-suggest-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--av-border-subtle);
+  background: var(--av-bg-base);
+  color: var(--av-text-primary);
+  border-radius: 999px;
+  padding: 0.22rem 0.65rem;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.sh-suggest-chip:hover { border-color: var(--av-border-accent); }
+.sh-suggest-chip em { font-style: normal; font-size: 0.68rem; color: var(--av-accent); }
+.sh-link-search { display: flex; align-items: center; gap: 0.5rem; }
+.sh-link-search span { font-size: 0.72rem; font-weight: 700; color: var(--av-text-muted); white-space: nowrap; }
+.sh-link-search input {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.1rem;
+  padding: 0 0.6rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--av-border-subtle);
+  background: var(--av-bg-base);
+  color: var(--av-text-primary);
+  font: inherit;
+  font-size: 0.8rem;
+  outline: none;
+}
+.sh-link-search input:focus { border-color: var(--av-border-accent); }
+.sh-suggest-confirm {
+  min-height: 2.1rem;
+  padding: 0 0.7rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--av-border-subtle);
+  background: var(--av-surface-1);
+  color: var(--av-text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.sh-suggest-confirm:disabled { opacity: 0.55; cursor: default; }
+.sh-suggest-confirm:not(:disabled):hover { border-color: var(--av-border-accent); color: var(--av-text-primary); }
 .sh-probe button {
   min-height: 2rem;
   padding: 0 0.7rem;

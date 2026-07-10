@@ -139,6 +139,107 @@ def avareno_bridge_url() -> str:
     return os.environ.get("AVARENO_BRIDGE_URL", "").strip().rstrip("/")
 
 
+# ── Home Assistant (direct connection) ─────────────────────────────
+# The user's instance URL + long-lived token live in
+# SmartHomeConnection.configJson; the token only as an encrypted envelope.
+
+
+def _home_assistant_connection(conn: sqlite3.Connection, user_id: str) -> dict | None:
+    return row_to_dict(
+        conn.execute(
+            'SELECT * FROM "SmartHomeConnection" WHERE userId = ? AND provider = ? ORDER BY updatedAt DESC LIMIT 1',
+            (user_id, HOME_ASSISTANT_PROVIDER),
+        ).fetchone()
+    )
+
+
+def home_assistant_direct_config(conn: sqlite3.Connection, user_id: str) -> dict | None:
+    """Decrypted direct-mode config, or None when not configured."""
+    from app.services.connectors.security import decrypt_secret
+
+    connection = _home_assistant_connection(conn, user_id)
+    if not connection or not connection.get("configJson"):
+        return None
+    config = _json_or_empty_dict(connection.get("configJson"))
+    base_url = str(config.get("baseUrl") or "").strip()
+    token = decrypt_secret(config.get("tokenCiphertext"))
+    if not base_url or not token:
+        return None
+    return {"baseUrl": base_url, "token": token, "connectionId": connection["id"]}
+
+
+def setup_home_assistant(conn: sqlite3.Connection, user_id: str, household_id: str, base_url: str, token: str) -> dict:
+    """Validate a user-provided instance and store the connection securely.
+
+    The connection is only persisted after /api/config answered with the
+    provided token. The token is never returned and never logged.
+    """
+    from app.services.connectors.home_assistant import (
+        HomeAssistantError,
+        validate_credentials,
+        validate_home_assistant_url,
+    )
+    from app.services.connectors.security import ConnectorSecurityError, prepare_connector_secret_for_storage
+
+    cleaned_url = validate_home_assistant_url(base_url)
+    token = (token or "").strip()
+    if len(token) < 8:
+        raise HomeAssistantError("Bitte gib einen Long-Lived Access Token an.")
+
+    instance = validate_credentials(cleaned_url, token)
+
+    try:
+        envelope = prepare_connector_secret_for_storage(token)
+    except ConnectorSecurityError:
+        raise HomeAssistantError(
+            "Token-Verschlüsselung ist nicht konfiguriert (AVARENO_CONNECTOR_SECRET_KEY fehlt). Verbindung wurde nicht gespeichert."
+        ) from None
+
+    connection = connect_provider(conn, user_id, household_id, HOME_ASSISTANT_PROVIDER)
+    config_json = json.dumps(
+        {
+            "baseUrl": cleaned_url,
+            "tokenCiphertext": envelope["ciphertext"],
+            "instanceName": instance["instanceName"],
+            "version": instance["version"],
+            "storedAt": envelope["createdAt"],
+        }
+    )
+    now = now_iso()
+    conn.execute(
+        'UPDATE "SmartHomeConnection" SET status = ?, configJson = ?, updatedAt = ? WHERE id = ?',
+        ("CONNECTED", config_json, now, connection["id"]),
+    )
+
+    sync = sync_provider(conn, user_id, household_id, HOME_ASSISTANT_PROVIDER)
+    return {
+        "ok": True,
+        "instance": instance,
+        "synced": sync.get("synced", 0),
+        "source": sync.get("source"),
+    }
+
+
+def disconnect_home_assistant(conn: sqlite3.Connection, user_id: str) -> dict:
+    """Remove the stored config. Imported devices and object links stay."""
+    connection = _home_assistant_connection(conn, user_id)
+    if not connection:
+        return {"ok": True, "disconnected": False}
+    now = now_iso()
+    conn.execute(
+        'UPDATE "SmartHomeConnection" SET status = ?, configJson = NULL, updatedAt = ? WHERE id = ?',
+        ("AVAILABLE", now, connection["id"]),
+    )
+    return {"ok": True, "disconnected": True}
+
+
+def _fetch_home_assistant_direct_devices(config: dict) -> list[dict]:
+    from app.services.connectors.home_assistant import fetch_states, normalize_entities
+
+    states = fetch_states(config["baseUrl"], config["token"])
+    return normalize_entities(states)
+
+
 def smart_home_payload(conn: sqlite3.Connection, user_id: str) -> dict:
     connections = rows_to_dicts(
         conn.execute('SELECT * FROM "SmartHomeConnection" WHERE userId = ? ORDER BY provider ASC', (user_id,)).fetchall()
@@ -204,10 +305,12 @@ def smart_home_payload(conn: sqlite3.Connection, user_id: str) -> dict:
             {
                 "id": HOME_ASSISTANT_PROVIDER,
                 "name": "Home Assistant",
-                "mode": "BRIDGED" if avareno_bridge_enabled() else "PLANNED",
+                "mode": "LIVE"
+                if home_assistant_direct_config(conn, user_id)
+                else ("BRIDGED" if avareno_bridge_enabled() else "PLANNED"),
                 "status": _provider_status(connections, HOME_ASSISTANT_PROVIDER),
-                "tokenConfigured": home_assistant_ready,
-                "authNote": "Best used through Avareno Bridge so one Home Assistant setup can represent many brands.",
+                "tokenConfigured": bool(home_assistant_direct_config(conn, user_id)) or home_assistant_ready,
+                "authNote": "Direkt mit Instanz-URL und Long-Lived Access Token, oder über die Avareno Bridge.",
             },
             {
                 "id": "ALEXA",
@@ -306,6 +409,9 @@ def sync_provider(conn: sqlite3.Connection, user_id: str, household_id: str, pro
     if provider == AVARENO_BRIDGE_PROVIDER:
         source_devices = _fetch_avareno_bridge_devices()
         source = "BRIDGE"
+    elif provider == HOME_ASSISTANT_PROVIDER and (ha_config := home_assistant_direct_config(conn, user_id)):
+        source_devices = _fetch_home_assistant_direct_devices(ha_config)
+        source = "LIVE"
     elif provider == HOME_ASSISTANT_PROVIDER and avareno_bridge_enabled():
         source_devices = _fetch_avareno_bridge_devices()
         source = "BRIDGED_HOME_ASSISTANT"
@@ -430,6 +536,16 @@ def execute_command(conn: sqlite3.Connection, user_id: str, device_id: str, comm
     if device["provider"] == SMARTTHINGS_PROVIDER and smartthings_token() and not str(device["providerDeviceId"]).startswith("demo-"):
         status = "SENT"
         result = _send_smartthings_command(device["providerDeviceId"], commands)
+    elif (
+        device["provider"] == HOME_ASSISTANT_PROVIDER
+        and command in {"power_on", "power_off"}
+        and "power" in _json_or_empty_list(device.get("capabilities"))
+        and (ha_config := home_assistant_direct_config(conn, user_id))
+    ):
+        from app.services.connectors.home_assistant import execute_power_command
+
+        status = "SENT"
+        result = execute_power_command(ha_config["baseUrl"], ha_config["token"], str(device["providerDeviceId"]), command)
     elif device["provider"] == LOCAL_DISCOVERY_PROVIDER and command in LOCAL_TV_COMMANDS:
         status = "SENT"
         result = _send_local_tv_command(device, command)
@@ -2859,29 +2975,81 @@ def _infer_room(source_device: dict) -> str | None:
     return None
 
 
-def _best_item_match(conn: sqlite3.Connection, user_id: str, name: str, room: str | None, device_type: str) -> str | None:
+def _item_match_candidates(
+    conn: sqlite3.Connection, user_id: str, name: str, room: str | None, device_type: str
+) -> list[dict]:
+    """Score the user's items against a device. Shared by the import-time
+    auto-link and the link-suggestions endpoint; reasons are plain facts,
+    not confidence claims."""
     terms = [part for part in name.lower().replace("-", " ").split() if len(part) > 2]
     source_brand = _known_device_brand(name)
     rows = rows_to_dicts(conn.execute('SELECT * FROM "Item" WHERE userId = ?', (user_id,)).fetchall())
-    best: tuple[int, str | None] = (0, None)
+    candidates: list[dict] = []
     for item in rows:
         haystack = " ".join(
             str(item.get(key) or "").lower() for key in ["name", "category", "manufacturer", "model", "location", "itemType"]
         )
         if source_brand and source_brand not in haystack:
             continue
+        reasons: list[str] = []
         score = sum(2 for term in terms if term in haystack)
+        if score > 0:
+            reasons.append("Name passt")
         if room and str(item.get("location") or "").lower() == room.lower():
             score += 2
+            reasons.append("Gleicher Raum")
         if device_type == "tv" and ("tv" in haystack or "oled" in haystack):
             score += 4
+            reasons.append("Typ passt")
         if device_type == "light" and ("light" in haystack or "lampe" in haystack):
             score += 3
+            reasons.append("Typ passt")
         if device_type == "3d_printer" and ("bambu" in haystack or "3d" in haystack or "printer" in haystack or "drucker" in haystack):
             score += 5
-        if score > best[0]:
-            best = (score, item["id"])
-    return best[1] if best[0] >= 3 else None
+            reasons.append("Typ passt")
+        if source_brand:
+            reasons.append("Marke passt")
+        if score > 0:
+            candidates.append(
+                {
+                    "itemId": item["id"],
+                    "name": item.get("name"),
+                    "location": item.get("location"),
+                    "score": score,
+                    "reasons": sorted(set(reasons)),
+                }
+            )
+    candidates.sort(key=lambda entry: entry["score"], reverse=True)
+    return candidates
+
+
+def _best_item_match(conn: sqlite3.Connection, user_id: str, name: str, room: str | None, device_type: str) -> str | None:
+    candidates = _item_match_candidates(conn, user_id, name, room, device_type)
+    if candidates and candidates[0]["score"] >= 3:
+        return candidates[0]["itemId"]
+    return None
+
+
+def link_suggestions_for_device(conn: sqlite3.Connection, user_id: str, device_id: str) -> dict:
+    """Suggestions only — nothing is linked here. Ownership enforced."""
+    device = row_to_dict(
+        conn.execute('SELECT * FROM "SmartHomeDevice" WHERE id = ? AND userId = ?', (device_id, user_id)).fetchone()
+    )
+    if not device:
+        raise ValueError("Smart home device not found")
+    linked_ids = {
+        row["itemId"]
+        for row in conn.execute(
+            'SELECT itemId FROM "SmartHomeDevice" WHERE userId = ? AND itemId IS NOT NULL', (user_id,)
+        ).fetchall()
+    }
+    candidates = _item_match_candidates(conn, user_id, str(device.get("name") or ""), device.get("roomName"), str(device.get("deviceType") or ""))
+    suggestions = []
+    for candidate in candidates[:5]:
+        suggestions.append({**candidate, "alreadyLinked": candidate["itemId"] in linked_ids})
+        if len(suggestions) == 3:
+            break
+    return {"deviceId": device_id, "suggestions": suggestions}
 
 
 def _known_device_brand(value: str) -> str | None:
