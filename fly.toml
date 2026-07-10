@@ -9,6 +9,10 @@ primary_region = "fra"
 [env]
   PORT = "8080"
   AVARENO_REQUIRE_AUTH = "1"
+  AVARENO_APP_URL = "https://avareno.app"
+  AVARENO_ENABLE_STATIC_UPLOADS = "false"
+  AVARENO_CORS_ORIGINS = "https://avareno.app,https://www.avareno.app"
+  STRIPE_CHECKOUT_LOCALE = "de"
 
 [http_service]
   internal_port = 8080
