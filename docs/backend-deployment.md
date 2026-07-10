@@ -43,6 +43,7 @@ AVARENO_DB_PATH=/data/avareno.db
 AVARENO_UPLOAD_ROOT=/data/uploads
 AVARENO_ENABLE_STATIC_UPLOADS=false
 AVARENO_SIGNED_URL_SECRET=<long-random-secret>
+AVARENO_CONNECTOR_SECRET_KEY=<long-random-secret, encrypts provider tokens (Home Assistant); without it connector setup refuses to store credentials>
 AVARENO_CORS_ORIGINS=https://avareno.app,https://www.avareno.app
 SUPABASE_URL=<project-url>
 SUPABASE_PUBLISHABLE_KEY=<publishable-key>
