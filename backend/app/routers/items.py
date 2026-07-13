@@ -364,6 +364,50 @@ def resolve_item_support_links(item_id: str) -> dict:
         return build_product_support_suggestion(item)
 
 
+@router.delete("/{item_id}")
+def delete_item(item_id: str) -> dict:
+    """Delete an object plus its attached documents (files included).
+
+    Loops/reminders/repairs cascade via foreign keys; linked smart-home
+    devices are unlinked (SET NULL), never deleted. The action is audited
+    like document deletion. Irreversible - the UI must confirm first.
+    """
+    from app.routers.documents import _document_file_path
+    from app.services.privacy import record_privacy_audit_event
+
+    with db() as conn:
+        user = get_default_user(conn)
+        item = row_to_dict(
+            conn.execute('SELECT * FROM "Item" WHERE id = ? AND userId = ?', (item_id, user["id"])).fetchone()
+        )
+        if not item:
+            raise HTTPException(status_code=404, detail="Item not found")
+
+        documents = rows_to_dicts(
+            conn.execute('SELECT * FROM "Document" WHERE itemId = ? AND userId = ?', (item_id, user["id"])).fetchall()
+        )
+        files_deleted = 0
+        for document in documents:
+            upload_target = _document_file_path(document, missing_ok=True)
+            if upload_target and upload_target.exists():
+                upload_target.unlink()
+                files_deleted += 1
+        conn.execute('DELETE FROM "Document" WHERE itemId = ? AND userId = ?', (item_id, user["id"]))
+        # Children with ON DELETE CASCADE / SET NULL are handled by SQLite
+        # (PRAGMA foreign_keys=ON in db()).
+        conn.execute('DELETE FROM "Item" WHERE id = ? AND userId = ?', (item_id, user["id"]))
+
+        record_privacy_audit_event(
+            conn,
+            user_id=user["id"],
+            event_type="ITEM_DELETED",
+            status="DELETED",
+            message="Object deleted with its documents; reminders and repairs cascaded; devices unlinked.",
+            context={"item_id": item_id, "documents_deleted": len(documents), "files_deleted": files_deleted},
+        )
+        return {"ok": True, "deleted": item_id, "documentsDeleted": len(documents)}
+
+
 @router.patch("/{item_id}")
 def patch_item(item_id: str, payload: ItemPatch) -> dict:
     with db() as conn:

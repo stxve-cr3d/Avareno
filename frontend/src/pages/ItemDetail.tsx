@@ -193,6 +193,7 @@ export function ItemDetail() {
   const [supportSuggestion, setSupportSuggestion] = useState<ProductSupportSuggestion | null>(null);
   const [detailMessage, setDetailMessage] = useState("");
   const [busy, setBusy] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [recommendationTab, setRecommendationTab] = useState<RecommendationTab>("spare");
   const [dismissedWarrantyItemId, setDismissedWarrantyItemId] = useState<string | null>(null);
   const [ownershipEditing, setOwnershipEditing] = useState(false);
@@ -572,6 +573,20 @@ export function ItemDetail() {
     resetCommerceLinks(updated);
     setDetailMessage("Shop links gespeichert");
     setCommerceEditing(false);
+  }
+
+  async function deleteThisItem() {
+    if (!item) return;
+    setBusy("item-delete");
+    try {
+      await api(`/api/items/${item.id}`, { method: "DELETE" });
+      navigate("/app/dinge", { replace: true });
+    } catch (error) {
+      setDetailMessage(error instanceof Error ? error.message : "Das Objekt konnte nicht gelöscht werden.");
+      setConfirmingDelete(false);
+    } finally {
+      setBusy("");
+    }
   }
 
   async function smartCommand(deviceId: string, command: string) {
@@ -1472,6 +1487,36 @@ export function ItemDetail() {
             <div className="mt-4 grid gap-3">
               {loops.length ? loops.map((loop) => <LoopCard key={loop.id} loop={loop} />) : <div className="rounded-lg border border-dashed border-line av-surface p-5 text-sm font-bold text-muted">Noch keine Care-Punkte für dieses Produkt.</div>}
             </div>
+          </section>
+
+          <section className="object-panel rounded-lg p-4">
+            <SectionTitle eyebrow="Endgültig" title="Objekt löschen" icon={<Trash2 size={19} />} />
+            <p className="mt-3 text-sm font-semibold text-muted">
+              Entfernt dieses Objekt mit allen Belegen und Dokumenten endgültig. Erinnerungen und Reparaturen werden mit gelöscht; verbundene Geräte bleiben erhalten und werden nur getrennt.
+            </p>
+            {confirmingDelete ? (
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <button
+                  className="inline-flex min-h-11 items-center gap-2 rounded-full border border-red-200/70 px-4 text-sm font-black text-red-600 hover:bg-red-50"
+                  disabled={busy === "item-delete"}
+                  onClick={deleteThisItem}
+                  type="button"
+                >
+                  <Trash2 size={15} /> {busy === "item-delete" ? "Wird gelöscht…" : "Endgültig löschen"}
+                </button>
+                <button className="profile-secondary-action is-muted" onClick={() => setConfirmingDelete(false)} type="button">
+                  Abbrechen
+                </button>
+              </div>
+            ) : (
+              <button
+                className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full border border-line px-4 text-sm font-black text-muted hover:text-red-600 hover:border-red-200/70"
+                onClick={() => setConfirmingDelete(true)}
+                type="button"
+              >
+                <Trash2 size={15} /> Objekt löschen…
+              </button>
+            )}
           </section>
         </aside>
       </section>
