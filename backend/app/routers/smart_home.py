@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from app.db import db, row_to_dict
-from app.dependencies import get_default_user
+from app.dependencies import ensure_household_for_user, get_default_user
 from app.schemas import (
     BambuHostDiagnosticRequest,
     BambuLabSetupRequest,
@@ -43,12 +43,10 @@ router = APIRouter()
 
 
 def _default_household(conn, user_id: str) -> dict:
-    household = row_to_dict(
-        conn.execute('SELECT * FROM "Household" WHERE userId = ? ORDER BY createdAt ASC LIMIT 1', (user_id,)).fetchone()
-    )
-    if not household:
+    user = row_to_dict(conn.execute('SELECT * FROM "User" WHERE id = ?', (user_id,)).fetchone())
+    if not user:
         raise HTTPException(status_code=404, detail="Household not found")
-    return household
+    return ensure_household_for_user(conn, user)
 
 
 @router.get("")

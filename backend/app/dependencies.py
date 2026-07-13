@@ -28,6 +28,34 @@ def get_default_user(conn: sqlite3.Connection) -> dict:
     return row_to_dict(conn.execute('SELECT * FROM "User" WHERE id = ?', (user_id,)).fetchone()) or {}
 
 
+def ensure_household_for_user(conn: sqlite3.Connection, user: dict) -> dict:
+    """Return the user's household, creating it if missing.
+
+    Fixes the fresh-install/first-login race where the default household
+    is only backfilled by the *next* db connection's ensure pass, so the
+    very first household-dependent request used to 404.
+    """
+    household = row_to_dict(
+        conn.execute('SELECT * FROM "Household" WHERE userId = ? ORDER BY createdAt ASC LIMIT 1', (user["id"],)).fetchone()
+    )
+    if household:
+        return household
+
+    now = now_iso()
+    household_id = make_id()
+    conn.execute(
+        'INSERT INTO "Household" (id, userId, name, type, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
+        (household_id, user["id"], f"{user.get('name') or 'Avareno'}'s Home", "HOME", now, now),
+    )
+    conn.execute(
+        """INSERT INTO "HouseholdMember" (id, householdId, userId, email, name, role, status, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (make_id(), household_id, user["id"], user.get("email") or "", user.get("name"), "OWNER", "ACTIVE", now, now),
+    )
+    conn.commit()
+    return row_to_dict(conn.execute('SELECT * FROM "Household" WHERE id = ?', (household_id,)).fetchone()) or {}
+
+
 def require_authenticated_user(conn: sqlite3.Connection) -> dict:
     if not current_auth_claims():
         raise HTTPException(status_code=401, detail="Authentication required")
