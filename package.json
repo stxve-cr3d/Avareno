@@ -1,7 +1,7 @@
 {
   "name": "avareno",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.0-beta.1",
   "workspaces": [
     "frontend"
   ],
@@ -13,7 +13,9 @@
     "pages:deploy": "npm run build && npx wrangler pages deploy frontend/dist --project-name avareno",
     "db:init": "python3 backend/scripts/seed.py",
     "db:seed": "python3 backend/scripts/seed.py",
-    "typecheck": "python3 -m compileall -q backend && npm run typecheck -w frontend"
+    "typecheck": "python3 -m compileall -q backend && npm run typecheck -w frontend",
+    "test:backend": "python3 -m pytest backend/tests -q",
+    "verify": "npm run typecheck && npm run test:backend && npm run build"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

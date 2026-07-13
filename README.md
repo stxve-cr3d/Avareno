@@ -1,6 +1,8 @@
-# Avareno MVP
+# Avareno — 0.1.0-beta.1
 
-Avareno is a mobile-first web app for real-life open loops: receipts, devices, documents, message reminders, warranties, and small life tasks that should not stay in your head.
+Avareno is a private memory for real life: products, receipts, warranties, documents, repairs, reminders and open tasks in one calm, private place.
+
+Beta docs: [docs/BETA_READINESS.md](docs/BETA_READINESS.md) · [docs/BETA_TESTING.md](docs/BETA_TESTING.md) · [CHANGELOG.md](CHANGELOG.md) · Deployment: [docs/deploy-fly.md](docs/deploy-fly.md)
 
 ## Stack
 
@@ -71,9 +73,11 @@ Cloudflare Pages can proxy `/api/*` to a separately hosted backend when the Page
 ## Scripts
 
 ```bash
-npm run dev
-npm run build
-npm run typecheck
+npm run dev            # frontend :5173 + backend :4000
+npm run build          # production frontend bundle
+npm run typecheck      # backend compileall + frontend tsc
+npm run test:backend   # pytest API/security suite (pip install -r backend/requirements-dev.txt once)
+npm run verify         # typecheck + tests + build
 npm run db:init
 npm run db:seed
 ```
