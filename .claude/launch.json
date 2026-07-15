@@ -19,6 +19,12 @@
       "runtimeArgs": ["run", "dev", "-w", "frontend"],
       "port": 5173,
       "autoPort": true
+    },
+    {
+      "name": "Mobile (Expo web)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "web", "--prefix", "mobile"],
+      "port": 8081
     }
   ]
 }
