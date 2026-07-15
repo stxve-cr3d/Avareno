@@ -25,6 +25,7 @@ os.environ["AVARENO_MAX_UPLOAD_BYTES"] = str(64 * 1024)  # 64 KB cap for upload 
 os.environ.pop("AVARENO_ENV", None)
 os.environ.pop("AVARENO_REQUIRE_AUTH", None)
 os.environ.pop("AVARENO_ENABLE_STATIC_UPLOADS", None)
+os.environ.pop("ANTHROPIC_API_KEY", None)  # extraction must use the mock in tests
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
