@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from app.services.document_storage import UPLOAD_ROOT
+from app.services.supabase_admin import supabase_admin_configured
 from app.db import rows_to_dicts
 from app.utils import make_id, now_iso
 
@@ -215,16 +216,21 @@ def account_deletion_plan(user_id: str) -> dict[str, Any]:
 
 
 def deletion_plan(user_id: str) -> dict[str, Any]:
+    ready = supabase_admin_configured()
     return {
         "state": IMPLEMENTATION_STATE,
         "userId": user_id,
-        "ready": False,
+        "ready": ready,
         "knownTables": KNOWN_USER_TABLES,
         "knownStorageRoots": [str(UPLOAD_ROOT)],
         "requiredAreas": DELETION_TODO_AREAS,
-        "authDeletion": "Supabase auth user deletion requires server-side admin orchestration; never run from the browser.",
+        "authDeletion": "Server-side Supabase Auth deletion is available only when the server admin configuration is present.",
         "backupPolicyNote": "Define retention and restore exclusions before claiming irreversible deletion.",
-        "userVisibleMessage": "Kontolöschung kann als Anfrage protokolliert werden. Vollständige Ausführung bleibt blockiert, bis Auth, Storage, Provider und Backups orchestriert sind.",
+        "userVisibleMessage": (
+            "Kontolöschung entfernt lokale Daten, private Storage-Objekte und zuletzt den Auth-Nutzer."
+            if ready
+            else "Kontolöschung ist nicht verfügbar, bis die serverseitige Supabase-Admin-Konfiguration vollständig ist."
+        ),
     }
 
 
@@ -662,22 +668,6 @@ def delete_ai_extracted_data(conn: sqlite3.Connection, user_id: str, document_id
         "documentId": document_id,
         "audit": audit,
         "userVisibleMessage": "Gespeicherte KI-Extraktionen wurden gelöscht.",
-    }
-
-
-def request_account_deletion_record(conn: sqlite3.Connection, user_id: str) -> dict[str, Any]:
-    audit = record_privacy_audit_event(
-        conn,
-        user_id=user_id,
-        event_type="ACCOUNT_DELETION_REQUESTED",
-        status="BLOCKED_MANUAL_REVIEW",
-        message="Account deletion request recorded; full deletion orchestration is not production-ready.",
-        context={"known_table_count": len(KNOWN_USER_TABLES), "storage_root_count": 1},
-    )
-    return {
-        **account_deletion_plan(user_id),
-        "requestId": audit["id"],
-        "audit": audit,
     }
 
 

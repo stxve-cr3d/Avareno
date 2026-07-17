@@ -5,6 +5,8 @@ import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react
 import { getAuthAccessToken, safeAppRedirect, supabase } from "../lib/authClient";
 import type { SocialAuthProvider } from "../lib/authClient";
 import { useAuth } from "../lib/authProvider";
+import { getActivationSummary, recordActivationAction, resolvePostAuthPath } from "../lib/activation";
+import { betaFeatures } from "../lib/betaFeatures";
 import { useLanguage } from "../lib/language";
 import { api } from "../lib/api";
 import { formatPrice as formatPlanPrice, getPaidPlans, getPlanById } from "../lib/pricing";
@@ -37,12 +39,6 @@ declare global {
   }
 }
 
-const onboardingOptions = [
-  "Produkte & Geräte",
-  "Dokumente & Rechnungen",
-  "Garantien & Erinnerungen",
-  "Smart Home"
-];
 const phoneCountries = [
   { code: "DE", dialCode: "+49", flag: "🇩🇪", label: "Deutschland" },
   { code: "AT", dialCode: "+43", flag: "🇦🇹", label: "Österreich" },
@@ -59,6 +55,9 @@ export function LoginPage() {
 }
 
 export function SignupPage() {
+  if (betaFeatures.inviteOnly) {
+    return <Navigate to="/login" replace />;
+  }
   return <AuthForm mode="signup" />;
 }
 
@@ -203,7 +202,7 @@ export function AuthCallbackPage() {
   useEffect(() => {
     let active = true;
 
-    auth.completeAuthCallback({ code, errorDescription }).then((result) => {
+    auth.completeAuthCallback({ code, errorDescription }).then(async (result) => {
       if (!active) {
         return;
       }
@@ -211,7 +210,7 @@ export function AuthCallbackPage() {
       setHandled(true);
 
       if (result.ok) {
-        navigate(result.nextPath ?? "/app", { replace: true });
+        navigate(await resolvePostAuthPath("/app"), { replace: true });
       }
     });
 
@@ -240,12 +239,53 @@ export function AuthCallbackPage() {
 export function OnboardingPage() {
   const auth = useAuth();
   const navigate = useNavigate();
-  const [displayName, setDisplayName] = useState(auth.profile?.displayName ?? "");
-  const [privateProfile, setPrivateProfile] = useState(true);
-  const [motivationEnabled, setMotivationEnabled] = useState(true);
-  const [leaderboardEnabled, setLeaderboardEnabled] = useState(false);
-  const [interests, setInterests] = useState<string[]>(["Produkte & Geräte", "Garantien & Erinnerungen"]);
+  const { language } = useLanguage();
+  const [searchParams] = useSearchParams();
+  const [checking, setChecking] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [onboardingError, setOnboardingError] = useState("");
+  const resume = searchParams.get("resume") === "1";
+  const copy = language === "en"
+    ? {
+        label: "Onboarding",
+        eyebrow: "First step",
+        title: "Create your first product dossier.",
+        body: "Save a product and attach its receipt, warranty or manual. You can add missing details later.",
+        primary: "Add first product",
+        secondary: "Go to overview for now",
+        loading: "Preparing your private workspace…",
+        error: "The first step could not be saved. Please try again."
+      }
+    : {
+        label: "Onboarding",
+        eyebrow: "Erster Schritt",
+        title: "Lege deine erste Produktakte an.",
+        body: "Speichere ein Produkt und ordne ihm Rechnung, Garantie oder Anleitung zu. Du kannst fehlende Angaben später ergänzen.",
+        primary: "Erstes Produkt hinzufügen",
+        secondary: "Zunächst zur Übersicht",
+        loading: "Dein privater Bereich wird vorbereitet…",
+        error: "Der Einstieg konnte nicht gespeichert werden. Bitte versuche es erneut."
+      };
+
+  useEffect(() => {
+    if (auth.status !== "authenticated") return;
+    let active = true;
+    getActivationSummary()
+      .then((summary) => {
+        if (!active) return;
+        if (!resume && (summary.activationA || summary.onboardingCompletedAt || summary.onboardingDismissedAt)) {
+          navigate("/app", { replace: true });
+          return;
+        }
+        setChecking(false);
+      })
+      .catch(() => {
+        if (active) setChecking(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [auth.status, navigate, resume]);
 
   if (auth.status === "loading") {
     return (
@@ -253,7 +293,7 @@ export function OnboardingPage() {
         <AuthIntro
           eyebrow="Zugang"
           title="Privaten Speicher laden"
-          body="Wir prüfen kurz deine Supabase-Session und bereiten den ersten Start vor."
+          body={copy.loading}
         />
       </AuthSurface>
     );
@@ -263,83 +303,62 @@ export function OnboardingPage() {
     return <Navigate to="/login" replace />;
   }
 
-  if (auth.status === "authenticated" && auth.profile?.onboardingCompleted) {
-    return <Navigate to="/app" replace />;
-  }
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function startOnboarding() {
+    if (isSubmitting) return;
     setIsSubmitting(true);
-    const result = await auth.completeOnboarding({ displayName, privateProfile, motivationEnabled, leaderboardEnabled, interests });
-    setIsSubmitting(false);
-
-    if (result.ok) {
-      navigate(result.nextPath ?? "/app", { replace: true });
+    setOnboardingError("");
+    try {
+      await recordActivationAction("onboarding_started");
+      navigate("/app/capture/item?onboarding=1", { replace: true });
+    } catch {
+      setOnboardingError(copy.error);
+      setIsSubmitting(false);
     }
   }
 
-  function toggleInterest(interest: string) {
-    setInterests((current) => current.includes(interest) ? current.filter((entry) => entry !== interest) : [...current, interest]);
+  async function dismissOnboarding() {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setOnboardingError("");
+    try {
+      await recordActivationAction("onboarding_dismissed");
+      navigate("/app", { replace: true });
+    } catch {
+      setOnboardingError(copy.error);
+      setIsSubmitting(false);
+    }
+  }
+
+  if (checking) {
+    return (
+      <AuthSurface label={copy.label}>
+        <AuthIntro eyebrow={copy.eyebrow} title={copy.title} body={copy.loading} />
+      </AuthSurface>
+    );
   }
 
   return (
-    <AuthSurface label="Onboarding">
+    <AuthSurface label={copy.label}>
+      <div className="auth-inline-tools">
+        <LanguageSwitch />
+        <ThemeSwitch />
+      </div>
       <AuthIntro
-        eyebrow="Erster Start"
-        title="Dein privater Speicher"
-        body="Kurz einstellen, wofür Avareno dir zuerst helfen soll. Alles Optionale kannst du später ändern."
+        eyebrow={copy.eyebrow}
+        title={copy.title}
+        body={copy.body}
       />
 
-      <form className="auth-form" onSubmit={submit}>
-        <p className="auth-step-label">1. Name</p>
-        <AuthField icon={<UserRound size={17} />} label="Anzeigename">
-          <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Dein Name" type="text" />
-        </AuthField>
-
-        <p className="auth-step-label">2. Wobei soll Avareno helfen?</p>
-        <div className="auth-choice-list">
-          {onboardingOptions.map((interest) => (
-            <label className="auth-toggle" key={interest}>
-              <input checked={interests.includes(interest)} onChange={() => toggleInterest(interest)} type="checkbox" />
-              <span>
-                <strong>{interest}</strong>
-              </span>
-            </label>
-          ))}
-        </div>
-
-        <p className="auth-step-label">3. Optional</p>
-        <label className="auth-toggle">
-          <input checked={privateProfile} onChange={(event) => setPrivateProfile(event.target.checked)} type="checkbox" />
-          <span>
-            <strong>Profil privat halten</strong>
-            <small>Freunde sehen nur das, was du später bewusst freigibst.</small>
-          </span>
-        </label>
-
-        <label className="auth-toggle">
-          <input checked={motivationEnabled} onChange={(event) => setMotivationEnabled(event.target.checked)} type="checkbox" />
-          <span>
-            <strong>Sanfte Erinnerungen erlauben</strong>
-            <small>Keine Spielmechanik, nur kleine Hinweise für offene Punkte.</small>
-          </span>
-        </label>
-
-        <label className="auth-toggle">
-          <input checked={leaderboardEnabled} onChange={(event) => setLeaderboardEnabled(event.target.checked)} type="checkbox" />
-          <span>
-            <strong>Privaten Freunde-Überblick aktivieren</strong>
-            <small>Optional und nur für eingeladene Freunde sichtbar.</small>
-          </span>
-        </label>
-
-        <AuthMessage error={auth.error} success={null} />
-
-        <button className="auth-primary" disabled={isSubmitting} type="submit">
-          {isSubmitting ? "Speichere Start..." : "Avareno starten"}
+      <div className="auth-form">
+        <AuthMessage error={onboardingError || auth.error} success={null} />
+        <button className="auth-primary" disabled={isSubmitting} onClick={() => void startOnboarding()} type="button">
+          {isSubmitting ? copy.loading : copy.primary}
           <ArrowRight size={17} />
         </button>
-      </form>
+        <button className="auth-secondary-submit" disabled={isSubmitting} onClick={() => void dismissOnboarding()} type="button">
+          {copy.secondary}
+        </button>
+      </div>
     </AuthSurface>
   );
 }
@@ -397,7 +416,7 @@ export function AccountSettingsPage() {
   }, [auth.profile]);
 
   useEffect(() => {
-    if (auth.status !== "authenticated") {
+    if (!betaFeatures.billing || auth.status !== "authenticated") {
       return;
     }
     void loadBillingStatus();
@@ -779,7 +798,7 @@ export function AccountSettingsPage() {
         </div>
       </section>
 
-      <section className="account-panel account-billing-panel">
+      {betaFeatures.billing ? <section className="account-panel account-billing-panel">
         <div className="account-panel-head">
           <div>
             <span>Plan & Abrechnung</span>
@@ -958,7 +977,7 @@ export function AccountSettingsPage() {
             ))
           )}
         </div>
-      </section>
+      </section> : null}
 
       <form className="account-panel" onSubmit={submit}>
         <div className="account-panel-head">
@@ -1036,18 +1055,21 @@ export function AccountSettingsPage() {
         <label className="auth-toggle">
           <input checked={motivationEnabled} onChange={(event) => setMotivationEnabled(event.target.checked)} type="checkbox" />
           <span>
-            <strong>Motivation aktiv</strong>
-            <small>Sanfte Hinweise für offene Erinnerungen und Care-Punkte.</small>
+            <strong>Hinweise aktiv</strong>
+            <small>Sanfte Hinweise für offene Erinnerungen und Fristen.</small>
           </span>
         </label>
 
-        <label className="auth-toggle">
-          <input checked={leaderboardEnabled} onChange={(event) => setLeaderboardEnabled(event.target.checked)} type="checkbox" />
-          <span>
-            <strong>Freunde-Sichtbarkeit</strong>
-            <small>Nur für private Freundeskreise, nie öffentlich.</small>
-          </span>
-        </label>
+        {/* Disabled for the focused Avareno beta. Kept for a later product phase. */}
+        {betaFeatures.community ? (
+          <label className="auth-toggle">
+            <input checked={leaderboardEnabled} onChange={(event) => setLeaderboardEnabled(event.target.checked)} type="checkbox" />
+            <span>
+              <strong>Freunde-Sichtbarkeit</strong>
+              <small>Nur für private Freundeskreise, nie öffentlich.</small>
+            </span>
+          </label>
+        ) : null}
 
         <AuthMessage error={emailVerificationError || avatarError || (passkeyMessageActive ? null : auth.error)} success={emailVerificationMessage || (saved ? "Account-Einstellungen gespeichert." : avatarMessage || null)} />
 
@@ -1122,7 +1144,7 @@ export function AccountSettingsPage() {
           <div>
             <span>Sitzung</span>
             <h2>Abmelden & Konto</h2>
-            <p>Abmelden beendet die aktuelle Supabase-Session. Eine irreversible Kontolöschung braucht Backend-Support.</p>
+            <p>Abmelden beendet die lokale Sitzung. Die Kontolöschung ist im Privacy Center verfügbar.</p>
           </div>
         </div>
         <div className="account-action-row">
@@ -1130,10 +1152,10 @@ export function AccountSettingsPage() {
             <LogOut size={16} />
             Abmelden
           </button>
-          <button className="profile-secondary-action is-muted" disabled type="button">
+          <Link className="profile-secondary-action is-muted" to="/app/ich/privacy">
             <Trash2 size={16} />
-            Account löschen wird später ergänzt.
-          </button>
+            Account löschen
+          </Link>
         </div>
       </section>
     </section>
@@ -1163,7 +1185,8 @@ function AuthForm({ mode }: { mode: AuthMode }) {
   const [captchaError, setCaptchaError] = useState<string | null>(null);
   const [captchaResetNonce, setCaptchaResetNonce] = useState(0);
   const from = safeAppRedirect((location.state as { from?: string } | null)?.from);
-  const phoneAuthAvailable = auth.config.phoneProvider.configured || auth.config.mode === "mock";
+  const phoneAuthAvailable = !betaFeatures.emailPasswordOnly
+    && (auth.config.phoneProvider.configured || auth.config.mode === "mock");
   const phoneCountry = phoneCountries.find((country) => country.code === phoneCountryCode) ?? phoneCountries[0];
   const phoneForAuth = formatPhoneForAuth(phone, phoneCountry.dialCode);
   const captchaRequired = auth.config.turnstileEnabled && (authMethod === "email" || !phoneCodeSent);
@@ -1188,7 +1211,7 @@ function AuthForm({ mode }: { mode: AuthMode }) {
   }, []);
 
   if (auth.status === "authenticated") {
-    return <Navigate to={pendingProtectedPath ?? (auth.profile?.onboardingCompleted ? from : "/onboarding")} replace />;
+    return <AuthenticatedEntryRedirect preferredPath={pendingProtectedPath ?? from} />;
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -1213,7 +1236,9 @@ function AuthForm({ mode }: { mode: AuthMode }) {
         setPhoneCodeSent(true);
         setPhoneOtpSuccess("SMS-Code wurde gesendet. Gib ihn hier ein, um den Zugang abzuschließen.");
       } else if (result.ok) {
-        const target = resolvePostAuthTarget(mode, result.nextPath, from);
+        const target = mode === "signup"
+          ? resolvePostAuthTarget(mode, result.nextPath, from)
+          : await resolvePostAuthPath(from);
 
         if (isAuthRedirectTarget(target)) {
           navigate(target, { replace: true });
@@ -1234,7 +1259,9 @@ function AuthForm({ mode }: { mode: AuthMode }) {
       : await auth.signup({ email, password, displayName, captchaToken });
 
     if (result.ok) {
-      const target = resolvePostAuthTarget(mode, result.nextPath, from);
+      const target = mode === "signup"
+        ? resolvePostAuthTarget(mode, result.nextPath, from)
+        : await resolvePostAuthPath(from);
 
       if (isAuthRedirectTarget(target)) {
         navigate(target, { replace: true });
@@ -1425,7 +1452,7 @@ function AuthForm({ mode }: { mode: AuthMode }) {
           <ArrowRight size={17} />
         </button>
 
-        {authMethod === "email" ? (
+        {authMethod === "email" && !betaFeatures.emailPasswordOnly ? (
           <button className="auth-secondary-submit" disabled={!auth.config.ready || isSubmitting || Boolean(pendingProtectedPath)} onClick={openMagicLinkDialog} type="button">
             <Mail size={16} />
             Magic Link senden
@@ -1473,7 +1500,7 @@ function AuthForm({ mode }: { mode: AuthMode }) {
         </div>
       ) : null}
 
-      <div className="auth-provider-grid" aria-label="Weitere Login-Anbieter">
+      {!betaFeatures.emailPasswordOnly ? <div className="auth-provider-grid" aria-label="Weitere Login-Anbieter">
         <button disabled={!auth.config.providers.google.configured} type="button" onClick={() => void auth.signInWithProvider("google")}>
           <GoogleIcon />
           <span>Mit Google fortfahren</span>
@@ -1483,13 +1510,13 @@ function AuthForm({ mode }: { mode: AuthMode }) {
           <span>Mit Passkey fortfahren</span>
         </button>
         <button disabled={!auth.config.providers.apple.configured} type="button" onClick={() => void auth.signInWithProvider("apple")}>Mit Apple fortfahren</button>
-      </div>
+      </div> : null}
 
       <div className="auth-secondary-links">
         {mode === "login" ? (
           <>
             <Link to="/forgot-password">Passwort vergessen?</Link>
-            <span>Kein Account? <Link to="/signup">Erstellen</Link></span>
+            {!betaFeatures.inviteOnly ? <span>Kein Account? <Link to="/signup">Erstellen</Link></span> : null}
           </>
         ) : (
           <span>Schon dabei? <Link to="/login">Einloggen</Link></span>
@@ -1660,6 +1687,30 @@ function isAuthRedirectTarget(path: string) {
     || path === "/forgot-password"
     || path === "/reset-password"
     || path.startsWith("/auth/");
+}
+
+function AuthenticatedEntryRedirect({ preferredPath }: { preferredPath: string }) {
+  const [target, setTarget] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    resolvePostAuthPath(preferredPath).then((nextPath) => {
+      if (active) setTarget(nextPath);
+    });
+    return () => {
+      active = false;
+    };
+  }, [preferredPath]);
+
+  if (target) {
+    return <Navigate to={target} replace />;
+  }
+
+  return (
+    <AuthSurface label="Privater Bereich wird geöffnet">
+      <AuthIntro eyebrow="Zugang" title="Avareno wird geöffnet" body="Onboarding-Status und Produktspeicher werden geprüft." />
+    </AuthSurface>
+  );
 }
 
 function resolvePostAuthTarget(mode: AuthMode, nextPath: string | undefined, from: string) {

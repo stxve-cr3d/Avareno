@@ -58,7 +58,7 @@ def test_invalid_item_payload_rejected(client):
 
 
 def test_delete_item_cascades_and_cleans_files(client):
-    item_id = client.post("/api/items", json={"name": "Löschen Testobjekt"}).json()["id"]
+    item_id = client.post("/api/items", json={"name": "Löschen Testobjekt", "category": "Sonstiges"}).json()["id"]
     upload = client.post(
         "/api/documents/upload",
         data={"type": "RECEIPT", "itemId": item_id},
@@ -82,7 +82,7 @@ def test_delete_unknown_item_404(client):
 
 
 def test_repair_log_entry(client):
-    item_id = client.post("/api/items", json={"name": "Repair Testobjekt"}).json()["id"]
+    item_id = client.post("/api/items", json={"name": "Repair Testobjekt", "category": "Sonstiges"}).json()["id"]
     repair = client.post(
         f"/api/items/{item_id}/repairs",
         json={"date": "2026-07-01T10:00:00+00:00", "problem": "Testdefekt", "status": "OPEN"},
@@ -90,3 +90,23 @@ def test_repair_log_entry(client):
     assert repair.status_code == 201, repair.text
     detail = client.get(f"/api/items/{item_id}").json()
     assert any(entry.get("problem") == "Testdefekt" for entry in detail.get("repairLogs") or [])
+
+
+def test_product_creation_completes_activation_server_side(client):
+    started = client.post("/api/me/activation", json={"action": "onboarding_started"})
+    assert started.status_code == 200, started.text
+
+    created = client.post("/api/items", json={"name": "Aktivierung Testprodukt", "category": "Elektronik"})
+    assert created.status_code == 201, created.text
+
+    activation = client.get("/api/me/activation")
+    assert activation.status_code == 200
+    body = activation.json()
+    assert body["activationA"] is True
+    assert body["onboardingCompletedAt"]
+    assert body["firstProductCreatedAt"]
+    assert body["nextPath"] == "/app"
+
+    opened = client.post("/api/me/activation", json={"action": "product_detail_opened"})
+    assert opened.status_code == 200
+    assert opened.json()["firstProductDetailOpenedAt"]

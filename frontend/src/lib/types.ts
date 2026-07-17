@@ -726,6 +726,8 @@ export type Document = {
   mimeType: string;
   extractedText?: string | null;
   extractedJson?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 };
 
 export type Loop = {

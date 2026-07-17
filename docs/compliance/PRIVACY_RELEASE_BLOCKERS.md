@@ -15,15 +15,14 @@ Status: engineering blocker list, 2026-07-02. Not legal advice. Public launch st
 - AI-extracted data correction through the item detail document review panel.
 - Local connected-source disconnect.
 - Consent and privacy audit metadata tables.
-- Account deletion request logging.
+- Full active-account deletion across Supabase Storage/public rows, local
+  files/database rows and Supabase Auth, with old-token regression.
 
 ## Must Finish Before Public Launch
 
-1. Full account deletion execution
-   - Delete or anonymize app database rows according to final retention rules.
-   - Delete user-owned storage objects.
-   - Delete Supabase Auth user server-side and revoke sessions.
-   - Revoke connector tokens and provider access where supported.
+1. Account deletion operations beyond active data
+   - Repeat the integrated deletion test on the exact intended beta project.
+   - Revoke connector tokens/provider access before real connectors are enabled.
    - Define backup retention and restoration exclusion behavior.
 
 2. Production export workflow

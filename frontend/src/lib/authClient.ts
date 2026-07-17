@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Provider } from "@supabase/supabase-js";
+import { betaFeatures } from "./betaFeatures";
 
 export type SocialAuthProvider = Extract<Provider, "google" | "apple">;
 export type AuthRuntimeMode = "supabase" | "mock" | "setup_required";
@@ -60,26 +61,26 @@ export const authRuntime: AuthRuntimeConfig = {
   providers: {
     google: {
       label: "Google",
-      configured: mode === "supabase" && import.meta.env.VITE_AUTH_GOOGLE_ENABLED === "true",
+      configured: mode === "supabase" && betaFeatures.oauth && import.meta.env.VITE_AUTH_GOOGLE_ENABLED === "true",
       envName: "VITE_AUTH_GOOGLE_ENABLED",
       setupNote: "Google OAuth im Supabase Dashboard aktivieren und danach VITE_AUTH_GOOGLE_ENABLED=true setzen."
     },
     apple: {
       label: "Apple",
-      configured: mode === "supabase" && import.meta.env.VITE_AUTH_APPLE_ENABLED === "true",
+      configured: mode === "supabase" && betaFeatures.oauth && import.meta.env.VITE_AUTH_APPLE_ENABLED === "true",
       envName: "VITE_AUTH_APPLE_ENABLED",
       setupNote: "Apple OAuth im Supabase Dashboard aktivieren und danach VITE_AUTH_APPLE_ENABLED=true setzen."
     }
   },
   phoneProvider: {
     label: "SMS / Twilio",
-    configured: mode === "supabase" && import.meta.env.VITE_AUTH_PHONE_ENABLED === "true",
+    configured: mode === "supabase" && !betaFeatures.emailPasswordOnly && import.meta.env.VITE_AUTH_PHONE_ENABLED === "true",
     envName: "VITE_AUTH_PHONE_ENABLED",
     setupNote: "Phone Auth im Supabase Dashboard mit Twilio aktivieren und danach VITE_AUTH_PHONE_ENABLED=true setzen."
   },
   passkeyProvider: {
     label: "Passkey",
-    configured: mode === "supabase" && import.meta.env.VITE_AUTH_PASSKEY_ENABLED === "true",
+    configured: mode === "supabase" && !betaFeatures.emailPasswordOnly && import.meta.env.VITE_AUTH_PASSKEY_ENABLED === "true",
     envName: "VITE_AUTH_PASSKEY_ENABLED",
     setupNote: "Passkeys im Supabase Dashboard aktivieren und danach VITE_AUTH_PASSKEY_ENABLED=true setzen."
   },
@@ -98,7 +99,7 @@ export const supabase = mode === "supabase"
       autoRefreshToken: true,
       detectSessionInUrl: false,
       experimental: {
-        passkey: import.meta.env.VITE_AUTH_PASSKEY_ENABLED === "true"
+        passkey: !betaFeatures.emailPasswordOnly && import.meta.env.VITE_AUTH_PASSKEY_ENABLED === "true"
       },
       flowType: "pkce",
       persistSession: true,

@@ -25,6 +25,7 @@ import {
 import { Link, NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, apiBlob } from "../lib/api";
 import { useAuth } from "../lib/authProvider";
+import { betaFeatures } from "../lib/betaFeatures";
 import { defaultMotivationPrivacy } from "../lib/friendsData";
 import type { MotivationPrivacyPreferences } from "../lib/friendsData";
 import {
@@ -114,7 +115,10 @@ export function Rewards() {
   }
 
   useEffect(() => {
-    void loadFriends();
+    // Friends/XP are disabled for the focused Avareno beta. Kept for a later product phase.
+    if (betaFeatures.community) {
+      void loadFriends();
+    }
     // Load the server-side source of truth for motivation-privacy prefs.
     getPrivacy()
       .then((serverPrefs) => setPreferences(serverPrefs))
@@ -185,23 +189,28 @@ export function Rewards() {
         </div>
       </section>
 
-      <section className="profile-focus">
-        <div>
-          <span>Privater Freundeskreis</span>
-          <h2>Gemeinsam dranbleiben, ohne Druck.</h2>
-          <p>Freunde, Motivation und Sichtbarkeit sind getrennt. Jede Seite hat nur eine Aufgabe.</p>
-        </div>
-        <button className="profile-primary-action" disabled={!invite} onClick={() => void copyInvite()} type="button">
-          <Copy size={16} />
-          {inviteCopied ? "Code kopiert" : "Einladungscode kopieren"}
-        </button>
-      </section>
+      {/* Friends/XP are disabled for the focused Avareno beta. Kept for a later product phase. */}
+      {betaFeatures.community ? (
+        <>
+          <section className="profile-focus">
+            <div>
+              <span>Privater Freundeskreis</span>
+              <h2>Gemeinsam dranbleiben, ohne Druck.</h2>
+              <p>Freunde, Motivation und Sichtbarkeit sind getrennt. Jede Seite hat nur eine Aufgabe.</p>
+            </div>
+            <button className="profile-primary-action" disabled={!invite} onClick={() => void copyInvite()} type="button">
+              <Copy size={16} />
+              {inviteCopied ? "Code kopiert" : "Einladungscode kopieren"}
+            </button>
+          </section>
 
-      <section className="profile-stats" aria-label="Profil Überblick">
-        <ProfileStat icon={<Sparkles size={18} />} label="Diese Woche" value={self ? `${self.weeklyXp} XP` : "…"} />
-        <ProfileStat icon={<CheckCircle2 size={18} />} label="Streak" value={self ? `${self.currentStreakDays} Tage` : "…"} />
-        <ProfileStat icon={<UserPlus size={18} />} label="Freunde" value={String(friends.length)} />
-      </section>
+          <section className="profile-stats" aria-label="Profil Überblick">
+            <ProfileStat icon={<Sparkles size={18} />} label="Diese Woche" value={self ? `${self.weeklyXp} XP` : "…"} />
+            <ProfileStat icon={<CheckCircle2 size={18} />} label="Streak" value={self ? `${self.currentStreakDays} Tage` : "…"} />
+            <ProfileStat icon={<UserPlus size={18} />} label="Freunde" value={String(friends.length)} />
+          </section>
+        </>
+      ) : null}
 
       <ProfileSectionNav app={location.pathname.startsWith("/app")} basePath={profileBasePath} />
 
@@ -253,7 +262,8 @@ function getProfileSection(pathname: string) {
 function ProfileSectionNav({ app, basePath }: { app: boolean; basePath: string }) {
   const items = [
     { to: basePath, label: "Übersicht", end: true },
-    { to: `${basePath}/friends`, label: "Freunde" },
+    // Disabled for the focused Avareno beta. Kept for a later product phase.
+    ...(betaFeatures.community ? [{ to: `${basePath}/friends`, label: "Freunde" }] : []),
     { to: `${basePath}/privacy`, label: "Datenschutz" },
     { to: app ? `${basePath}/settings` : "/settings/account", label: "Konto" }
   ];
@@ -280,37 +290,40 @@ function ProfileOverview({
 }) {
   return (
     <section className="profile-overview-grid">
-      <article className="profile-panel">
-        <div className="profile-panel-head">
-          <div>
-            <span>Nächster Bereich</span>
-            <h2>Freundeskreis</h2>
-            <p>
-              {friendCount === 0
-                ? "Noch keine Freunde verbunden. Teile deinen Code, um zu starten."
-                : `${friendCount} ${friendCount === 1 ? "Freund ist" : "Freunde sind"} verbunden.`}
-            </p>
+      {/* Disabled for the focused Avareno beta. Kept for a later product phase. */}
+      {betaFeatures.community ? (
+        <article className="profile-panel">
+          <div className="profile-panel-head">
+            <div>
+              <span>Nächster Bereich</span>
+              <h2>Freundeskreis</h2>
+              <p>
+                {friendCount === 0
+                  ? "Noch keine Freunde verbunden. Teile deinen Code, um zu starten."
+                  : `${friendCount} ${friendCount === 1 ? "Freund ist" : "Freunde sind"} verbunden.`}
+              </p>
+            </div>
+            <UserPlus size={18} />
           </div>
-          <UserPlus size={18} />
-        </div>
-        <div className="profile-preview-row">
-          <span>{friendCount} verbunden</span>
-          <span>Privater Kreis</span>
-        </div>
-        <Link className="profile-secondary-action" to={`${basePath}/friends`}>Freunde ansehen</Link>
-      </article>
+          <div className="profile-preview-row">
+            <span>{friendCount} verbunden</span>
+            <span>Privater Kreis</span>
+          </div>
+          <Link className="profile-secondary-action" to={`${basePath}/friends`}>Freunde ansehen</Link>
+        </article>
+      ) : null}
 
       <article className="profile-panel">
         <div className="profile-panel-head">
           <div>
             <span>Datenschutz</span>
             <h2>Kontrolle</h2>
-            <p>Freundes-Sichtbarkeit, Export, Löschung und AI-Verarbeitung werden hier getrennt vorbereitet.</p>
+            <p>Sichtbarkeit, Export, Löschung und AI-Verarbeitung werden hier getrennt vorbereitet.</p>
           </div>
           <LockKeyhole size={18} />
         </div>
         <div className="profile-preview-row">
-          <span>{preferences.hideXpFromFriends ? "XP privat" : "XP teilbar"}</span>
+          <span>Privat als Standard</span>
           <span>Export in Vorbereitung</span>
         </div>
         <Link className="profile-secondary-action" to={`${basePath}/privacy`}>Datenschutz prüfen</Link>
@@ -731,6 +744,7 @@ function PrivacyCenterPanel({
   onChange: (next: Partial<MotivationPrivacyPreferences>) => void;
   onRefresh: () => Promise<PrivacySummary>;
 }) {
+  const auth = useAuth();
   const [deleteState, setDeleteState] = useState<"idle" | "confirm">("idle");
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -774,11 +788,18 @@ function PrivacyCenterPanel({
   }
 
   function handleDeletionRequest() {
-    void runAction("account-deletion-request", async () => {
-      await api("/api/privacy/deletion/request", { method: "POST", body: JSON.stringify({}) });
-      setDeleteState("idle");
-      return "Löschanfrage wurde protokolliert. Vollständige Ausführung bleibt bis Auth-, Storage-, Provider- und Backup-Orchestrierung gesperrt.";
-    });
+    setBusyAction("account-deletion-request");
+    setActionError(null);
+    void api<{ deleted: boolean }>("/api/privacy/deletion/request", { method: "POST", body: JSON.stringify({}) })
+      .then(async () => {
+        setDeleteState("idle");
+        await auth.logout();
+        window.location.assign("/login");
+      })
+      .catch((error: unknown) => {
+        setActionError(error instanceof Error ? error.message : "Kontolöschung konnte nicht sicher abgeschlossen werden.");
+        setBusyAction(null);
+      });
   }
 
   return (
@@ -953,10 +974,10 @@ function PrivacyCenterPanel({
           <p>Eine Löschung muss Nutzerprofil, Auth-User, Objekte, Dokumente, extrahierte Metadaten, Erinnerungen, Care/Resolve-Daten, Connector-Tokens, Logs, Storage-Objekte und Backup-Regeln abdecken.</p>
           {deleteState === "confirm" ? (
             <div className="privacy-delete-confirm">
-              <strong>Anfrage statt Sofortlöschung</strong>
+              <strong>Unwiderruflich löschen</strong>
               <span>{summary.deletion.userVisibleMessage}</span>
               <button disabled={busyAction === "account-deletion-request"} onClick={handleDeletionRequest} type="button">
-                {busyAction === "account-deletion-request" ? "Protokolliert..." : "Löschanfrage protokollieren"}
+                {busyAction === "account-deletion-request" ? "Löscht..." : "Account endgültig löschen"}
               </button>
             </div>
           ) : null}

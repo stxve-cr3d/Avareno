@@ -3,6 +3,7 @@ import type { FormEvent, ReactNode } from "react";
 import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { authRuntime, safeAppRedirect, supabase } from "./authClient";
 import type { SocialAuthProvider } from "./authClient";
+import { betaFeatures } from "./betaFeatures";
 import type { UserProfile } from "./types";
 
 type AuthStatus = "loading" | "authenticated" | "anonymous";
@@ -183,6 +184,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async signup(input) {
       setError(null);
 
+      if (betaFeatures.inviteOnly) {
+        setError("Avareno ist derzeit eine geschlossene Beta. Neue Konten werden nur per Einladung angelegt.");
+        return { ok: false };
+      }
+
       if (authRuntime.mode === "mock") {
         return signupWithDevProfile(input, setProfile, setStatus, setError);
       }
@@ -223,6 +229,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     async requestMagicLink(input) {
       setError(null);
+
+      if (betaFeatures.emailPasswordOnly) {
+        setError("In der geschlossenen Beta ist nur der Login mit E-Mail und Passwort aktiv.");
+        return { ok: false };
+      }
 
       const email = input.email.trim().toLowerCase();
       if (!email.includes("@")) {
@@ -328,6 +339,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async requestPhoneOtp(input) {
       setError(null);
 
+      if (betaFeatures.emailPasswordOnly) {
+        setError("In der geschlossenen Beta ist nur der Login mit E-Mail und Passwort aktiv.");
+        return { ok: false };
+      }
+
       const phone = normalizePhoneNumber(input.phone);
       if (!isE164PhoneNumber(phone)) {
         setError("Bitte nutze eine gültige Telefonnummer mit Landesvorwahl.");
@@ -373,6 +389,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     async verifyPhoneOtp(input) {
       setError(null);
+
+      if (betaFeatures.emailPasswordOnly) {
+        setError("In der geschlossenen Beta ist nur der Login mit E-Mail und Passwort aktiv.");
+        return { ok: false };
+      }
 
       const phone = normalizePhoneNumber(input.phone);
       const token = input.token.replace(/\s+/g, "");
@@ -520,6 +541,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async signInWithProvider(provider) {
       setError(null);
 
+      if (!betaFeatures.oauth) {
+        setError("OAuth-Login ist für die geschlossene Beta deaktiviert.");
+        return { ok: false };
+      }
+
       const providerConfig = authRuntime.providers[provider];
       if (!providerConfig.configured) {
         setError("Diese Login-Methode ist noch nicht konfiguriert.");
@@ -548,6 +574,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async signInWithPasskey() {
       setError(null);
 
+      if (betaFeatures.emailPasswordOnly) {
+        setError("In der geschlossenen Beta ist nur der Login mit E-Mail und Passwort aktiv.");
+        return { ok: false };
+      }
+
       if (!authRuntime.passkeyProvider.configured) {
         setError("Passkeys sind noch nicht konfiguriert.");
         return { ok: false };
@@ -574,6 +605,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     async registerPasskey() {
       setError(null);
+
+      if (betaFeatures.emailPasswordOnly) {
+        setError("Passkeys sind für die geschlossene Beta deaktiviert.");
+        return { ok: false };
+      }
 
       if (!authRuntime.passkeyProvider.configured) {
         setError("Passkeys sind noch nicht konfiguriert.");
@@ -718,7 +754,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (authRuntime.mode === "mock") {
         window.localStorage.removeItem(devSessionKey);
       } else if (supabase) {
-        await supabase.auth.signOut();
+        try {
+          await supabase.auth.signOut({ scope: "local" });
+        } finally {
+          // Clear application state even when a server-side account deletion
+          // means the Auth service no longer recognizes this session.
+        }
       }
 
       setProfile(null);

@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from app.db import db, row_to_dict, rows_to_dicts
 from app.dependencies import get_default_user
 from app.schemas import LoopCreate, LoopPatch, SnoozeRequest
+from app.services.authorization import require_owned_item
 from app.services.entitlements import PlanLimitExceeded, require_reminder_capacity
 from app.services.xp_service import award_xp
 from app.utils import make_id, normalize_iso, now_iso
@@ -12,17 +13,30 @@ from app.utils import make_id, normalize_iso, now_iso
 router = APIRouter()
 
 
-def _loop_with_relations(conn, loop_id: str) -> dict | None:
-    loop = row_to_dict(conn.execute('SELECT * FROM "Loop" WHERE id = ?', (loop_id,)).fetchone())
+def _loop_with_relations(conn, loop_id: str, user_id: str) -> dict | None:
+    loop = row_to_dict(
+        conn.execute(
+            'SELECT * FROM "Loop" WHERE id = ? AND userId = ?',
+            (loop_id, user_id),
+        ).fetchone()
+    )
     if not loop:
         return None
     loop["item"] = (
-        row_to_dict(conn.execute('SELECT * FROM "Item" WHERE id = ?', (loop["itemId"],)).fetchone())
+        row_to_dict(
+            conn.execute(
+                'SELECT * FROM "Item" WHERE id = ? AND userId = ?',
+                (loop["itemId"], user_id),
+            ).fetchone()
+        )
         if loop.get("itemId")
         else None
     )
     loop["reminders"] = rows_to_dicts(
-        conn.execute('SELECT * FROM "Reminder" WHERE loopId = ? ORDER BY remindAt ASC', (loop_id,)).fetchall()
+        conn.execute(
+            'SELECT * FROM "Reminder" WHERE loopId = ? AND userId = ? ORDER BY remindAt ASC',
+            (loop_id, user_id),
+        ).fetchall()
     )
     return loop
 
@@ -39,7 +53,12 @@ def list_loops() -> list[dict]:
         )
         for loop in loops:
             loop["item"] = (
-                row_to_dict(conn.execute('SELECT * FROM "Item" WHERE id = ?', (loop["itemId"],)).fetchone())
+                row_to_dict(
+                    conn.execute(
+                        'SELECT * FROM "Item" WHERE id = ? AND userId = ?',
+                        (loop["itemId"], user["id"]),
+                    ).fetchone()
+                )
                 if loop.get("itemId")
                 else None
             )
@@ -55,7 +74,7 @@ def get_loop(loop_id: str) -> dict:
         )
         if not loop:
             raise HTTPException(status_code=404, detail="Loop not found")
-        return _loop_with_relations(conn, loop_id) or loop
+        return _loop_with_relations(conn, loop_id, user["id"]) or loop
 
 
 @router.post("", status_code=201)
@@ -66,6 +85,8 @@ def create_loop(payload: LoopCreate) -> dict:
             require_reminder_capacity(conn, user)
         except PlanLimitExceeded as exc:
             raise HTTPException(status_code=402, detail=exc.payload()) from exc
+        if payload.itemId:
+            require_owned_item(conn, user["id"], payload.itemId)
         now = now_iso()
         loop_id = make_id()
         due_date = normalize_iso(payload.dueDate)
@@ -108,7 +129,7 @@ def create_loop(payload: LoopCreate) -> dict:
                     now,
                 ),
             )
-        return _loop_with_relations(conn, loop_id) or {}
+        return _loop_with_relations(conn, loop_id, user["id"]) or {}
 
 
 @router.patch("/{loop_id}")
@@ -122,14 +143,19 @@ def patch_loop(loop_id: str, payload: LoopPatch) -> dict:
             raise HTTPException(status_code=404, detail="Loop not found")
 
         updates = payload.model_dump(exclude_unset=True)
+        if updates.get("itemId"):
+            require_owned_item(conn, user["id"], updates["itemId"])
         for key in ["dueDate", "reminderAt"]:
             if key in updates:
                 updates[key] = normalize_iso(updates[key])
         updates["updatedAt"] = now_iso()
 
         assignments = ", ".join(f'"{key}" = ?' for key in updates)
-        conn.execute(f'UPDATE "Loop" SET {assignments} WHERE id = ?', [*updates.values(), loop_id])
-        return _loop_with_relations(conn, loop_id) or {}
+        conn.execute(
+            f'UPDATE "Loop" SET {assignments} WHERE id = ? AND userId = ?',
+            [*updates.values(), loop_id, user["id"]],
+        )
+        return _loop_with_relations(conn, loop_id, user["id"]) or {}
 
 
 @router.post("/{loop_id}/complete")
@@ -142,7 +168,10 @@ def complete_loop(loop_id: str) -> dict:
         if not loop:
             raise HTTPException(status_code=404, detail="Loop not found")
 
-        conn.execute('UPDATE "Loop" SET status = ?, updatedAt = ? WHERE id = ?', ("DONE", now_iso(), loop_id))
+        conn.execute(
+            'UPDATE "Loop" SET status = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+            ("DONE", now_iso(), loop_id, user["id"]),
+        )
         updated_user = award_xp(
             conn,
             user_id=user["id"],
@@ -152,7 +181,7 @@ def complete_loop(loop_id: str) -> dict:
             points=int(loop["xpReward"]),
         )
         return {
-            "loop": _loop_with_relations(conn, loop_id),
+            "loop": _loop_with_relations(conn, loop_id, user["id"]),
             "user": updated_user,
             "message": f"Loop closed +{loop['xpReward']} XP",
         }
@@ -168,7 +197,7 @@ def snooze_loop(loop_id: str, payload: SnoozeRequest) -> dict:
         if not loop:
             raise HTTPException(status_code=404, detail="Loop not found")
         conn.execute(
-            'UPDATE "Loop" SET status = ?, reminderAt = ?, updatedAt = ? WHERE id = ?',
-            ("SNOOZED", normalize_iso(payload.reminderAt), now_iso(), loop_id),
+            'UPDATE "Loop" SET status = ?, reminderAt = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+            ("SNOOZED", normalize_iso(payload.reminderAt), now_iso(), loop_id, user["id"]),
         )
-        return _loop_with_relations(conn, loop_id) or {}
+        return _loop_with_relations(conn, loop_id, user["id"]) or {}

@@ -179,7 +179,7 @@ export function PricingPage() {
         <StandardHero
           eyebrow="Preise"
           title="Wähle den Speicher, der zu deinem Alltag passt"
-          text="Starte kostenlos und erweitere Avareno, wenn dein privater Speicher für Objekte, Belege, Garantien und offene Punkte wächst."
+          text="Starte kostenlos und erweitere Avareno, wenn dein privater Speicher für Produkte, Belege, Garantien und Dokumente wächst."
         >
           <div className="avareno-price-signal">
             <span>Stripe-ready</span>

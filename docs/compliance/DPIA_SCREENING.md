@@ -61,6 +61,32 @@ Use the most conservative outcome that applies.
 - High risk: STOP. DSFA/DPIA likely needed before production.
 - Unknown risk: STOP and ask for legal/privacy review.
 
+## Screening: First Product Activation Flow
+
+- Feature name: First Product Activation Flow
+- Description: short authenticated onboarding, creation of the first real product record, optional product-linked document upload and aggregate time-to-value reporting
+- Data categories: account id and routing timestamps, product/object data, optional receipt/manual/warranty file and document metadata
+- Users affected: newly registered and returning registered users
+- Third parties: none added; optional barcode catalogue lookup is a separate explicit action
+- Launch state: scoped beta
+
+High-risk trigger notes:
+
+- Sensitive/highly personal documents: possible because a user may upload an invoice or other private file, but upload is optional and no automatic AI analysis occurs.
+- Large-volume processing: no; the flow processes one selected product and one selected file at a time.
+- Connected accounts/imports: no.
+- AI analysis/profiling: no AI and no eligibility/ranking decision. Activation metrics are aggregate service-improvement measures.
+- Exposure to other users: none intended.
+- Monitoring over time: limited server timestamps for essential routing and aggregate time-to-value, not a general behavioural event stream.
+- Third-country transfer/new provider: none added.
+- Breach harm: medium because product ownership and uploaded documents may reveal private information; production private storage and cross-user access controls remain important.
+
+Screening outcome: low risk for the content-free onboarding status itself,
+medium for the optional document upload. Local account deletion and controlled
+Supabase RLS/Storage isolation are now tested. The intended beta project still
+requires the same verification; malware scanning, backup handling and legal
+review remain open.
+
 ## Screening: Supabase Phone/SMS OTP Auth
 
 - Feature name: Supabase Phone/SMS OTP Auth
@@ -149,7 +175,9 @@ Screening outcome: low risk for local/static MVP suggestions; medium before enab
 ## Screening: MVP Privacy Controls Foundation
 
 - Feature name: MVP Privacy Controls Foundation
-- Description: Privacy Center/API controls for local JSON/ZIP export bundle, document deletion, AI-extracted field deletion/correction, local connector disconnect, consent/audit metadata and account deletion request logging.
+- Description: Privacy Center/API controls for local JSON/ZIP export bundle,
+  document deletion, AI-extracted field deletion/correction, local connector
+  disconnect, consent/audit metadata and executed full account deletion.
 - Data categories: account/profile metadata, object memory, uploaded document metadata/files, extracted text/json, connector metadata, consent/audit metadata.
 - Users affected: registered/local MVP users.
 - Third parties: none added by this implementation.
@@ -165,7 +193,11 @@ High-risk trigger notes:
 - Third-country transfer/new provider: none added.
 - Breach harm: high if production private files remain in public/static uploads or if account deletion/export is incorrectly authorized.
 
-Screening outcome: medium/high for production because sensitive documents and rights requests are involved. Scoped MVP controls may proceed, but public launch still requires storage/auth isolation, production export job and cross-user tests, account deletion orchestration, provider revocation, backup deletion policy and legal/DSB review.
+Screening outcome: medium/high for production because sensitive documents and
+rights requests are involved. Controlled local cross-user, Storage and account
+deletion tests now pass. Public launch still requires target-environment
+verification, a production export job, provider revocation, backup deletion
+policy and legal/DSB review.
 
 ## Required Follow-Ups
 

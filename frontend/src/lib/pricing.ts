@@ -59,7 +59,7 @@ export const pricingPlans = [
     id: "free",
     name: "Free",
     description: {
-      de: "Für die ersten Objekte und zum Ausprobieren.",
+      de: "Für die ersten Produkte und zum Ausprobieren.",
       en: "For the first things and trying Avareno."
     },
     currency: "EUR",
@@ -77,11 +77,11 @@ export const pricingPlans = [
       householdMembers: 1
     },
     features: [
-      feature("itemQuota", "30 Objekte mit Garantie & Beleg", "30 items with warranty & receipt"),
+      feature("itemQuota", "30 Produkte mit Garantie & Beleg", "30 products with warranty & receipt"),
       feature("storageQuota", "100 MB für Belege & Dokumente", "100 MB for receipts & documents"),
       feature("reminderQuota", "5 aktive Erinnerungen", "5 active reminders"),
       feature("aiQuota", "10 AI-Aktionen pro Monat (in Vorbereitung)", "10 AI actions per month (coming soon)"),
-      feature("privateVault", "1 Private Vault mit PIN-Schutz", "1 private vault with PIN protection")
+      feature("privateVault", "1 Private Vault mit PIN-Schutz (in Vorbereitung)", "1 private vault with PIN protection (coming soon)")
     ],
     isPopular: false,
     isStripeSubscription: false,
@@ -110,11 +110,11 @@ export const pricingPlans = [
       householdMembers: 1
     },
     features: [
-      feature("itemQuota", "300 Objekte mit Garantie & Beleg", "300 items with warranty & receipt"),
+      feature("itemQuota", "300 Produkte mit Garantie & Beleg", "300 products with warranty & receipt"),
       feature("storageQuota", "2 GB für Belege & Dokumente", "2 GB for receipts & documents"),
       feature("reminderQuota", "100 aktive Erinnerungen", "100 active reminders"),
       feature("aiQuota", "100 AI-Aktionen pro Monat (in Vorbereitung)", "100 AI actions per month (coming soon)"),
-      feature("privateVault", "1 Private Vault mit PIN-Schutz", "1 private vault with PIN protection")
+      feature("privateVault", "1 Private Vault mit PIN-Schutz (in Vorbereitung)", "1 private vault with PIN protection (coming soon)")
     ],
     isPopular: false,
     isStripeSubscription: true,
@@ -125,8 +125,8 @@ export const pricingPlans = [
     id: "pro",
     name: "Pro",
     description: {
-      de: "Für größere Objektgedächtnisse und mehr AI-Unterstützung.",
-      en: "For larger object memories and more AI assistance."
+      de: "Für viele Produkte und mehr AI-Unterstützung.",
+      en: "For many products and more AI assistance."
     },
     currency: "EUR",
     prices: {
@@ -143,11 +143,11 @@ export const pricingPlans = [
       householdMembers: 1
     },
     features: [
-      feature("itemQuota", "2.000 Objekte mit Garantie & Beleg", "2,000 items with warranty & receipt"),
+      feature("itemQuota", "2.000 Produkte mit Garantie & Beleg", "2,000 products with warranty & receipt"),
       feature("storageQuota", "20 GB für Belege & Dokumente", "20 GB for receipts & documents"),
       feature("reminderQuota", "1.000 aktive Erinnerungen", "1,000 active reminders"),
       feature("aiQuota", "500 AI-Aktionen pro Monat (in Vorbereitung)", "500 AI actions per month (coming soon)"),
-      feature("privateVault", "3 Private Vaults mit PIN-Schutz", "3 private vaults with PIN protection")
+      feature("privateVault", "3 Private Vaults mit PIN-Schutz (in Vorbereitung)", "3 private vaults with PIN protection (coming soon)")
     ],
     isPopular: true,
     isStripeSubscription: true,
@@ -176,11 +176,11 @@ export const pricingPlans = [
       householdMembers: 5
     },
     features: [
-      feature("itemQuota", "5.000 Objekte für den ganzen Haushalt", "5,000 items for the whole household"),
+      feature("itemQuota", "5.000 Produkte für den ganzen Haushalt", "5,000 products for the whole household"),
       feature("storageQuota", "50 GB für Belege & Dokumente", "50 GB for receipts & documents"),
       feature("reminderQuota", "2.500 aktive Erinnerungen", "2,500 active reminders"),
       feature("aiQuota", "1.000 AI-Aktionen pro Monat (in Vorbereitung)", "1,000 AI actions per month (coming soon)"),
-      feature("privateVault", "5 Private Vaults mit PIN-Schutz", "5 private vaults with PIN protection"),
+      feature("privateVault", "5 Private Vaults mit PIN-Schutz (in Vorbereitung)", "5 private vaults with PIN protection (coming soon)"),
       feature("familyMembers", "5 Familienmitglieder (in Vorbereitung)", "5 family members (coming soon)")
     ],
     isPopular: false,

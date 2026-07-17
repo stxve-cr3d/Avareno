@@ -38,9 +38,9 @@ const marketingCopy = {
     siteAria: "Avareno Website-Navigation",
     navLinks: [
       { to: "/#product", label: "Produkt" },
-      { to: "/#memory-gallery", label: "Beispiele" },
-      { to: "/#dinge", label: "Objekte" },
       { to: "/#how-it-works", label: "Ablauf" },
+      { to: "/#produktakte", label: "Produktakte" },
+      { to: "/#use-cases", label: "Anwendungsfälle" },
       { to: "/datenschutz", label: "Sicherheit" },
       { to: "/#pricing", label: "Preise" }
     ],
@@ -48,10 +48,10 @@ const marketingCopy = {
       {
         title: "Produkt",
         links: [
-          { to: "/#dinge", label: "Objekte" },
+          { to: "/#produktakte", label: "Produktakte" },
           { to: "/#how-it-works", label: "Ablauf" },
           { to: "/#pricing", label: "Preise" },
-          { to: "/#security", label: "Privater Vault" }
+          { to: "/#security", label: "Privatsphäre" }
         ]
       },
       {
@@ -97,9 +97,9 @@ const marketingCopy = {
     siteAria: "Avareno website navigation",
     navLinks: [
       { to: "/#product", label: "Product" },
-      { to: "/#memory-gallery", label: "Memory" },
-      { to: "/#dinge", label: "Objekte" },
       { to: "/#how-it-works", label: "How it works" },
+      { to: "/#produktakte", label: "Product dossier" },
+      { to: "/#use-cases", label: "Use cases" },
       { to: "/datenschutz", label: "Security" },
       { to: "/#pricing", label: "Pricing" }
     ],
@@ -107,10 +107,10 @@ const marketingCopy = {
       {
         title: "Product",
         links: [
-          { to: "/#dinge", label: "Objekte" },
+          { to: "/#produktakte", label: "Product dossier" },
           { to: "/#how-it-works", label: "How it works" },
           { to: "/#pricing", label: "Pricing" },
-          { to: "/#security", label: "Private Vault" }
+          { to: "/#security", label: "Privacy" }
         ]
       },
       {

@@ -93,9 +93,9 @@ function CareOverview({ basePath, status, loops, onRetry }: { basePath: string; 
   return (
     <AppPage>
       <AppPageHeader
-        kicker="Care · Support & Fristen"
-        title="Was braucht Aufmerksamkeit?"
-        subtitle="Garantien, Rückgaben, Reparaturen und offene Zusagen bleiben sichtbar, bis sie erledigt sind."
+        kicker="Erinnerungen & Fristen"
+        title="Erinnerungen"
+        subtitle="Garantie-Enden, Rückgaben und Fristen bleiben sichtbar, bis sie erledigt sind."
         actions={
           <ActionButton to="/app/capture/loop" icon={<Plus size={15} />}>
             Erinnerung hinzufügen
@@ -232,7 +232,7 @@ function CareDetail({
         body: JSON.stringify({ reminderAt: nextDate })
       });
       replaceLoop(updated);
-      setActionMessage({ tone: "success", text: "Care-Punkt wurde um 2 Tage verschoben." });
+      setActionMessage({ tone: "success", text: "Erinnerung wurde um 2 Tage verschoben." });
     } catch (error) {
       setActionMessage({ tone: "error", text: errorText(error) });
     } finally {
@@ -265,7 +265,7 @@ function CareDetail({
   if (loading) {
     return (
       <AppPage>
-        <AppSection title="Care-Punkt wird geöffnet" slim>
+        <AppSection title="Erinnerung wird geöffnet" slim>
           <p className="av-note">Einen Moment, Avareno holt den Kontext.</p>
         </AppSection>
       </AppPage>
@@ -276,9 +276,9 @@ function CareDetail({
     return (
       <AppPage>
         <Link className="av-back" to={basePath}>
-          <ArrowLeft size={15} /> Zurück zu Care
+          <ArrowLeft size={15} /> Zurück zu Erinnerungen
         </Link>
-        <EmptyState title="Dieser Care-Punkt ist nicht verfügbar.">
+        <EmptyState title="Diese Erinnerung ist nicht verfügbar.">
           Zurück zur Übersicht, dort siehst du alle offenen Punkte.
         </EmptyState>
       </AppPage>
@@ -293,7 +293,7 @@ function CareDetail({
   return (
     <AppPage>
       <Link className="av-back" to={basePath}>
-        <ArrowLeft size={15} /> Zurück zu Care
+        <ArrowLeft size={15} /> Zurück zu Erinnerungen
       </Link>
 
       <AppPageHeader
@@ -369,7 +369,7 @@ function CareDetail({
 function CareLoadError({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="av-empty">
-      <p className="av-empty-title">Care konnte nicht geladen werden</p>
+      <p className="av-empty-title">Erinnerungen konnten nicht geladen werden</p>
       <div className="av-empty-body">Die Verbindung ist gerade nicht erreichbar. Deine offenen Punkte sind sicher gespeichert — versuche es gleich noch einmal.</div>
       <div style={{ marginTop: "1rem", display: "flex", justifyContent: "center" }}>
         <SecondaryAction onClick={onRetry}>Erneut versuchen</SecondaryAction>
@@ -382,8 +382,8 @@ function CareEmpty() {
   return (
     <div className="av-empty-rich av-empty-start">
       <div className="av-empty-copy">
-        <h3>Nichts steht gerade an</h3>
-        <p>Care behält Garantie-Enden, Rückgaben, Reparaturen und offene Zusagen im Blick und meldet sich, bevor eine Frist verstreicht. Lege eine Erinnerung an, damit nichts untergeht.</p>
+        <h3>Aktuell stehen keine Erinnerungen an.</h3>
+        <p>Avareno behält Garantie-Enden, Rückgaben und Fristen im Blick und meldet sich, bevor etwas verstreicht. Lege eine Erinnerung an, damit nichts untergeht.</p>
         <div className="av-empty-actions">
           <ActionButton to="/app/capture/loop" icon={<Plus size={15} />}>
             Erinnerung hinzufügen
@@ -409,7 +409,7 @@ function CareStatCard({ icon, tone, label, value }: { icon: ReactNode; tone: Sta
 /* Lifecycle steps for the CareTimeline — opened → context → reminder → due → resolved. */
 function buildCareSteps(loop: Loop, item: Item | null, isDone: boolean, overdue: boolean): CareStep[] {
   const steps: CareStep[] = [];
-  steps.push({ title: "Care-Punkt geöffnet", detail: careSourceLabel(loop.sourceType), state: "done", tone: "teal" });
+  steps.push({ title: "Erinnerung angelegt", detail: careSourceLabel(loop.sourceType), state: "done", tone: "teal" });
   if (item?.warrantyUntil) {
     steps.push({ title: "Garantie aktiv", detail: `bis ${careLongDateLabel(item.warrantyUntil)}`, state: "done", tone: "amber" });
   }
@@ -426,7 +426,7 @@ function buildCareSteps(loop: Loop, item: Item | null, isDone: boolean, overdue:
   }
   steps.push({
     title: isDone ? "Erledigt" : "Abschluss offen",
-    detail: isDone ? "Care-Punkt geschlossen" : "Als erledigt markieren, wenn gelöst",
+    detail: isDone ? "Erinnerung geschlossen" : "Als erledigt markieren, wenn gelöst",
     state: isDone ? "done" : "todo",
     tone: isDone ? "green" : undefined
   });

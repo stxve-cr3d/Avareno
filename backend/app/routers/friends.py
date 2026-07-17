@@ -48,7 +48,12 @@ def _get_or_create_invite(conn, user_id: str) -> dict:
         'INSERT INTO "FriendInviteCode" (id, userId, code, status, createdAt, expiresAt) VALUES (?, ?, ?, ?, ?, ?)',
         (invite_id, user_id, code, "ACTIVE", now, None),
     )
-    return row_to_dict(conn.execute('SELECT * FROM "FriendInviteCode" WHERE id = ?', (invite_id,)).fetchone()) or {}
+    return row_to_dict(
+        conn.execute(
+            'SELECT * FROM "FriendInviteCode" WHERE id = ? AND userId = ?',
+            (invite_id, user_id),
+        ).fetchone()
+    ) or {}
 
 
 def _get_prefs(conn, user_id: str) -> dict:
@@ -320,7 +325,7 @@ def delete_circle(circle_id: str) -> dict:
     with db() as conn:
         user = get_default_user(conn)
         _owned_circle(conn, circle_id, user["id"])
-        conn.execute('DELETE FROM "FriendCircle" WHERE id = ?', (circle_id,))
+        conn.execute('DELETE FROM "FriendCircle" WHERE id = ? AND userId = ?', (circle_id, user["id"]))
         return {"removed": True}
 
 
@@ -335,7 +340,10 @@ def add_circle_member(circle_id: str, payload: FriendCircleMemberAdd) -> dict:
             'INSERT OR IGNORE INTO "FriendCircleMember" (id, circleId, friendUserId, createdAt) VALUES (?, ?, ?, ?)',
             (make_id(), circle_id, payload.friendUserId, now_iso()),
         )
-        conn.execute('UPDATE "FriendCircle" SET updatedAt = ? WHERE id = ?', (now_iso(), circle_id))
+        conn.execute(
+            'UPDATE "FriendCircle" SET updatedAt = ? WHERE id = ? AND userId = ?',
+            (now_iso(), circle_id, user["id"]),
+        )
         return _circle_public(conn, _owned_circle(conn, circle_id, user["id"]))
 
 

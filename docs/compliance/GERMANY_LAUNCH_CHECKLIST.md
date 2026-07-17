@@ -26,7 +26,10 @@ Detailed privacy release blockers live in `docs/compliance/PRIVACY_RELEASE_BLOCK
 - [x] Privacy Center foundation exists.
 - [x] MVP local data export includes database JSON and local uploaded document ZIP bundle with manifest.
 - [ ] Production data export flow implemented and tested end to end. Authenticated export jobs, provider-side exports, backup behavior and cross-user tests remain open.
-- [ ] Account deletion flow implemented and tested end to end. Account deletion request logging is active; full execution remains blocked by Auth, Storage, provider and backup orchestration.
+- [x] Active-account deletion flow implemented and tested end to end against
+  controlled local Supabase Auth/Database/Storage plus backend data.
+- [ ] Backup expiry/restoration exclusions and future provider revocation are
+  defined before public launch.
 - [x] Document/file deletion deletes local metadata, extracted text/json, and local upload object where present.
 - [x] Connected sources can be disconnected locally from the Privacy Center/API.
 - [ ] Connector token revocation/deletion implemented. Local connector metadata disconnect exists; provider-side revocation and encrypted token stores remain open.
@@ -40,14 +43,18 @@ Detailed privacy release blockers live in `docs/compliance/PRIVACY_RELEASE_BLOCK
 
 ## 3. Security
 
-- [ ] Supabase RLS/access control applied and verified in dashboard.
+- [ ] Supabase RLS/access control applied and verified in the intended target
+  project. Versioned migrations and local two-user tests pass.
 - [ ] Supabase Data API exposure settings reviewed.
 - [ ] Storage buckets private by default except explicitly reviewed avatars.
 - [x] MVP signed URLs or authenticated file endpoints used for private files. Document UI now uses short-lived signed API download tickets.
-- [ ] Production private object storage/bucket state and signed URL policy verified with multiple users.
+- [ ] Intended beta-project private object Storage state verified with User A,
+  User B and anon. The same controlled local verification passes.
 - [x] Local/static `/uploads` is not used by default for real production private documents. Static serving now requires explicit `AVARENO_ENABLE_STATIC_UPLOADS`.
-- [ ] Secrets are not exposed to frontend.
-- [ ] Supabase service-role key is server-only and never in frontend/env examples.
+- [x] Browser source and production bundle contain no service-role reference or
+  secret-like value in the controlled scan.
+- [x] Supabase service-role key is server-only and absent from frontend env
+  examples/source.
 - [ ] Connector tokens encrypted at rest or not stored.
 - [ ] Logs do not contain sensitive data, tokens, raw document content, prompts, or connector payloads.
 - [x] Connector SSRF validation helper exists.

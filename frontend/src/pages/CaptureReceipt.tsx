@@ -1,186 +1,290 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { CheckCircle2, FileCheck2, ReceiptText, UploadCloud, Wand2 } from "lucide-react";
-import { api, dateInputValue } from "../lib/api";
-import type { Document, ExtractedReceipt, Item } from "../lib/types";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { FileText, UploadCloud } from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
-import { Card } from "../components/Card";
+import { api } from "../lib/api";
+import { betaFeatures } from "../lib/betaFeatures";
+import { useLanguage } from "../lib/language";
+import type { Document, Item } from "../lib/types";
+
+const maxUploadBytes = 10 * 1024 * 1024;
+const acceptedExtensions = [".pdf", ".png", ".jpg", ".jpeg"];
+
+const documentTypes = [
+  { value: "RECEIPT", de: "Rechnung oder Kassenbeleg", en: "Invoice or receipt" },
+  { value: "WARRANTY", de: "Garantienachweis", en: "Warranty document" },
+  { value: "MANUAL", de: "Bedienungsanleitung", en: "User manual" },
+  { value: "OTHER", de: "Sonstiges Dokument", en: "Other document" }
+] as const;
 
 export function CaptureReceipt() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { language } = useLanguage();
+  const requestedItemId = searchParams.get("itemId") ?? "";
+  const activationOrigin = searchParams.get("from") === "first-product" ? "first-product" : undefined;
+  const [items, setItems] = useState<Item[]>([]);
+  const [selectedItemId, setSelectedItemId] = useState(requestedItemId);
+  const [documentType, setDocumentType] = useState<(typeof documentTypes)[number]["value"]>("RECEIPT");
   const [file, setFile] = useState<File | null>(null);
-  const [document, setDocument] = useState<Document | null>(null);
-  const [manualText, setManualText] = useState("");
-  const [extracted, setExtracted] = useState<ExtractedReceipt | null>(null);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const submittingRef = useRef(false);
+  const copy = language === "de" ? deCopy : enCopy;
 
-  async function upload() {
-    if (!file) return null;
-    const data = new FormData();
-    data.append("file", file);
-    data.append("type", "RECEIPT");
-    const created = await api<Document>("/api/documents/upload", { method: "POST", body: data });
-    setDocument(created);
-    return created;
+  useEffect(() => {
+    let cancelled = false;
+    api<Item[]>("/api/items")
+      .then((result) => {
+        if (cancelled) return;
+        setItems(result);
+        if (!requestedItemId && result.length === 1) setSelectedItemId(result[0].id);
+        if (requestedItemId && !result.some((item) => item.id === requestedItemId)) {
+          setError(copy.productUnavailable);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setError(copy.loadError);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [copy.loadError, copy.productUnavailable, requestedItemId]);
+
+  function chooseFile(nextFile: File | null) {
+    setError("");
+    if (!nextFile) {
+      setFile(null);
+      return;
+    }
+    const extension = extensionOf(nextFile.name);
+    if (!acceptedExtensions.includes(extension)) {
+      setFile(null);
+      setError(copy.unsupportedFile);
+      return;
+    }
+    if (nextFile.size > maxUploadBytes) {
+      setFile(null);
+      setError(copy.fileTooLarge);
+      return;
+    }
+    setFile(nextFile);
   }
 
-  async function extract() {
+  async function uploadDocument(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (submittingRef.current) return;
+    if (!betaFeatures.documentUploads) {
+      setError(copy.uploadDisabled);
+      return;
+    }
+    if (!selectedItemId) {
+      setError(copy.selectProduct);
+      return;
+    }
+    if (!file) {
+      setError(copy.selectFile);
+      return;
+    }
+
+    submittingRef.current = true;
     setBusy(true);
+    setError("");
     try {
-      const doc = document ?? (await upload());
-      const result = await api<ExtractedReceipt>("/api/extract/receipt", {
-        method: "POST",
-        body: JSON.stringify({ documentId: doc?.id, fileName: file?.name, text: manualText })
+      const data = new FormData();
+      data.append("file", file);
+      data.append("type", documentType);
+      data.append("itemId", selectedItemId);
+      await api<Document>("/api/documents/upload", { method: "POST", body: data });
+      navigate(`/app/dinge/${encodeURIComponent(selectedItemId)}`, {
+        replace: true,
+        state: { documentAdded: true, activationOrigin }
       });
-      setExtracted(result);
+    } catch (caught) {
+      submittingRef.current = false;
+      setError(friendlyUploadError(caught, language));
     } finally {
       setBusy(false);
     }
   }
 
-  async function createItem() {
-    if (!extracted) return;
-    const item = await api<Item>("/api/items", {
-      method: "POST",
-      body: JSON.stringify({
-        name: extracted.itemName,
-        category: extracted.category,
-        manufacturer: extracted.manufacturer,
-        model: extracted.model,
-        purchaseDate: extracted.purchaseDate,
-        merchant: extracted.merchant,
-        price: Number(extracted.price),
-        currency: extracted.currency,
-        warrantyUntil: extracted.warrantyUntil,
-        documentId: document?.id
-      })
-    });
-    navigate(`/app/items/${item.id}`);
+  if (loading) {
+    return (
+      <main className="activation-page">
+        <section className="activation-panel activation-status-panel" aria-live="polite">
+          <div className="activation-loading-dot" aria-hidden="true" />
+          <p>{copy.loading}</p>
+        </section>
+      </main>
+    );
   }
 
-  function updateField(field: keyof ExtractedReceipt, value: string) {
-    if (!extracted) return;
-    setExtracted({
-      ...extracted,
-      [field]: field === "price" ? Number(value) : field.includes("Date") || field === "warrantyUntil" ? new Date(value).toISOString() : value
-    });
+  if (!items.length) {
+    return (
+      <main className="activation-page">
+        <section className="activation-panel activation-empty">
+          <div className="activation-heading">
+            <p className="activation-eyebrow">{copy.eyebrow}</p>
+            <h1>{copy.noProductTitle}</h1>
+            <p>{copy.noProductIntro}</p>
+          </div>
+          <Link className="av-btn av-btn-primary min-h-11 text-sm" to="/app/capture/item">
+            {copy.addProduct}
+          </Link>
+        </section>
+      </main>
+    );
   }
+
+  const selectedItem = items.find((item) => item.id === selectedItemId);
 
   return (
-    <div className="capture-receipt-page space-y-5">
-      <div className="rounded-lg border border-line av-surface p-5">
-        <div className="flex items-start gap-3">
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-leaf/10 text-leaf">
-            <ReceiptText size={22} />
-          </div>
-          <div>
-            <p className="text-sm font-black text-leaf">Beleg reinlegen</p>
-            <h1 className="mt-1 text-3xl font-black text-ink">Beleg erfassen</h1>
-            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-muted">Avareno liest nur diesen ausgewählten Beleg aus. Prüfe die Felder, bevor daraus ein Objekt entsteht.</p>
-          </div>
+    <main className="activation-page">
+      <section className="activation-panel" aria-labelledby="document-upload-title">
+        <div className="activation-heading">
+          <p className="activation-eyebrow">{copy.eyebrow}</p>
+          <h1 id="document-upload-title">{copy.title}</h1>
+          <p>{copy.intro}</p>
         </div>
-        <div className="capture-steps mt-5">
-          <CaptureStep done={Boolean(file || manualText.trim())} label="Beleg" detail={file?.name ?? (manualText.trim() ? "Text eingefügt" : "Datei oder Text fehlt")} />
-          <CaptureStep done={Boolean(extracted)} label="Erkannt" detail={extracted ? `${extracted.itemName} / ${extracted.merchant}` : "Noch nicht ausgelesen"} />
-          <CaptureStep done={Boolean(extracted)} label="Bestätigen" detail="Felder prüfen, dann Objekt erstellen" />
-        </div>
-      </div>
 
-      <Card>
-        <label className="flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-line av-surface p-5 text-center transition hover:border-leaf hover:bg-leaf/5">
-          <UploadCloud className="text-leaf" />
-          <span className="mt-3 text-sm font-black text-ink">{file ? file.name : "Belegbild oder PDF auswählen"}</span>
-          <span className="mt-1 text-xs font-semibold text-muted">Bild oder PDF · lokal ausgewählt, erst beim Auslesen hochgeladen</span>
-          <input className="hidden" type="file" accept="image/*,.pdf" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-        </label>
-        <textarea
-          value={manualText}
-          onChange={(event) => setManualText(event.target.value)}
-          className="mt-4 min-h-28 w-full rounded-lg border border-line av-surface p-4 text-sm font-semibold leading-6 outline-none focus:border-leaf"
-          placeholder="Optional: Belegdaten einfügen, falls du gerade keine Datei hast"
-        />
-        <Button className="mt-4 w-full" onClick={extract} disabled={busy || (!file && !manualText.trim())} icon={<Wand2 size={18} />}>
-          {busy ? "Wird ausgelesen..." : "Informationen auslesen"}
-        </Button>
-      </Card>
-
-      {extracted ? (
-        <Card>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="text-leaf" size={20} />
+        <form className="activation-form" onSubmit={uploadDocument} noValidate>
+          {requestedItemId && selectedItem ? (
+            <div className="activation-linked-product">
+              <FileText size={20} aria-hidden="true" />
               <div>
-                <h2 className="text-xl font-black text-ink">Objektgedächtnis prüfen</h2>
-                <p className="mt-1 text-sm font-semibold text-muted">Erkannte Daten bleiben editierbar. Speichern erst nach Bestätigung.</p>
+                <span>{copy.linkedTo}</span>
+                <strong>{selectedItem.name}</strong>
+                <small>{selectedItem.category}</small>
               </div>
             </div>
-            <span className="inline-flex min-h-8 items-center gap-2 rounded-full border border-line av-surface-soft px-3 text-xs font-black text-muted">
-              <FileCheck2 size={14} /> {document ? "Beleg gespeichert" : "Noch nicht gespeichert"}
-            </span>
+          ) : (
+            <label className="activation-field" htmlFor="document-product">
+              <span>{copy.productLabel}</span>
+              <select id="document-product" value={selectedItemId} onChange={(event) => setSelectedItemId(event.target.value)}>
+                <option value="">{copy.productPlaceholder}</option>
+                {items.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </label>
+          )}
+
+          <label className="activation-field" htmlFor="document-type">
+            <span>{copy.typeLabel}</span>
+            <select id="document-type" value={documentType} onChange={(event) => setDocumentType(event.target.value as typeof documentType)}>
+              {documentTypes.map((type) => (
+                <option key={type.value} value={type.value}>{language === "de" ? type.de : type.en}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="activation-file-drop" htmlFor="document-file">
+            <UploadCloud size={25} aria-hidden="true" />
+            <strong>{file ? file.name : copy.filePrompt}</strong>
+            <span>{copy.fileHelp}</span>
+            <input
+              accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+              id="document-file"
+              type="file"
+              onChange={(event) => chooseFile(event.target.files?.[0] ?? null)}
+            />
+          </label>
+
+          <div className="activation-privacy-note">
+            <strong>{copy.privacyTitle}</strong>
+            <p>{copy.privacyText}</p>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {[
-              ["itemName", "Name des Objekts"],
-              ["merchant", "Händler"],
-              ["manufacturer", "Hersteller"],
-              ["model", "Modell"],
-              ["category", "Kategorie"],
-              ["currency", "Währung"]
-            ].map(([field, label]) => (
-              <label key={field} className="text-sm font-bold text-ink">
-                {label}
-                <input
-                  className="mt-1 w-full rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
-                  value={String(extracted[field as keyof ExtractedReceipt])}
-                  onChange={(event) => updateField(field as keyof ExtractedReceipt, event.target.value)}
-                />
-              </label>
-            ))}
-            <label className="text-sm font-bold text-ink">
-              Preis
-              <input
-                type="number"
-                className="mt-1 w-full rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
-                value={extracted.price}
-                onChange={(event) => updateField("price", event.target.value)}
-              />
-            </label>
-            <label className="text-sm font-bold text-ink">
-              Kaufdatum
-              <input
-                type="date"
-                className="mt-1 w-full rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
-                value={dateInputValue(extracted.purchaseDate)}
-                onChange={(event) => updateField("purchaseDate", event.target.value)}
-              />
-            </label>
-            <label className="text-sm font-bold text-ink">
-              Garantie bis
-              <input
-                type="date"
-                className="mt-1 w-full rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
-                value={dateInputValue(extracted.warrantyUntil)}
-                onChange={(event) => updateField("warrantyUntil", event.target.value)}
-              />
-            </label>
+
+          {error ? <div className="activation-error" role="alert">{error}</div> : null}
+
+          <div className="activation-submit">
+            <Button type="submit" disabled={busy || !betaFeatures.documentUploads}>
+              {busy ? copy.uploading : copy.upload}
+            </Button>
+            <p>{copy.safeFailure}</p>
           </div>
-          <Button className="mt-5 w-full" onClick={createItem}>
-            Objekt erstellen
-          </Button>
-        </Card>
-      ) : null}
-    </div>
+        </form>
+      </section>
+    </main>
   );
 }
 
-function CaptureStep({ detail, done, label }: { detail: string; done: boolean; label: string }) {
-  return (
-    <div className={done ? "capture-step is-done" : "capture-step"}>
-      <span>{done ? <CheckCircle2 size={14} /> : null}</span>
-      <div>
-        <strong>{label}</strong>
-        <small>{detail}</small>
-      </div>
-    </div>
-  );
+function extensionOf(fileName: string) {
+  const dot = fileName.lastIndexOf(".");
+  return dot >= 0 ? fileName.slice(dot).toLowerCase() : "";
 }
+
+function friendlyUploadError(caught: unknown, language: "de" | "en") {
+  const detail = caught instanceof Error ? caught.message.toLowerCase() : "";
+  if (detail.includes("limit") || detail.includes("speicher")) {
+    return language === "de"
+      ? "Der verfügbare Speicher reicht für diese Datei nicht aus."
+      : "There is not enough storage available for this file.";
+  }
+  if (caught instanceof TypeError) {
+    return language === "de"
+      ? "Die Verbindung ist fehlgeschlagen. Prüfe deine Internetverbindung und versuche es erneut."
+      : "The connection failed. Check your internet connection and try again.";
+  }
+  return language === "de"
+    ? "Das Dokument konnte nicht gespeichert werden. Dein Produkt bleibt unverändert – versuche es bitte erneut."
+    : "The document could not be saved. Your product remains unchanged—please try again.";
+}
+
+const deCopy = {
+  eyebrow: "Dokument zuordnen",
+  title: "Dokument zum Produkt hinzufügen",
+  intro: "Wähle eine Datei aus und ordne sie einer bestehenden Produktakte zu. Es findet keine automatische Analyse statt.",
+  linkedTo: "Wird zugeordnet zu",
+  productLabel: "Produkt",
+  productPlaceholder: "Produkt auswählen",
+  typeLabel: "Dokumentart",
+  filePrompt: "Datei auswählen",
+  fileHelp: "PDF, PNG oder JPG · maximal 10 MB",
+  privacyTitle: "Privater Upload",
+  privacyText: "Die Datei wird nur für deine ausgewählte Produktakte gespeichert. Avareno sendet sie in diesem Schritt nicht an einen KI-Anbieter.",
+  upload: "Dokument speichern",
+  uploading: "Dokument wird gespeichert …",
+  safeFailure: "Wenn der Upload fehlschlägt, bleibt deine Produktakte erhalten.",
+  loading: "Produkte werden geladen …",
+  noProductTitle: "Lege zuerst ein Produkt an.",
+  noProductIntro: "Dokumente werden in Avareno immer einer Produktakte zugeordnet.",
+  addProduct: "Produkt hinzufügen",
+  productUnavailable: "Die ausgewählte Produktakte ist nicht mehr verfügbar.",
+  loadError: "Die Produktakten konnten gerade nicht geladen werden.",
+  unsupportedFile: "Dieses Dateiformat wird nicht unterstützt.",
+  fileTooLarge: "Die Datei ist größer als 10 MB.",
+  selectProduct: "Bitte wähle ein Produkt aus.",
+  selectFile: "Bitte wähle eine Datei aus.",
+  uploadDisabled: "Dokument-Uploads sind vorübergehend deaktiviert."
+};
+
+const enCopy: typeof deCopy = {
+  eyebrow: "Link a document",
+  title: "Add a document to the product",
+  intro: "Choose a file and link it to an existing product record. No automatic analysis takes place.",
+  linkedTo: "Will be linked to",
+  productLabel: "Product",
+  productPlaceholder: "Select a product",
+  typeLabel: "Document type",
+  filePrompt: "Choose a file",
+  fileHelp: "PDF, PNG or JPG · up to 10 MB",
+  privacyTitle: "Private upload",
+  privacyText: "The file is stored only for your selected product record. Avareno does not send it to an AI provider in this step.",
+  upload: "Save document",
+  uploading: "Saving document …",
+  safeFailure: "If the upload fails, your product record remains intact.",
+  loading: "Loading products …",
+  noProductTitle: "Create a product first.",
+  noProductIntro: "Documents in Avareno are always linked to a product record.",
+  addProduct: "Add product",
+  productUnavailable: "The selected product record is no longer available.",
+  loadError: "Product records could not be loaded right now.",
+  unsupportedFile: "This file format is not supported.",
+  fileTooLarge: "The file is larger than 10 MB.",
+  selectProduct: "Select a product.",
+  selectFile: "Choose a file.",
+  uploadDisabled: "Document uploads are temporarily disabled."
+};

@@ -22,14 +22,29 @@ def notification_state(remind_at: str | None, now: datetime | None = None) -> st
     return "later"
 
 
-def enrich_reminder(conn: sqlite3.Connection, reminder: dict, now: datetime | None = None) -> dict:
+def enrich_reminder(
+    conn: sqlite3.Connection,
+    reminder: dict,
+    user_id: str,
+    now: datetime | None = None,
+) -> dict:
     item = (
-        row_to_dict(conn.execute('SELECT * FROM "Item" WHERE id = ?', (reminder["itemId"],)).fetchone())
+        row_to_dict(
+            conn.execute(
+                'SELECT * FROM "Item" WHERE id = ? AND userId = ?',
+                (reminder["itemId"], user_id),
+            ).fetchone()
+        )
         if reminder.get("itemId")
         else None
     )
     loop = (
-        row_to_dict(conn.execute('SELECT * FROM "Loop" WHERE id = ?', (reminder["loopId"],)).fetchone())
+        row_to_dict(
+            conn.execute(
+                'SELECT * FROM "Loop" WHERE id = ? AND userId = ?',
+                (reminder["loopId"], user_id),
+            ).fetchone()
+        )
         if reminder.get("loopId")
         else None
     )
@@ -66,7 +81,7 @@ def list_notifications(conn: sqlite3.Connection, user_id: str, include_inactive:
             ).fetchall()
         )
     return [
-        enrich_reminder(conn, row, now)
+        enrich_reminder(conn, row, user_id, now)
         for row in rows
         if include_inactive or (parse_iso(row.get("remindAt")) or now) <= until
     ]
@@ -85,7 +100,12 @@ def list_planner_loops(conn: sqlite3.Connection, user_id: str, days: int = 14) -
     )
     for loop in loops:
         loop["item"] = (
-            row_to_dict(conn.execute('SELECT * FROM "Item" WHERE id = ?', (loop["itemId"],)).fetchone())
+            row_to_dict(
+                conn.execute(
+                    'SELECT * FROM "Item" WHERE id = ? AND userId = ?',
+                    (loop["itemId"], user_id),
+                ).fetchone()
+            )
             if loop.get("itemId")
             else None
         )

@@ -141,16 +141,28 @@ Provider-specific draft entries live in `SUBPROCESSORS_DRAFT.md`. Implementation
 - Recipients: Supabase Auth, configured auth email provider, OAuth providers if enabled.
 - Retention: until account deletion plus provider/legal retention.
 - Security: Supabase Auth, redirect allowlist, Turnstile when enabled, no service-role key in frontend.
-- Open: DPA/AVV status, passkey provider status, account deletion flow.
+- Open: DPA/AVV status, passkey provider status and backup deletion policy;
+  the invite-beta account deletion sequence is implemented and locally tested.
 
 ### Profile And Settings
 
 - Purpose: personalize app and manage privacy preferences.
-- Data categories: display name, avatar, preferences, onboarding interests.
+- Data categories: display name, avatar, preferences, onboarding interests, first-product onboarding started/completed/dismissed timestamp and first product-detail-open timestamp.
 - Recipients: app database/storage, Supabase Storage for avatars.
 - Retention: until user edits/deletes or account deletion.
 - Security: user-owned paths, access control.
-- Open: avatar deletion behavior and public avatar URL risk review.
+- Open: avatar deletion behavior, public avatar URL risk review, and whether activation timestamps should be shortened or anonymised after aggregate reporting.
+
+### First Product Activation
+
+- Purpose: direct a newly registered user to one real product record, preserve skip/resume state and calculate aggregate activation A/B and time-to-value.
+- Data categories: app user id; registration, onboarding and first-detail timestamps; existence/creation time of the first owned product and first owned non-Vault document. Reporting excludes product names, email addresses, filenames, file content, notes, barcodes and raw payloads.
+- Recipients: Avareno app database and authorised internal aggregate reporting only. No third-party analytics provider is added.
+- Retention: timestamps currently follow the account lifetime; production retention/anonymisation for aggregate activation reporting is TODO.
+- Security: server-owned state, authenticated user ownership, no localStorage as source of truth, no public event stream, duplicate-submit guards, private document access.
+- Export/deletion: activation timestamps are part of account data and are
+  removed by full account deletion; backup propagation remains open.
+- Open: legal-basis/retention review for product-improvement reporting, production RLS two-user tests and a policy preventing content fields from entering activation telemetry.
 
 ### Object Memory
 
@@ -178,7 +190,7 @@ Provider-specific draft entries live in `SUBPROCESSORS_DRAFT.md`. Implementation
 - Retention: until user deletion/account deletion; MVP document delete removes local metadata, extracted text/json and verified local `/uploads` object where present; raw extraction retention for production TBD.
 - Security: private buckets, user-owned paths, no public listing; MVP uses short-lived signed or authenticated API downloads by default, static `/uploads` requires explicit dev flag, and upload size/MIME/extension allowlists exist.
 - Export/deletion: MVP local ZIP export bundle includes available local uploaded document files with a manifest; production provider/storage export flow remains open.
-- Open: production private storage abstraction, malware scanning strategy, encryption at rest, backup deletion, sensitive document handling.
+- Open: production private storage abstraction, malware scanning strategy, encryption at rest, backup deletion, sensitive document handling. The first-product flow does not run automatic extraction or send an uploaded document to an AI provider.
 
 ### Private Vault
 
@@ -209,12 +221,14 @@ Provider-specific draft entries live in `SUBPROCESSORS_DRAFT.md`. Implementation
 
 ### Privacy Rights, Consent And Audit
 
-- Purpose: provide user controls for export, deletion request logging, consent/permission history and safe privacy audit events.
+- Purpose: provide user controls for export, executed account deletion,
+  consent/permission history and safe privacy audit events.
 - Data categories: user id, privacy action type, safe status/message/context, consent scope/status/legal basis/source/timestamps.
 - Recipients: app database.
 - Retention: TODO legal review; do not store raw document text, filenames, connector payloads, prompts, tokens or secrets in privacy audit records.
 - Security: safe-context redaction, user-owned records, future RLS/access-control tests required.
-- Export/deletion: local JSON/ZIP export bundle and account deletion request logging exist; full account deletion, provider exports and backup handling remain open.
+- Export/deletion: local JSON/ZIP export bundle and authenticated full account
+  deletion exist; provider exports and backup handling remain open.
 - Open: production retention, export/deletion job status, consent revocation UX, account deletion effects on audit records.
 
 ### Public Website, Cookies, Turnstile

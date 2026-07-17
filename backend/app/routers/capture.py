@@ -8,6 +8,7 @@ from fastapi import APIRouter
 from app.db import db, row_to_dict
 from app.dependencies import get_default_user
 from app.schemas import CaptureDropRequest, MessageCapture, UniversalCaptureRequest
+from app.services.authorization import require_owned_space
 from app.services.item_service import calculate_completeness_score
 from app.services.message_parser import parse_message_reminder
 from app.services.product_images import suggest_product_image
@@ -49,15 +50,13 @@ def _guess_category(text: str, item_type: str) -> str:
 
 
 def _guess_brand_model(text: str) -> tuple[str | None, str | None]:
-    lowered = text.lower()
-    if "lg" in lowered or "oled" in lowered:
-        return "LG", "OLED C3" if "c3" in lowered else None
-    if "apple" in lowered or "iphone" in lowered:
-        return "Apple", "iPhone" if "iphone" in lowered else None
-    if "samsung" in lowered:
-        return "Samsung", None
-    if "bosch" in lowered:
-        return "Bosch", None
+    # Only recognize a manufacturer the user actually typed as a word.
+    # Never invent brand-specific demo models (the old LG/OLED-C3 special
+    # case is removed for the focused beta).
+    tokens = set(re.findall(r"[a-zäöüß0-9\-]+", text.lower()))
+    for brand in ["LG", "Apple", "Samsung", "Bosch", "Philips", "Siemens", "Sony", "Miele"]:
+        if brand.lower() in tokens:
+            return brand, None
     return None, None
 
 
@@ -73,8 +72,8 @@ def _guess_name(text: str, manufacturer: str | None, model: str | None, category
 
 def _guess_location(conn, text: str, user_id: str, requested_space_id: str | None = None) -> tuple[str | None, str | None]:
     if requested_space_id:
-        space = row_to_dict(conn.execute('SELECT * FROM "Space" WHERE id = ?', (requested_space_id,)).fetchone())
-        return requested_space_id, space["name"] if space else None
+        space = require_owned_space(conn, user_id, requested_space_id)
+        return space["id"], space["name"]
     lowered = text.lower()
     spaces = conn.execute(
         """SELECT s.* FROM "Space" s
@@ -363,6 +362,16 @@ def capture_message(payload: MessageCapture) -> dict:
             ),
         )
         updated_user = award_xp(conn, user_id=user["id"], loop_id=loop_id, action="create_message_reminder", points=10)
-        loop = dict(conn.execute('SELECT * FROM "Loop" WHERE id = ?', (loop_id,)).fetchone())
-        reminder = dict(conn.execute('SELECT * FROM "Reminder" WHERE id = ?', (reminder_id,)).fetchone())
+        loop = dict(
+            conn.execute(
+                'SELECT * FROM "Loop" WHERE id = ? AND userId = ?',
+                (loop_id, user["id"]),
+            ).fetchone()
+        )
+        reminder = dict(
+            conn.execute(
+                'SELECT * FROM "Reminder" WHERE id = ? AND userId = ?',
+                (reminder_id, user["id"]),
+            ).fetchone()
+        )
         return {"parsed": parsed, "loop": loop, "reminder": reminder, "user": updated_user}

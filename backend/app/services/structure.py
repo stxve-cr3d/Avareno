@@ -59,11 +59,15 @@ WOW_FEATURES = [
 ]
 
 
-def _with_item_counts(conn: sqlite3.Connection, spaces: list[dict]) -> list[dict]:
+def _with_item_counts(conn: sqlite3.Connection, spaces: list[dict], user_id: str) -> list[dict]:
     counts = {
         row["spaceId"]: row["count"]
         for row in conn.execute(
-            'SELECT spaceId, COUNT(*) AS count FROM "Item" WHERE spaceId IS NOT NULL GROUP BY spaceId'
+            '''SELECT spaceId, COUNT(*) AS count
+               FROM "Item"
+               WHERE userId = ? AND spaceId IS NOT NULL
+               GROUP BY spaceId''',
+            (user_id,),
         ).fetchall()
     }
     return [{**space, "itemCount": counts.get(space["id"], 0)} for space in spaces]
@@ -113,7 +117,7 @@ def structure_payload(conn: sqlite3.Connection, user_id: str) -> dict:
 
     return {
         "household": household,
-        "spaces": _with_item_counts(conn, spaces),
+        "spaces": _with_item_counts(conn, spaces, user_id),
         "members": members,
         "plan": plan,
         "usage": {

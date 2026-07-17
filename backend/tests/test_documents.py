@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 
 def _create_item(client) -> str:
-    return client.post("/api/items", json={"name": "Dokument Testobjekt"}).json()["id"]
+    return client.post("/api/items", json={"name": "Dokument Testobjekt", "category": "Sonstiges"}).json()["id"]
 
 
 def test_upload_and_signed_download_roundtrip(client):
@@ -55,6 +57,42 @@ def test_upload_rejects_empty_file(client):
         files={"file": ("empty.pdf", b"", "application/pdf")},
     )
     assert response.status_code in (400, 422)
+
+
+def test_upload_accepts_only_pdf_jpeg_and_png_with_matching_bytes(client):
+    accepted = [
+        ("controlled.pdf", b"%PDF-1.7 controlled", "application/pdf"),
+        ("controlled.jpg", b"\xff\xd8\xff\xe0controlled", "image/jpeg"),
+        ("controlled.png", b"\x89PNG\r\n\x1a\ncontrolled", "image/png"),
+    ]
+    for file_name, content, mime_type in accepted:
+        response = client.post(
+            "/api/documents/upload",
+            data={"type": "OTHER"},
+            files={"file": (file_name, content, mime_type)},
+        )
+        assert response.status_code == 201, response.text
+        payload = response.json()
+        stored_name = Path(payload["filePath"]).name
+        assert stored_name != file_name
+        assert stored_name == f"{payload['id']}{Path(file_name).suffix}"
+        assert payload["fileName"] == file_name
+
+
+def test_upload_rejects_mime_extension_and_magic_byte_mismatches(client):
+    rejected = [
+        ("controlled.txt", b"plain text", "text/plain"),
+        ("controlled.pdf", b"%PDF-1.7 controlled", "image/png"),
+        ("controlled.pdf", b"<script>not a pdf</script>", "application/pdf"),
+        ("controlled.png", b"GIF89a", "image/png"),
+    ]
+    for file_name, content, mime_type in rejected:
+        response = client.post(
+            "/api/documents/upload",
+            data={"type": "OTHER"},
+            files={"file": (file_name, content, mime_type)},
+        )
+        assert response.status_code == 400
 
 
 def test_forged_signed_token_rejected(client):

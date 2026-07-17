@@ -207,8 +207,8 @@ def setup_home_assistant(conn: sqlite3.Connection, user_id: str, household_id: s
     )
     now = now_iso()
     conn.execute(
-        'UPDATE "SmartHomeConnection" SET status = ?, configJson = ?, updatedAt = ? WHERE id = ?',
-        ("CONNECTED", config_json, now, connection["id"]),
+        'UPDATE "SmartHomeConnection" SET status = ?, configJson = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+        ("CONNECTED", config_json, now, connection["id"], user_id),
     )
 
     sync = sync_provider(conn, user_id, household_id, HOME_ASSISTANT_PROVIDER)
@@ -227,8 +227,8 @@ def disconnect_home_assistant(conn: sqlite3.Connection, user_id: str) -> dict:
         return {"ok": True, "disconnected": False}
     now = now_iso()
     conn.execute(
-        'UPDATE "SmartHomeConnection" SET status = ?, configJson = NULL, updatedAt = ? WHERE id = ?',
-        ("AVAILABLE", now, connection["id"]),
+        'UPDATE "SmartHomeConnection" SET status = ?, configJson = NULL, updatedAt = ? WHERE id = ? AND userId = ?',
+        ("AVAILABLE", now, connection["id"], user_id),
     )
     return {"ok": True, "disconnected": True}
 
@@ -248,7 +248,7 @@ def smart_home_payload(conn: sqlite3.Connection, user_id: str) -> dict:
         conn.execute(
             """SELECT d.*, i.name AS itemName, i.imageUrl AS itemImageUrl, i.model AS itemModel, i.manufacturer AS itemManufacturer
                FROM "SmartHomeDevice" d
-               LEFT JOIN "Item" i ON i.id = d.itemId
+               LEFT JOIN "Item" i ON i.id = d.itemId AND i.userId = d.userId
                WHERE d.userId = ?
                ORDER BY d.updatedAt DESC, d.name ASC""",
             (user_id,),
@@ -258,7 +258,7 @@ def smart_home_payload(conn: sqlite3.Connection, user_id: str) -> dict:
         conn.execute(
             """SELECT c.*, d.name AS deviceName
                FROM "SmartHomeCommand" c
-               JOIN "SmartHomeDevice" d ON d.id = c.deviceId
+               JOIN "SmartHomeDevice" d ON d.id = c.deviceId AND d.userId = c.userId
                WHERE c.userId = ?
                ORDER BY c.createdAt DESC
                LIMIT 12""",
@@ -388,8 +388,8 @@ def connect_provider(conn: sqlite3.Connection, user_id: str, household_id: str, 
     status = "CONNECTED" if provider in {SMARTTHINGS_PROVIDER, AVARENO_BRIDGE_PROVIDER, HOME_ASSISTANT_PROVIDER, LOCAL_DISCOVERY_PROVIDER, BAMBU_LAB_PROVIDER} else "PLANNED"
     if existing:
         conn.execute(
-            'UPDATE "SmartHomeConnection" SET status = ?, lastSyncAt = ?, updatedAt = ? WHERE id = ?',
-            (status, now, now, existing["id"]),
+            'UPDATE "SmartHomeConnection" SET status = ?, lastSyncAt = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+            (status, now, now, existing["id"], user_id),
         )
         connection_id = existing["id"]
     else:
@@ -400,7 +400,12 @@ def connect_provider(conn: sqlite3.Connection, user_id: str, household_id: str, 
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (connection_id, user_id, household_id, provider, status, now, now, now),
         )
-    return row_to_dict(conn.execute('SELECT * FROM "SmartHomeConnection" WHERE id = ?', (connection_id,)).fetchone()) or {}
+    return row_to_dict(
+        conn.execute(
+            'SELECT * FROM "SmartHomeConnection" WHERE id = ? AND userId = ?',
+            (connection_id, user_id),
+        ).fetchone()
+    ) or {}
 
 
 def sync_provider(conn: sqlite3.Connection, user_id: str, household_id: str, provider: str) -> dict:
@@ -431,8 +436,8 @@ def sync_provider(conn: sqlite3.Connection, user_id: str, household_id: str, pro
 
     now = now_iso()
     conn.execute(
-        'UPDATE "SmartHomeConnection" SET status = ?, lastSyncAt = ?, updatedAt = ? WHERE id = ?',
-        ("CONNECTED" if synced else connection["status"], now, now, connection["id"]),
+        'UPDATE "SmartHomeConnection" SET status = ?, lastSyncAt = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+        ("CONNECTED" if synced else connection["status"], now, now, connection["id"], user_id),
     )
     return {"provider": provider, "source": source, "synced": len(synced), "devices": synced}
 
@@ -492,8 +497,8 @@ def confirm_home_graph_connect(conn: sqlite3.Connection, user_id: str, household
     if existing:
         connection_id = existing["id"]
         conn.execute(
-            'UPDATE "SmartHomeConnection" SET status = ?, lastSyncAt = ?, updatedAt = ? WHERE id = ?',
-            ("CONNECTED", now, now, connection_id),
+            'UPDATE "SmartHomeConnection" SET status = ?, lastSyncAt = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+            ("CONNECTED", now, now, connection_id, user_id),
         )
     else:
         connection_id = make_id()
@@ -574,25 +579,34 @@ def execute_command(conn: sqlite3.Connection, user_id: str, device_id: str, comm
         else:
             db_power = "on" if command == "power_on" else "off"
         conn.execute(
-            'UPDATE "SmartHomeDevice" SET powerState = ?, status = ?, rawJson = ?, updatedAt = ?, lastSeenAt = ? WHERE id = ?',
-            (db_power, "ONLINE", json.dumps(raw_json), now, now, device_id),
+            '''UPDATE "SmartHomeDevice"
+               SET powerState = ?, status = ?, rawJson = ?, updatedAt = ?, lastSeenAt = ?
+               WHERE id = ? AND userId = ?''',
+            (db_power, "ONLINE", json.dumps(raw_json), now, now, device_id, user_id),
         )
     elif command == "set_brightness":
         raw_json = _json_or_empty_dict(device.get("rawJson"))
         raw_json["brightness"] = max(0, min(100, int(value or 0)))
         conn.execute(
-            'UPDATE "SmartHomeDevice" SET status = ?, rawJson = ?, updatedAt = ?, lastSeenAt = ? WHERE id = ?',
-            ("ONLINE", json.dumps(raw_json), now, now, device_id),
+            '''UPDATE "SmartHomeDevice"
+               SET status = ?, rawJson = ?, updatedAt = ?, lastSeenAt = ?
+               WHERE id = ? AND userId = ?''',
+            ("ONLINE", json.dumps(raw_json), now, now, device_id, user_id),
         )
     elif command in {"volume_up", "volume_down", "mute_toggle", "source_menu"}:
         raw_json = _json_or_empty_dict(device.get("rawJson"))
         raw_json["lastMediaCommand"] = command
         conn.execute(
-            'UPDATE "SmartHomeDevice" SET status = ?, rawJson = ?, updatedAt = ?, lastSeenAt = ? WHERE id = ?',
-            ("ONLINE", json.dumps(raw_json), now, now, device_id),
+            '''UPDATE "SmartHomeDevice"
+               SET status = ?, rawJson = ?, updatedAt = ?, lastSeenAt = ?
+               WHERE id = ? AND userId = ?''',
+            ("ONLINE", json.dumps(raw_json), now, now, device_id, user_id),
         )
     else:
-        conn.execute('UPDATE "SmartHomeDevice" SET status = ?, updatedAt = ?, lastSeenAt = ? WHERE id = ?', ("ONLINE", now, now, device_id))
+        conn.execute(
+            'UPDATE "SmartHomeDevice" SET status = ?, updatedAt = ?, lastSeenAt = ? WHERE id = ? AND userId = ?',
+            ("ONLINE", now, now, device_id, user_id),
+        )
 
     command_id = make_id()
     conn.execute(
@@ -606,7 +620,12 @@ def execute_command(conn: sqlite3.Connection, user_id: str, device_id: str, comm
                VALUES (?, ?, ?, ?, ?, ?)""",
             (make_id(), device["itemId"], user_id, "SMART_HOME", f"Smart home command: {command}", now),
         )
-    return row_to_dict(conn.execute('SELECT * FROM "SmartHomeCommand" WHERE id = ?', (command_id,)).fetchone()) or {}
+    return row_to_dict(
+        conn.execute(
+            'SELECT * FROM "SmartHomeCommand" WHERE id = ? AND userId = ?',
+            (command_id, user_id),
+        ).fetchone()
+    ) or {}
 
 
 # Allowlisted Samsung remote keys — discrete actions only. KEY_POWER excluded on
@@ -652,7 +671,16 @@ def get_device_detail(conn: sqlite3.Connection, user_id: str, device_id: str) ->
     )
     if not device:
         raise ValueError("Smart home device not found")
-    item = row_to_dict(conn.execute('SELECT * FROM "Item" WHERE id = ?', (device["itemId"],)).fetchone()) if device.get("itemId") else None
+    item = (
+        row_to_dict(
+            conn.execute(
+                'SELECT * FROM "Item" WHERE id = ? AND userId = ?',
+                (device["itemId"], user_id),
+            ).fetchone()
+        )
+        if device.get("itemId")
+        else None
+    )
     return {"device": device, "item": item}
 
 
@@ -681,7 +709,10 @@ def send_remote_key(conn: sqlite3.Connection, user_id: str, device_id: str, key:
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
         (command_id, user_id, device_id, f"remote_key:{key}", json.dumps({"key": key}), "SENT", json.dumps(result), now),
     )
-    conn.execute('UPDATE "SmartHomeDevice" SET status = ?, updatedAt = ?, lastSeenAt = ? WHERE id = ?', ("ONLINE", now, now, device_id))
+    conn.execute(
+        'UPDATE "SmartHomeDevice" SET status = ?, updatedAt = ?, lastSeenAt = ? WHERE id = ? AND userId = ?',
+        ("ONLINE", now, now, device_id, user_id),
+    )
     return result
 
 
@@ -695,8 +726,16 @@ def link_device_to_item(conn: sqlite3.Connection, user_id: str, device_id: str, 
         item = row_to_dict(conn.execute('SELECT * FROM "Item" WHERE id = ? AND userId = ?', (item_id, user_id)).fetchone())
         if not item:
             raise ValueError("Item not found")
-    conn.execute('UPDATE "SmartHomeDevice" SET itemId = ?, updatedAt = ? WHERE id = ?', (item_id, now_iso(), device_id))
-    return row_to_dict(conn.execute('SELECT * FROM "SmartHomeDevice" WHERE id = ?', (device_id,)).fetchone()) or {}
+    conn.execute(
+        'UPDATE "SmartHomeDevice" SET itemId = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+        (item_id, now_iso(), device_id, user_id),
+    )
+    return row_to_dict(
+        conn.execute(
+            'SELECT * FROM "SmartHomeDevice" WHERE id = ? AND userId = ?',
+            (device_id, user_id),
+        ).fetchone()
+    ) or {}
 
 
 def delete_device(conn: sqlite3.Connection, user_id: str, device_id: str) -> dict:
@@ -705,8 +744,8 @@ def delete_device(conn: sqlite3.Connection, user_id: str, device_id: str) -> dic
     )
     if not device:
         raise ValueError("Smart home device not found")
-    conn.execute('DELETE FROM "SmartHomeCommand" WHERE deviceId = ?', (device_id,))
-    conn.execute('DELETE FROM "SmartHomeDevice" WHERE id = ?', (device_id,))
+    conn.execute('DELETE FROM "SmartHomeCommand" WHERE deviceId = ? AND userId = ?', (device_id, user_id))
+    conn.execute('DELETE FROM "SmartHomeDevice" WHERE id = ? AND userId = ?', (device_id, user_id))
     return {"removed": True, "id": device_id}
 
 
@@ -734,8 +773,17 @@ def pair_local_device(conn: sqlite3.Connection, user_id: str, device_id: str) ->
         if name:
             raw_json["friendlyName"] = str(name)
     conn.execute(
-        'UPDATE "SmartHomeDevice" SET name = ?, rawJson = ?, updatedAt = ?, lastSeenAt = ? WHERE id = ?',
-        (str(raw_json.get("friendlyName") or device.get("name") or "Samsung TV"), json.dumps(raw_json), now_iso(), now_iso(), device_id),
+        '''UPDATE "SmartHomeDevice"
+           SET name = ?, rawJson = ?, updatedAt = ?, lastSeenAt = ?
+           WHERE id = ? AND userId = ?''',
+        (
+            str(raw_json.get("friendlyName") or device.get("name") or "Samsung TV"),
+            json.dumps(raw_json),
+            now_iso(),
+            now_iso(),
+            device_id,
+            user_id,
+        ),
     )
     return {"paired": bool(token), "deviceId": device_id, "result": result}
 
@@ -849,9 +897,25 @@ def import_local_candidate(
     }
     device = _upsert_device(conn, user_id, household_id, connection["id"], LOCAL_DISCOVERY_PROVIDER, source_device, "LOCAL_LAN" if local_discovery_enabled() else "LOCAL_MANUAL")
     if candidate.get("matchedItemId"):
-        conn.execute('UPDATE "SmartHomeDevice" SET itemId = ?, updatedAt = ? WHERE id = ?', (candidate["matchedItemId"], now_iso(), device["id"]))
+        matched_item = row_to_dict(
+            conn.execute(
+                'SELECT id FROM "Item" WHERE id = ? AND userId = ?',
+                (candidate["matchedItemId"], user_id),
+            ).fetchone()
+        )
+        if not matched_item:
+            raise ValueError("Item not found")
+        conn.execute(
+            'UPDATE "SmartHomeDevice" SET itemId = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+            (candidate["matchedItemId"], now_iso(), device["id"], user_id),
+        )
         device["itemId"] = candidate["matchedItemId"]
-    return row_to_dict(conn.execute('SELECT * FROM "SmartHomeDevice" WHERE id = ?', (device["id"],)).fetchone()) or device
+    return row_to_dict(
+        conn.execute(
+            'SELECT * FROM "SmartHomeDevice" WHERE id = ? AND userId = ?',
+            (device["id"], user_id),
+        ).fetchone()
+    ) or device
 
 
 def setup_bambu_lab_printer(conn: sqlite3.Connection, user_id: str, household_id: str, payload) -> dict:
@@ -885,7 +949,10 @@ def setup_bambu_lab_printer(conn: sqlite3.Connection, user_id: str, household_id
     device = _upsert_device(conn, user_id, household_id, connection["id"], BAMBU_LAB_PROVIDER, source_device, "LAN_READY")
     now = now_iso()
     if item_id:
-        conn.execute('UPDATE "SmartHomeDevice" SET itemId = ?, updatedAt = ? WHERE id = ?', (item_id, now, device["id"]))
+        conn.execute(
+            'UPDATE "SmartHomeDevice" SET itemId = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+            (item_id, now, device["id"], user_id),
+        )
         conn.execute(
             """INSERT INTO "ItemActivity" (id, itemId, userId, type, message, createdAt)
                VALUES (?, ?, ?, ?, ?, ?)""",
@@ -898,8 +965,23 @@ def setup_bambu_lab_printer(conn: sqlite3.Connection, user_id: str, household_id
     )
     return {
         "provider": BAMBU_LAB_PROVIDER,
-        "device": row_to_dict(conn.execute('SELECT * FROM "SmartHomeDevice" WHERE id = ?', (device["id"],)).fetchone()) or device,
-        "item": row_to_dict(conn.execute('SELECT * FROM "Item" WHERE id = ?', (item_id,)).fetchone()) if item_id else None,
+        "device": row_to_dict(
+            conn.execute(
+                'SELECT * FROM "SmartHomeDevice" WHERE id = ? AND userId = ?',
+                (device["id"], user_id),
+            ).fetchone()
+        )
+        or device,
+        "item": (
+            row_to_dict(
+                conn.execute(
+                    'SELECT * FROM "Item" WHERE id = ? AND userId = ?',
+                    (item_id, user_id),
+                ).fetchone()
+            )
+            if item_id
+            else None
+        ),
         "message": "Bambu printer ready",
     }
 
@@ -939,8 +1021,10 @@ def record_bambu_print_event(conn: sqlite3.Connection, user_id: str, payload) ->
 
     device_status = "ATTENTION" if event_type in {"FAILED", "FILAMENT_LOW", "PAUSED"} else "ONLINE"
     conn.execute(
-        'UPDATE "SmartHomeDevice" SET status = ?, rawJson = ?, updatedAt = ?, lastSeenAt = ? WHERE id = ?',
-        (device_status, json.dumps(raw_json), now, now, device["id"]),
+        '''UPDATE "SmartHomeDevice"
+           SET status = ?, rawJson = ?, updatedAt = ?, lastSeenAt = ?
+           WHERE id = ? AND userId = ?''',
+        (device_status, json.dumps(raw_json), now, now, device["id"], user_id),
     )
 
     copy = _bambu_event_copy(event_type, job_name, device["name"], payload.message)
@@ -981,9 +1065,9 @@ def record_bambu_print_event(conn: sqlite3.Connection, user_id: str, payload) ->
         conn.execute(
             """SELECT d.*, i.name AS itemName, i.imageUrl AS itemImageUrl, i.model AS itemModel, i.manufacturer AS itemManufacturer
                FROM "SmartHomeDevice" d
-               LEFT JOIN "Item" i ON i.id = d.itemId
-               WHERE d.id = ?""",
-            (device["id"],),
+               LEFT JOIN "Item" i ON i.id = d.itemId AND i.userId = d.userId
+               WHERE d.id = ? AND d.userId = ?""",
+            (device["id"], user_id),
         ).fetchone()
     )
     if updated_device:
@@ -991,7 +1075,12 @@ def record_bambu_print_event(conn: sqlite3.Connection, user_id: str, payload) ->
         updated_device["rawJson"] = _json_or_empty_dict(updated_device.get("rawJson"))
     return {
         "device": updated_device,
-        "command": row_to_dict(conn.execute('SELECT * FROM "SmartHomeCommand" WHERE id = ?', (command_id,)).fetchone()),
+        "command": row_to_dict(
+            conn.execute(
+                'SELECT * FROM "SmartHomeCommand" WHERE id = ? AND userId = ?',
+                (command_id, user_id),
+            ).fetchone()
+        ),
         "reminder": reminder,
         "message": copy["message"],
     }
@@ -1002,7 +1091,7 @@ def activate_smart_home_insight(conn: sqlite3.Connection, user_id: str, insight_
         conn.execute(
             """SELECT d.*, i.name AS itemName, i.imageUrl AS itemImageUrl, i.model AS itemModel, i.manufacturer AS itemManufacturer
                FROM "SmartHomeDevice" d
-               LEFT JOIN "Item" i ON i.id = d.itemId
+               LEFT JOIN "Item" i ON i.id = d.itemId AND i.userId = d.userId
                WHERE d.userId = ?""",
             (user_id,),
         ).fetchall()
@@ -1077,8 +1166,18 @@ def activate_smart_home_insight(conn: sqlite3.Connection, user_id: str, insight_
                VALUES (?, ?, ?, ?, ?, ?)""",
             (make_id(), item_id, user_id, "SMART_HOME", f"Smart insight activated: {title}", now),
         )
-    loop = row_to_dict(conn.execute('SELECT * FROM "Loop" WHERE id = ?', (loop_id,)).fetchone())
-    reminder = row_to_dict(conn.execute('SELECT * FROM "Reminder" WHERE id = ?', (reminder_id,)).fetchone())
+    loop = row_to_dict(
+        conn.execute(
+            'SELECT * FROM "Loop" WHERE id = ? AND userId = ?',
+            (loop_id, user_id),
+        ).fetchone()
+    )
+    reminder = row_to_dict(
+        conn.execute(
+            'SELECT * FROM "Reminder" WHERE id = ? AND userId = ?',
+            (reminder_id, user_id),
+        ).fetchone()
+    )
     return {"insight": insight, "loop": loop, "reminder": reminder, "message": "Smart plan created"}
 
 
@@ -1233,10 +1332,15 @@ def _upsert_bambu_event_reminder(
     )
     if existing:
         conn.execute(
-            'UPDATE "Reminder" SET message = ?, remindAt = ?, updatedAt = ? WHERE id = ?',
-            (copy["message"], remind_at, remind_at, existing["id"]),
+            'UPDATE "Reminder" SET message = ?, remindAt = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+            (copy["message"], remind_at, remind_at, existing["id"], user_id),
         )
-        return row_to_dict(conn.execute('SELECT * FROM "Reminder" WHERE id = ?', (existing["id"],)).fetchone()) or existing
+        return row_to_dict(
+            conn.execute(
+                'SELECT * FROM "Reminder" WHERE id = ? AND userId = ?',
+                (existing["id"], user_id),
+            ).fetchone()
+        ) or existing
 
     reminder_id = make_id()
     conn.execute(
@@ -1245,7 +1349,12 @@ def _upsert_bambu_event_reminder(
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (reminder_id, user_id, None, item_id, copy["title"], copy["message"], remind_at, "ACTIVE", remind_at, remind_at),
     )
-    return row_to_dict(conn.execute('SELECT * FROM "Reminder" WHERE id = ?', (reminder_id,)).fetchone()) or {}
+    return row_to_dict(
+        conn.execute(
+            'SELECT * FROM "Reminder" WHERE id = ? AND userId = ?',
+            (reminder_id, user_id),
+        ).fetchone()
+    ) or {}
 
 
 def _smart_home_insights(conn: sqlite3.Connection, user_id: str, devices: list[dict]) -> list[dict]:
@@ -2060,8 +2169,14 @@ def _upsert_device(
     existing_rows = [row for row in provider_rows if _same_physical_device(row)]
     existing = existing_rows[0] if existing_rows else None
     for duplicate in existing_rows[1:]:
-        conn.execute('DELETE FROM "SmartHomeCommand" WHERE deviceId = ?', (duplicate["id"],))
-        conn.execute('DELETE FROM "SmartHomeDevice" WHERE id = ?', (duplicate["id"],))
+        conn.execute(
+            'DELETE FROM "SmartHomeCommand" WHERE deviceId = ? AND userId = ?',
+            (duplicate["id"], user_id),
+        )
+        conn.execute(
+            'DELETE FROM "SmartHomeDevice" WHERE id = ? AND userId = ?',
+            (duplicate["id"], user_id),
+        )
     values = {
         "name": source_device.get("label") or source_device.get("name") or "Smart device",
         "roomName": source_device.get("roomName") or source_device.get("room") or _infer_room(source_device),
@@ -2076,7 +2191,7 @@ def _upsert_device(
         conn.execute(
             """UPDATE "SmartHomeDevice"
                SET connectionId = ?, name = ?, roomName = ?, deviceType = ?, capabilities = ?, status = ?, rawJson = ?, lastSeenAt = ?, updatedAt = ?
-               WHERE id = ?""",
+               WHERE id = ? AND userId = ?""",
             (
                 connection_id,
                 values["name"],
@@ -2088,6 +2203,7 @@ def _upsert_device(
                 values["lastSeenAt"],
                 values["updatedAt"],
                 existing["id"],
+                user_id,
             ),
         )
         device_id = existing["id"]
@@ -2119,7 +2235,12 @@ def _upsert_device(
                 values["updatedAt"],
             ),
         )
-    return row_to_dict(conn.execute('SELECT * FROM "SmartHomeDevice" WHERE id = ?', (device_id,)).fetchone()) or {}
+    return row_to_dict(
+        conn.execute(
+            'SELECT * FROM "SmartHomeDevice" WHERE id = ? AND userId = ?',
+            (device_id, user_id),
+        ).fetchone()
+    ) or {}
 
 
 def _demo_devices(conn: sqlite3.Connection, user_id: str) -> list[dict]:
@@ -2369,7 +2490,12 @@ def _attach_local_matches(conn: sqlite3.Connection, user_id: str, candidates: li
         match_id = _best_item_match(conn, user_id, candidate["name"], candidate.get("roomName"), candidate.get("deviceType", "device"))
         candidate["matchedItemId"] = match_id
         if match_id:
-            item = row_to_dict(conn.execute('SELECT id, name, imageUrl FROM "Item" WHERE id = ?', (match_id,)).fetchone())
+            item = row_to_dict(
+                conn.execute(
+                    'SELECT id, name, imageUrl FROM "Item" WHERE id = ? AND userId = ?',
+                    (match_id, user_id),
+                ).fetchone()
+            )
             candidate["matchedItemName"] = item["name"] if item else None
             candidate["matchedItemImageUrl"] = item["imageUrl"] if item else None
         else:

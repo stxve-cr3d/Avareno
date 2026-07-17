@@ -2,6 +2,7 @@ import React, { lazy } from "react";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, Navigate, RouterProvider, useParams } from "react-router-dom";
 import { App } from "./App";
+import { betaFeatures } from "./lib/betaFeatures";
 import { AuthProvider } from "./lib/authProvider";
 import { LanguageProvider } from "./lib/language";
 import { ThemeProvider } from "./lib/theme";
@@ -22,6 +23,7 @@ const FriendsListPage = lazy(() => import("./pages/Friends").then((m) => ({ defa
 const FriendProfilePage = lazy(() => import("./pages/Friends").then((m) => ({ default: m.FriendProfilePage })));
 const CaptureLoop = lazy(() => import("./pages/CaptureLoop").then((m) => ({ default: m.CaptureLoop })));
 const CaptureItem = lazy(() => import("./pages/CaptureItem").then((m) => ({ default: m.CaptureItem })));
+const ProductCreated = lazy(() => import("./pages/ProductCreated").then((m) => ({ default: m.ProductCreated })));
 const HomeBinder = lazy(() => import("./pages/HomeBinder").then((m) => ({ default: m.HomeBinder })));
 const AskAvareno = lazy(() => import("./pages/AskAvareno").then((m) => ({ default: m.AskAvareno })));
 const SearchPage = lazy(() => import("./pages/Search").then((m) => ({ default: m.Search })));
@@ -46,6 +48,11 @@ const EmailVerifyPage = lazy(() => import("./pages/AuthPages").then((m) => ({ de
 const OnboardingPage = lazy(() => import("./pages/AuthPages").then((m) => ({ default: m.OnboardingPage })));
 const AccountSettingsPage = lazy(() => import("./pages/AuthPages").then((m) => ({ default: m.AccountSettingsPage })));
 
+/* Routes of modules that are disabled for the focused Avareno beta redirect
+   to the app home instead of rendering a broken or misleading page.
+   Kept for a later product phase — flip the flag in lib/betaFeatures.ts. */
+const appHomeRedirect = <Navigate to="/app" replace />;
+
 const router = createBrowserRouter([
   {
     path: "/",
@@ -66,76 +73,78 @@ const router = createBrowserRouter([
       { path: "auth/verify-email", element: <EmailVerifyPage /> },
       { path: "onboarding", element: <OnboardingPage /> },
       { path: "settings/account", element: <AccountSettingsPage /> },
-      { path: "capture", element: <UniversalCapture /> },
+      { path: "capture", element: betaFeatures.universalCapture ? <UniversalCapture /> : <Navigate to="/app/capture/item" replace /> },
       { path: "capture/receipt", element: <CaptureReceipt /> },
-      { path: "capture/message", element: <CaptureMessage /> },
+      { path: "capture/message", element: betaFeatures.messageCapture ? <CaptureMessage /> : <Navigate to="/app/capture/loop" replace /> },
       { path: "capture/loop", element: <CaptureLoop /> },
       { path: "capture/item", element: <CaptureItem /> },
+      { path: "capture/item/success/:id", element: <ProductCreated /> },
       { path: "items", element: <Items /> },
       { path: "items/:id", element: <ItemDetail /> },
-      { path: "ask", element: <AskAvareno /> },
+      { path: "ask", element: betaFeatures.ask ? <AskAvareno /> : appHomeRedirect },
       { path: "search", element: <SearchPage /> },
-      { path: "smart-home", element: <SmartHome /> },
-      { path: "smart-home/devices/:deviceId", element: <HomeDeviceDetailPage /> },
-      { path: "home-graph", element: <HomeGraphConnect /> },
-      { path: "home-graph/devices/:deviceId", element: <HomeDeviceDetailPage /> },
-      { path: "home-graph/connect", element: <HomeGraphConnect /> },
-      { path: "resolve", element: <Resolve /> },
-      { path: "resolve/tickets", element: <Resolve /> },
-      { path: "resolve/tickets/:ticketId", element: <Resolve /> },
-      { path: "resolve/create", element: <Resolve /> },
+      { path: "smart-home", element: betaFeatures.smartHome ? <SmartHome /> : appHomeRedirect },
+      { path: "smart-home/devices/:deviceId", element: betaFeatures.smartHome ? <HomeDeviceDetailPage /> : appHomeRedirect },
+      { path: "home-graph", element: betaFeatures.connect ? <HomeGraphConnect /> : appHomeRedirect },
+      { path: "home-graph/devices/:deviceId", element: betaFeatures.smartHome ? <HomeDeviceDetailPage /> : appHomeRedirect },
+      { path: "home-graph/connect", element: betaFeatures.connect ? <HomeGraphConnect /> : appHomeRedirect },
+      { path: "resolve", element: betaFeatures.resolve ? <Resolve /> : appHomeRedirect },
+      { path: "resolve/tickets", element: betaFeatures.resolve ? <Resolve /> : appHomeRedirect },
+      { path: "resolve/tickets/:ticketId", element: betaFeatures.resolve ? <Resolve /> : appHomeRedirect },
+      { path: "resolve/create", element: betaFeatures.resolve ? <Resolve /> : appHomeRedirect },
       { path: "care", element: <Care /> },
       { path: "care/:loopId", element: <Care /> },
       { path: "reports/home-binder", element: <HomeBinder /> },
       { path: "loops/:id", element: <LoopCareRedirect /> },
       { path: "rewards", element: <Rewards /> },
-      { path: "friends", element: <FriendsListPage /> },
-      { path: "friends/:friendId", element: <FriendProfilePage /> },
-      { path: "rewards/friends", element: <FriendsListPage /> },
-      { path: "rewards/friends/:friendId", element: <FriendProfilePage /> },
+      { path: "friends", element: betaFeatures.community ? <FriendsListPage /> : appHomeRedirect },
+      { path: "friends/:friendId", element: betaFeatures.community ? <FriendProfilePage /> : appHomeRedirect },
+      { path: "rewards/friends", element: betaFeatures.community ? <FriendsListPage /> : appHomeRedirect },
+      { path: "rewards/friends/:friendId", element: betaFeatures.community ? <FriendProfilePage /> : appHomeRedirect },
       { path: "rewards/privacy", element: <Rewards /> },
       { path: "rewards/datenschutz", element: <Rewards /> },
       { path: "ich", element: <Rewards /> },
-      { path: "ich/friends", element: <Rewards /> },
-      { path: "ich/friends/:friendId", element: <Rewards /> },
+      { path: "ich/friends", element: betaFeatures.community ? <Rewards /> : <Navigate to="/ich" replace /> },
+      { path: "ich/friends/:friendId", element: betaFeatures.community ? <Rewards /> : <Navigate to="/ich" replace /> },
       { path: "ich/datenschutz", element: <Rewards /> },
       { path: "app", element: <MemoryHome /> },
-      { path: "app/capture", element: <UniversalCapture /> },
+      { path: "app/capture", element: betaFeatures.universalCapture ? <UniversalCapture /> : <Navigate to="/app/capture/item" replace /> },
       { path: "app/capture/receipt", element: <CaptureReceipt /> },
-      { path: "app/capture/message", element: <CaptureMessage /> },
+      { path: "app/capture/message", element: betaFeatures.messageCapture ? <CaptureMessage /> : <Navigate to="/app/capture/loop" replace /> },
       { path: "app/capture/loop", element: <CaptureLoop /> },
       { path: "app/capture/item", element: <CaptureItem /> },
+      { path: "app/capture/item/success/:id", element: <ProductCreated /> },
       { path: "app/dinge", element: <Items /> },
       { path: "app/dinge/:id", element: <ItemDetail /> },
       { path: "app/items", element: <Items /> },
       { path: "app/items/:id", element: <ItemDetail /> },
-      { path: "app/ask", element: <AskAvareno /> },
+      { path: "app/ask", element: betaFeatures.ask ? <AskAvareno /> : appHomeRedirect },
       { path: "app/search", element: <SearchPage /> },
-      { path: "app/smart-home", element: <SmartHome /> },
-      { path: "app/smart-home/devices/:deviceId", element: <HomeDeviceDetailPage /> },
-      { path: "app/home", element: <HomeGraphConnect /> },
-      { path: "app/home/devices/:deviceId", element: <HomeDeviceDetailPage /> },
-      { path: "app/home/connect", element: <HomeGraphConnect /> },
-      { path: "app/home-graph", element: <HomeGraphConnect /> },
-      { path: "app/home-graph/devices/:deviceId", element: <HomeDeviceDetailPage /> },
-      { path: "app/home-graph/connect", element: <HomeGraphConnect /> },
-      { path: "app/resolve", element: <Resolve /> },
-      { path: "app/resolve/tickets", element: <Resolve /> },
-      { path: "app/resolve/tickets/:ticketId", element: <Resolve /> },
-      { path: "app/resolve/create", element: <Resolve /> },
+      { path: "app/smart-home", element: betaFeatures.smartHome ? <SmartHome /> : appHomeRedirect },
+      { path: "app/smart-home/devices/:deviceId", element: betaFeatures.smartHome ? <HomeDeviceDetailPage /> : appHomeRedirect },
+      { path: "app/home", element: betaFeatures.connect ? <HomeGraphConnect /> : appHomeRedirect },
+      { path: "app/home/devices/:deviceId", element: betaFeatures.smartHome ? <HomeDeviceDetailPage /> : appHomeRedirect },
+      { path: "app/home/connect", element: betaFeatures.connect ? <HomeGraphConnect /> : appHomeRedirect },
+      { path: "app/home-graph", element: betaFeatures.connect ? <HomeGraphConnect /> : appHomeRedirect },
+      { path: "app/home-graph/devices/:deviceId", element: betaFeatures.smartHome ? <HomeDeviceDetailPage /> : appHomeRedirect },
+      { path: "app/home-graph/connect", element: betaFeatures.connect ? <HomeGraphConnect /> : appHomeRedirect },
+      { path: "app/resolve", element: betaFeatures.resolve ? <Resolve /> : appHomeRedirect },
+      { path: "app/resolve/tickets", element: betaFeatures.resolve ? <Resolve /> : appHomeRedirect },
+      { path: "app/resolve/tickets/:ticketId", element: betaFeatures.resolve ? <Resolve /> : appHomeRedirect },
+      { path: "app/resolve/create", element: betaFeatures.resolve ? <Resolve /> : appHomeRedirect },
       { path: "app/care", element: <Care /> },
       { path: "app/care/:loopId", element: <Care /> },
       { path: "app/reports/home-binder", element: <HomeBinder /> },
       { path: "app/loops/:id", element: <LoopCareRedirect app /> },
       { path: "app/profile", element: <Rewards /> },
-      { path: "app/profile/friends", element: <Rewards /> },
-      { path: "app/profile/friends/:friendId", element: <Rewards /> },
+      { path: "app/profile/friends", element: betaFeatures.community ? <Rewards /> : <Navigate to="/app/profile" replace /> },
+      { path: "app/profile/friends/:friendId", element: betaFeatures.community ? <Rewards /> : <Navigate to="/app/profile" replace /> },
       { path: "app/profile/privacy", element: <Rewards /> },
       { path: "app/profile/settings", element: <AccountSettingsPage /> },
-      { path: "app/vault", element: <VaultPage /> },
+      { path: "app/vault", element: betaFeatures.vault ? <VaultPage /> : appHomeRedirect },
       { path: "app/ich", element: <Rewards /> },
-      { path: "app/ich/friends", element: <Rewards /> },
-      { path: "app/ich/friends/:friendId", element: <Rewards /> },
+      { path: "app/ich/friends", element: betaFeatures.community ? <Rewards /> : <Navigate to="/app/ich" replace /> },
+      { path: "app/ich/friends/:friendId", element: betaFeatures.community ? <Rewards /> : <Navigate to="/app/ich" replace /> },
       { path: "app/ich/privacy", element: <Rewards /> },
       { path: "app/ich/datenschutz", element: <Rewards /> },
       { path: "app/ich/settings", element: <AccountSettingsPage /> },
@@ -143,9 +152,9 @@ const router = createBrowserRouter([
       { path: "app/rewards/privacy", element: <Navigate to="/app/ich/privacy" replace /> },
       { path: "app/rewards/datenschutz", element: <Navigate to="/app/ich/privacy" replace /> },
       { path: "app/rewards/friends", element: <Navigate to="/app/ich/friends" replace /> },
-      { path: "app/rewards/friends/:friendId", element: <Rewards /> },
+      { path: "app/rewards/friends/:friendId", element: betaFeatures.community ? <Rewards /> : <Navigate to="/app/ich" replace /> },
       { path: "app/friends", element: <Navigate to="/app/ich/friends" replace /> },
-      { path: "app/friends/:friendId", element: <FriendProfilePage /> },
+      { path: "app/friends/:friendId", element: betaFeatures.community ? <FriendProfilePage /> : <Navigate to="/app/ich" replace /> },
       { path: "app/settings", element: <AccountSettingsPage /> },
       { path: "app/settings/account", element: <AccountSettingsPage /> }
     ]

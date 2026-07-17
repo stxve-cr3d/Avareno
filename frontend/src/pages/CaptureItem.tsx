@@ -1,91 +1,101 @@
-import { FormEvent, useCallback, useState } from "react";
-import type { ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowRight, BookOpen, Camera, ChevronDown, LifeBuoy, PackagePlus, ReceiptText, ScanBarcode, ShieldCheck, Tag } from "lucide-react";
-import { api } from "../lib/api";
-import type { BarcodeLookup, Item } from "../lib/types";
-import { parseAvarenoProductQr } from "../lib/productQr";
+import { FormEvent, useCallback, useRef, useState } from "react";
+import { ChevronDown, ScanBarcode } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { BarcodeScannerDialog } from "../components/BarcodeScannerDialog";
 import { Button } from "../components/Button";
+import { api } from "../lib/api";
+import { useLanguage } from "../lib/language";
+import type { BarcodeLookup, Item } from "../lib/types";
 
-type PassportForm = {
+type ProductForm = {
   name: string;
-  itemType: string;
   category: string;
   manufacturer: string;
   model: string;
   serialNumber: string;
   barcode: string;
   barcodeFormat: string;
-  imageUrl: string;
   purchaseDate: string;
   merchant: string;
   price: string;
   warrantyUntil: string;
   location: string;
-  manualUrl: string;
-  driverUrl: string;
-  softwareUrl: string;
-  supportUrl: string;
-  supportContact: string;
+  notes: string;
 };
 
-/* Same values the backend stores and ItemDetail labels — no new taxonomy. */
-const itemTypes: { value: string; label: string }[] = [
-  { value: "THING", label: "Objekt / Produkt" },
-  { value: "ELECTRONIC", label: "Elektronik / Gerät" },
-  { value: "FURNITURE", label: "Möbel" },
-  { value: "INFRASTRUCTURE", label: "Haus & Infrastruktur" },
-  { value: "VEHICLE", label: "Fahrzeug" },
-  { value: "COLLECTIBLE", label: "Sammlung" }
-];
+type RequiredFieldErrors = Partial<Record<"name" | "category", string>>;
 
-const initialForm: PassportForm = {
+const initialForm: ProductForm = {
   name: "",
-  itemType: "THING",
-  category: "Sonstiges",
+  category: "",
   manufacturer: "",
   model: "",
   serialNumber: "",
   barcode: "",
   barcodeFormat: "",
-  imageUrl: "",
   purchaseDate: "",
   merchant: "",
   price: "",
   warrantyUntil: "",
   location: "",
-  manualUrl: "",
-  driverUrl: "",
-  softwareUrl: "",
-  supportUrl: "",
-  supportContact: ""
+  notes: ""
 };
+
+const categories = [
+  { value: "Elektronik", de: "Elektronik", en: "Electronics", itemType: "ELECTRONIC" },
+  { value: "Haushalt & Küche", de: "Haushalt & Küche", en: "Home & kitchen", itemType: "THING" },
+  { value: "Möbel", de: "Möbel", en: "Furniture", itemType: "FURNITURE" },
+  { value: "Werkzeug & Garten", de: "Werkzeug & Garten", en: "Tools & garden", itemType: "THING" },
+  { value: "Fahrzeug", de: "Fahrzeug", en: "Vehicle", itemType: "VEHICLE" },
+  { value: "Sonstiges", de: "Sonstiges", en: "Other", itemType: "THING" }
+] as const;
 
 export function CaptureItem() {
   const navigate = useNavigate();
-  const [form, setForm] = useState<PassportForm>(initialForm);
+  const [searchParams] = useSearchParams();
+  const { language } = useLanguage();
+  const [form, setForm] = useState<ProductForm>(initialForm);
+  const [fieldErrors, setFieldErrors] = useState<RequiredFieldErrors>({});
+  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [lookupBusy, setLookupBusy] = useState(false);
-  const [lookupResult, setLookupResult] = useState<BarcodeLookup | null>(null);
+  const [lookupMessage, setLookupMessage] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [error, setError] = useState("");
+  const submittingRef = useRef(false);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const copy = language === "de" ? deCopy : enCopy;
 
-  function updateField(field: keyof PassportForm, value: string) {
+  function updateField(field: keyof ProductForm, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
+    if (field === "name" || field === "category") {
+      setFieldErrors((current) => ({ ...current, [field]: undefined }));
+    }
   }
 
-  async function createItem(event: FormEvent) {
+  async function createItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form.name.trim()) return;
+    if (submittingRef.current) return;
+
+    const nextErrors: RequiredFieldErrors = {};
+    if (!form.name.trim()) nextErrors.name = copy.nameRequired;
+    if (!form.category) nextErrors.category = copy.categoryRequired;
+    if (Object.keys(nextErrors).length) {
+      setFieldErrors(nextErrors);
+      if (nextErrors.name) nameInputRef.current?.focus();
+      return;
+    }
+
+    submittingRef.current = true;
     setBusy(true);
     setError("");
     try {
+      const category = categories.find((entry) => entry.value === form.category);
       const item = await api<Item>("/api/items", {
         method: "POST",
         body: JSON.stringify({
           name: form.name.trim(),
-          category: form.category.trim() || "Sonstiges",
+          category: form.category,
+          itemType: category?.itemType ?? "THING",
           manufacturer: nullable(form.manufacturer),
           model: nullable(form.model),
           serialNumber: nullable(form.serialNumber),
@@ -94,342 +104,279 @@ export function CaptureItem() {
           purchaseDate: nullable(form.purchaseDate),
           merchant: nullable(form.merchant),
           price: form.price ? Number(form.price) : null,
-          warrantyUntil: nullable(form.warrantyUntil),
-          imageUrl: nullable(form.imageUrl),
-          location: nullable(form.location),
-          manualUrl: nullable(form.manualUrl),
-          driverUrl: nullable(form.driverUrl),
-          softwareUrl: nullable(form.softwareUrl),
-          supportUrl: nullable(form.supportUrl),
-          supportContact: nullable(form.supportContact),
-          itemType: form.itemType,
           currency: "EUR",
-          visibility: "HOUSEHOLD"
+          warrantyUntil: nullable(form.warrantyUntil),
+          location: nullable(form.location),
+          notes: nullable(form.notes),
+          visibility: "PRIVATE"
         })
       });
-      navigate(`/app/dinge/${item.id}`, { state: { justCreated: true } });
+      navigate(`/app/capture/item/success/${item.id}`, {
+        replace: true,
+        state: { onboarding: searchParams.get("onboarding") === "1" }
+      });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Der Produktpass konnte nicht erstellt werden.");
+      submittingRef.current = false;
+      setError(friendlySaveError(caught, language));
     } finally {
       setBusy(false);
     }
   }
 
-  const lookupBarcode = useCallback(async (barcodeValue = form.barcode) => {
-    const value = barcodeValue.trim();
-    if (!value) return;
+  async function lookupBarcode() {
+    const code = form.barcode.trim();
+    if (code.length < 4 || lookupBusy) {
+      setLookupMessage(copy.barcodeTooShort);
+      return;
+    }
+
     setLookupBusy(true);
-    setLookupResult(null);
-    setError("");
+    setLookupMessage("");
     try {
-      const result = await api<BarcodeLookup>(`/api/items/lookup/barcode?code=${encodeURIComponent(value)}`);
-      setLookupResult(result);
-      if (result.item) {
-        setForm((current) => ({ ...current, barcode: result.barcode, barcodeFormat: result.barcodeFormat }));
+      const result = await api<BarcodeLookup>(`/api/items/lookup/barcode?code=${encodeURIComponent(code)}`);
+      const source = result.item ?? result.product;
+      if (!source) {
+        setLookupMessage(copy.barcodeNotFound);
         return;
       }
-      if (result.product) {
-        setForm((current) => ({
-          ...current,
-          barcode: result.barcode,
-          barcodeFormat: result.barcodeFormat,
-          name: result.product?.name || current.name,
-          category: result.product?.category || current.category,
-          manufacturer: result.product?.manufacturer || current.manufacturer,
-          model: result.product?.model || current.model,
-          imageUrl: result.product?.imageUrl || current.imageUrl
-        }));
-      } else {
-        setForm((current) => ({ ...current, barcode: result.barcode, barcodeFormat: result.barcodeFormat }));
-      }
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Die Barcode-Suche ist fehlgeschlagen.");
+      setForm((current) => ({
+        ...current,
+        name: current.name || source.name || "",
+        category: current.category,
+        manufacturer: current.manufacturer || source.manufacturer || "",
+        model: current.model || source.model || "",
+        barcode: result.barcode || current.barcode,
+        barcodeFormat: result.barcodeFormat || current.barcodeFormat
+      }));
+      setLookupMessage(copy.barcodeFound);
+    } catch {
+      setLookupMessage(copy.barcodeLookupFailed);
     } finally {
       setLookupBusy(false);
     }
-  }, [form.barcode]);
+  }
 
-  const handleBarcodeDetected = useCallback(
-    (value: string) => {
-      setScannerOpen(false);
-      const productId = parseAvarenoProductQr(value);
-      if (productId) {
-        navigate(`/app/dinge/${productId}`);
-        return;
-      }
-      setForm((current) => ({ ...current, barcode: value }));
-      void lookupBarcode(value);
-    },
-    [lookupBarcode, navigate]
-  );
+  const handleDetected = useCallback((value: string) => {
+    setForm((current) => ({ ...current, barcode: value }));
+    setLookupMessage("");
+    setScannerOpen(false);
+  }, []);
 
   return (
-    <form className="capture-item-page mx-auto max-w-6xl space-y-5" onSubmit={createItem}>
-      <BarcodeScannerDialog onClose={() => setScannerOpen(false)} onDetected={handleBarcodeDetected} open={scannerOpen} />
-
-      <section className="overflow-hidden rounded-lg border border-line av-surface">
-        <div className="grid gap-5 bg-[#101111] p-5 text-white md:grid-cols-[minmax(0,1fr)_18rem] md:p-7">
-          <div>
-            <p className="text-xs font-bold uppercase text-white/50">Produktpass</p>
-            <h1 className="mt-3 max-w-3xl text-[clamp(2.6rem,7vw,5.8rem)] font-semibold leading-[0.94]">Ein Objekt sauber merken</h1>
-            <p className="mt-5 max-w-xl text-base font-semibold leading-7 text-white/62">
-              Fang mit dem an, was du gerade weißt. Barcode scannen oder einfügen, den Rest kannst du später in Ruhe ergänzen.
-            </p>
-          </div>
-          <div className="grid content-end gap-3">
-            <PassportSignal icon={<Tag size={17} />} label="Identität" value={form.name || "Noch ohne Namen"} />
-            <PassportSignal icon={<ScanBarcode size={17} />} label="Barcode" value={form.barcode || "Optional"} />
-            <PassportSignal icon={<ShieldCheck size={17} />} label="Garantie" value={form.warrantyUntil || "Später"} />
-            <PassportSignal icon={<LifeBuoy size={17} />} label="Support" value={form.supportContact || form.supportUrl || "Später"} />
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="space-y-5">
-          <PassportSection icon={<PackagePlus size={19} />} eyebrow="Das Wichtigste" title="Identität" helper="Nur der Name ist nötig. Ein Barcode-Scan füllt Hersteller und Modell automatisch aus.">
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-                  <Field label="Barcode / GTIN" value={form.barcode} onChange={(value) => updateField("barcode", value)} placeholder="EAN, UPC oder GTIN" inputMode="numeric" />
-                  <button
-                    className="mt-7 inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-line av-surface px-4 text-sm font-bold text-ink transition hover:border-leaf hover:text-leaf"
-                    data-testid="barcode-scan-open"
-                    onClick={() => setScannerOpen(true)}
-                    type="button"
-                  >
-                    <Camera size={17} />
-                    Scannen
-                  </button>
-                  <button
-                    className="mt-7 inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-ink px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                    data-testid="barcode-lookup"
-                    disabled={!form.barcode.trim() || lookupBusy}
-                    onClick={() => void lookupBarcode()}
-                    type="button"
-                  >
-                    <ScanBarcode size={17} />
-                    {lookupBusy ? "Wird gesucht..." : "Suchen"}
-                  </button>
-                </div>
-                {lookupResult ? (
-                  <div className="mt-2 rounded-lg border border-line av-surface-soft p-3 text-sm font-semibold text-muted">
-                    {lookupResult.item ? (
-                      <span>
-                        Schon gespeichert als <strong className="text-ink">{lookupResult.item.name}</strong>.
-                        <button className="ml-2 font-black text-leaf" onClick={() => navigate(`/app/dinge/${lookupResult.item?.id}`)} type="button">
-                          Öffnen
-                        </button>
-                      </span>
-                    ) : lookupResult.product ? (
-                      <span>
-                        Gefunden über <strong className="text-ink">{lookupResult.product.sourceName}</strong>. Die Felder wurden vorbereitet.
-                      </span>
-                    ) : (
-                      <span>Noch kein öffentlicher Produkttreffer. Der Barcode wird trotzdem lokal am Objekt gespeichert.</span>
-                    )}
-                  </div>
-                ) : null}
-              </div>
-              <Field label="Name" value={form.name} onChange={(value) => updateField("name", value)} placeholder="LG OLED C3 Wohnzimmer" required />
-              <SelectField label="Art" value={form.itemType} onChange={(value) => updateField("itemType", value)} options={itemTypes} />
-              <Field label="Kategorie" value={form.category} onChange={(value) => updateField("category", value)} placeholder="TV, Airfryer, Router" />
-              <Field label="Hersteller" value={form.manufacturer} onChange={(value) => updateField("manufacturer", value)} placeholder="LG" />
-              <Field label="Modell" value={form.model} onChange={(value) => updateField("model", value)} placeholder="OLED65C3" />
-              <Field label="Seriennummer" value={form.serialNumber} onChange={(value) => updateField("serialNumber", value)} placeholder="SN-..." />
-              <Field label="Ort" value={form.location} onChange={(value) => updateField("location", value)} placeholder="Wohnzimmer, Keller, Büro" />
-            </div>
-          </PassportSection>
-
-          <PassportSection icon={<ReceiptText size={19} />} eyebrow="Optional" title="Kauf & Garantie" helper="Hilft später bei Garantie, Rückgabe und Support — kannst du auch jederzeit nachtragen.">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Händler" value={form.merchant} onChange={(value) => updateField("merchant", value)} placeholder="MediaMarkt" />
-              <Field label="Preis" value={form.price} onChange={(value) => updateField("price", value)} placeholder="1499" inputMode="decimal" />
-              <DateField label="Kaufdatum" value={form.purchaseDate} onChange={(value) => updateField("purchaseDate", value)} />
-              <DateField label="Garantie bis" value={form.warrantyUntil} onChange={(value) => updateField("warrantyUntil", value)} />
-            </div>
-          </PassportSection>
-
-          <PassportSection collapsible icon={<BookOpen size={19} />} eyebrow="Optional" title="Handbuch & Support" helper="Handbuch, Treiber und Support direkt verbinden. Zum Aufklappen tippen.">
-
-            <div className="grid gap-3">
-              <Field label="Handbuch-URL" value={form.manualUrl} onChange={(value) => updateField("manualUrl", value)} placeholder="https://brand.com/manual" />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Treiber-URL" value={form.driverUrl} onChange={(value) => updateField("driverUrl", value)} placeholder="https://brand.com/drivers" />
-                <Field label="Software URL" value={form.softwareUrl} onChange={(value) => updateField("softwareUrl", value)} placeholder="https://brand.com/software" />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Support-URL" value={form.supportUrl} onChange={(value) => updateField("supportUrl", value)} placeholder="https://brand.com/support" />
-                <Field label="Support-Kontakt" value={form.supportContact} onChange={(value) => updateField("supportContact", value)} placeholder="LG Support" />
-              </div>
-            </div>
-          </PassportSection>
+    <main className="activation-page">
+      <section className="activation-panel" aria-labelledby="capture-item-title">
+        <div className="activation-heading">
+          <p className="activation-eyebrow">{copy.eyebrow}</p>
+          <h1 id="capture-item-title">{copy.title}</h1>
+          <p>{copy.intro}</p>
         </div>
 
-        <aside className="space-y-5 lg:sticky lg:top-28 lg:self-start">
-          <section className="rounded-lg border border-line av-surface p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-black uppercase text-muted">Bereit zum Speichern</p>
-                <h2 className="mt-1 text-2xl font-black text-ink">{form.name || "Neuer Produktpass"}</h2>
+        <form className="activation-form" onSubmit={createItem} noValidate>
+          <label className="activation-field" htmlFor="product-name">
+            <span>{copy.nameLabel}</span>
+            <input
+              ref={nameInputRef}
+              autoComplete="off"
+              autoFocus
+              id="product-name"
+              maxLength={160}
+              value={form.name}
+              onChange={(event) => updateField("name", event.target.value)}
+              aria-invalid={Boolean(fieldErrors.name)}
+              aria-describedby={fieldErrors.name ? "product-name-error" : undefined}
+              placeholder={copy.namePlaceholder}
+            />
+            {fieldErrors.name ? <small className="activation-field-error" id="product-name-error">{fieldErrors.name}</small> : null}
+          </label>
+
+          <label className="activation-field" htmlFor="product-category">
+            <span>{copy.categoryLabel}</span>
+            <select
+              id="product-category"
+              value={form.category}
+              onChange={(event) => updateField("category", event.target.value)}
+              aria-invalid={Boolean(fieldErrors.category)}
+              aria-describedby={fieldErrors.category ? "product-category-error" : undefined}
+            >
+              <option value="">{copy.categoryPlaceholder}</option>
+              {categories.map((category) => (
+                <option key={category.value} value={category.value}>
+                  {language === "de" ? category.de : category.en}
+                </option>
+              ))}
+            </select>
+            {fieldErrors.category ? <small className="activation-field-error" id="product-category-error">{fieldErrors.category}</small> : null}
+          </label>
+
+          <details className="activation-optional">
+            <summary>
+              <span>{copy.optionalTitle}</span>
+              <ChevronDown aria-hidden="true" size={18} />
+            </summary>
+            <p>{copy.optionalIntro}</p>
+
+            <div className="activation-optional-grid">
+              <OptionalField label={copy.manufacturerLabel}>
+                <input value={form.manufacturer} onChange={(event) => updateField("manufacturer", event.target.value)} autoComplete="organization" />
+              </OptionalField>
+              <OptionalField label={copy.modelLabel}>
+                <input value={form.model} onChange={(event) => updateField("model", event.target.value)} />
+              </OptionalField>
+              <OptionalField label={copy.serialLabel}>
+                <input value={form.serialNumber} onChange={(event) => updateField("serialNumber", event.target.value)} />
+              </OptionalField>
+              <OptionalField label={copy.purchaseDateLabel}>
+                <input type="date" value={form.purchaseDate} onChange={(event) => updateField("purchaseDate", event.target.value)} />
+              </OptionalField>
+              <OptionalField label={copy.merchantLabel}>
+                <input value={form.merchant} onChange={(event) => updateField("merchant", event.target.value)} />
+              </OptionalField>
+              <OptionalField label={copy.priceLabel}>
+                <input min="0" inputMode="decimal" step="0.01" type="number" value={form.price} onChange={(event) => updateField("price", event.target.value)} />
+              </OptionalField>
+              <OptionalField label={copy.warrantyLabel}>
+                <input type="date" value={form.warrantyUntil} onChange={(event) => updateField("warrantyUntil", event.target.value)} />
+              </OptionalField>
+              <OptionalField label={copy.locationLabel}>
+                <input value={form.location} onChange={(event) => updateField("location", event.target.value)} />
+              </OptionalField>
+            </div>
+
+            <div className="activation-barcode">
+              <OptionalField label={copy.barcodeLabel}>
+                <input
+                  inputMode="numeric"
+                  value={form.barcode}
+                  onChange={(event) => {
+                    updateField("barcode", event.target.value);
+                    setLookupMessage("");
+                  }}
+                />
+              </OptionalField>
+              <div className="activation-barcode-actions">
+                <Button type="button" variant="secondary" onClick={() => setScannerOpen(true)} icon={<ScanBarcode size={17} />}>
+                  {copy.scanBarcode}
+                </Button>
+                <Button type="button" variant="ghost" onClick={lookupBarcode} disabled={lookupBusy}>
+                  {lookupBusy ? copy.lookupBusy : copy.lookupBarcode}
+                </Button>
               </div>
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-leaf/10 text-leaf">
-                <ShieldCheck size={19} />
-              </span>
+              <small>{copy.barcodePrivacy}</small>
+              {lookupMessage ? <p className="activation-inline-message" role="status">{lookupMessage}</p> : null}
             </div>
-            <div className="mt-5 grid gap-2">
-              <PreviewLine label="Identität" ready={Boolean(form.name.trim())} />
-              <PreviewLine label="Barcode" ready={Boolean(form.barcode.trim())} />
-              <PreviewLine label="Garantie" ready={Boolean(form.warrantyUntil)} />
-              <PreviewLine label="Seriennummer" ready={Boolean(form.serialNumber.trim())} />
-              <PreviewLine label="Handbuch" ready={Boolean(form.manualUrl.trim())} />
-              <PreviewLine label="Support" ready={Boolean(form.supportUrl.trim() || form.supportContact.trim())} />
-            </div>
-            {error ? <p className="mt-4 rounded-lg bg-ember/10 p-3 text-sm font-black text-ember">{error}</p> : null}
-            <Button className="mt-5 w-full" disabled={!form.name.trim() || busy} icon={<ArrowRight size={18} />} type="submit">
-              {busy ? "Wird erstellt..." : "Produktpass erstellen"}
+
+            <OptionalField label={copy.notesLabel}>
+              <textarea rows={4} value={form.notes} onChange={(event) => updateField("notes", event.target.value)} />
+            </OptionalField>
+          </details>
+
+          {error ? <div className="activation-error" role="alert">{error}</div> : null}
+
+          <div className="activation-submit">
+            <Button type="submit" disabled={busy}>
+              {busy ? copy.saving : copy.save}
             </Button>
-          </section>
-        </aside>
+            <p>{copy.laterHint}</p>
+          </div>
+        </form>
       </section>
-    </form>
+
+      <BarcodeScannerDialog open={scannerOpen} onClose={() => setScannerOpen(false)} onDetected={handleDetected} />
+    </main>
+  );
+}
+
+function OptionalField({ children, label }: { children: React.ReactNode; label: string }) {
+  return (
+    <label className="activation-field">
+      <span>{label}</span>
+      {children}
+    </label>
   );
 }
 
 function nullable(value: string) {
-  return value.trim() || null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
 }
 
-function PassportSection({
-  children,
-  eyebrow,
-  icon,
-  title,
-  helper,
-  collapsible = false
-}: {
-  children: ReactNode;
-  eyebrow: string;
-  icon: ReactNode;
-  title: string;
-  helper?: string;
-  collapsible?: boolean;
-}) {
-  const [open, setOpen] = useState(!collapsible);
-  const bodyId = `passport-section-${title.replace(/\s+/g, "-").toLowerCase()}`;
-
-  const heading = (
-    <div className="flex w-full items-start justify-between gap-3 text-left">
-      <div>
-        <p className="text-xs font-black uppercase text-muted">{eyebrow}</p>
-        <h2 className="mt-1 text-2xl font-black text-ink">{title}</h2>
-        {helper ? <p className="mt-1 text-sm font-semibold leading-6 text-muted">{helper}</p> : null}
-      </div>
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-leaf/10 text-leaf">
-        {collapsible ? <ChevronDown className={`transition-transform ${open ? "rotate-180" : ""}`} size={19} /> : icon}
-      </span>
-    </div>
-  );
-
-  return (
-    <section className="rounded-lg border border-line av-surface p-4 md:p-5">
-      {collapsible ? (
-        <button aria-controls={bodyId} aria-expanded={open} className={open ? "mb-5 w-full" : "w-full"} onClick={() => setOpen((value) => !value)} type="button">
-          {heading}
-        </button>
-      ) : (
-        <div className="mb-5">{heading}</div>
-      )}
-      {open ? <div id={bodyId}>{children}</div> : null}
-    </section>
-  );
+function friendlySaveError(caught: unknown, language: "de" | "en") {
+  if (caught instanceof TypeError) {
+    return language === "de"
+      ? "Die Verbindung ist fehlgeschlagen. Prüfe deine Internetverbindung und versuche es erneut."
+      : "The connection failed. Check your internet connection and try again.";
+  }
+  return language === "de"
+    ? "Das Produkt konnte nicht gespeichert werden. Deine Eingaben bleiben erhalten – versuche es bitte erneut."
+    : "The product could not be saved. Your entries are still here—please try again.";
 }
 
-function Field({
-  inputMode,
-  label,
-  onChange,
-  placeholder,
-  required,
-  value
-}: {
-  inputMode?: "decimal" | "numeric" | "text";
-  label: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  required?: boolean;
-  value: string;
-}) {
-  return (
-    <label className="block text-sm font-bold text-ink">
-      {label}
-      <input
-        className="mt-2 w-full rounded-lg border border-line av-surface-soft p-3 text-sm font-semibold outline-none focus:border-leaf"
-        inputMode={inputMode}
-        onChange={(event) => onChange(event.target.value)}
-        onInput={(event) => onChange(event.currentTarget.value)}
-        placeholder={placeholder}
-        required={required}
-        value={value}
-      />
-    </label>
-  );
-}
+const deCopy = {
+  eyebrow: "Erstes Produkt",
+  title: "Lege deine erste Produktakte an.",
+  intro: "Für den Start reichen Name und Kategorie. Rechnung, Garantie und weitere Angaben kannst du danach ergänzen.",
+  nameLabel: "Produktname",
+  namePlaceholder: "z. B. Bosch Akkuschrauber",
+  categoryLabel: "Kategorie",
+  categoryPlaceholder: "Kategorie auswählen",
+  nameRequired: "Bitte gib einen Produktnamen ein.",
+  categoryRequired: "Bitte wähle eine Kategorie aus.",
+  optionalTitle: "Weitere Angaben hinzufügen",
+  optionalIntro: "Alle folgenden Angaben sind freiwillig und können später geändert werden.",
+  manufacturerLabel: "Hersteller",
+  modelLabel: "Modell",
+  serialLabel: "Seriennummer",
+  purchaseDateLabel: "Kaufdatum",
+  merchantLabel: "Händler",
+  priceLabel: "Preis in EUR",
+  warrantyLabel: "Garantie bis",
+  locationLabel: "Aufbewahrungsort",
+  barcodeLabel: "Barcode / GTIN",
+  notesLabel: "Notiz",
+  scanBarcode: "Barcode scannen",
+  lookupBarcode: "Produktdaten suchen",
+  lookupBusy: "Suche läuft …",
+  barcodePrivacy: "Nur wenn du „Produktdaten suchen“ wählst, kann der Code an einen Produktkatalog gesendet werden.",
+  barcodeTooShort: "Gib mindestens vier Zeichen ein.",
+  barcodeNotFound: "Keine Produktdaten gefunden. Der Barcode bleibt trotzdem gespeichert.",
+  barcodeFound: "Verfügbare Produktdaten wurden ergänzt. Bitte prüfe sie.",
+  barcodeLookupFailed: "Die Suche ist gerade nicht verfügbar. Du kannst das Produkt trotzdem speichern.",
+  save: "Produkt speichern",
+  saving: "Produkt wird gespeichert …",
+  laterHint: "Du kannst fehlende Angaben später ergänzen."
+};
 
-function SelectField({ label, onChange, options, value }: { label: string; onChange: (value: string) => void; options: { value: string; label: string }[]; value: string }) {
-  return (
-    <label className="block text-sm font-bold text-ink">
-      {label}
-      <select
-        className="mt-2 w-full rounded-lg border border-line av-surface-soft p-3 text-sm font-semibold outline-none focus:border-leaf"
-        onChange={(event) => onChange(event.target.value)}
-        value={value}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function DateField({ label, onChange, value }: { label: string; onChange: (value: string) => void; value: string }) {
-  return (
-    <label className="block text-sm font-bold text-ink">
-      {label}
-      <input
-        className="mt-2 w-full rounded-lg border border-line av-surface-soft p-3 text-sm font-semibold outline-none focus:border-leaf"
-        onChange={(event) => onChange(event.target.value)}
-        onInput={(event) => onChange(event.currentTarget.value)}
-        type="date"
-        value={value}
-      />
-    </label>
-  );
-}
-
-function PassportSignal({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
-  return (
-    <div className="flex min-h-16 items-center gap-3 rounded-lg border border-white/10 bg-white/10 p-3">
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md av-surface text-ink">{icon}</span>
-      <span className="min-w-0">
-        <span className="block text-xs font-black uppercase text-white/50">{label}</span>
-        <span className="mt-1 block truncate text-sm font-black text-white">{value}</span>
-      </span>
-    </div>
-  );
-}
-
-function PreviewLine({ label, ready }: { label: string; ready: boolean }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-line av-surface-soft px-3 py-2">
-      <span className="text-sm font-black text-ink">{label}</span>
-      <span className={`rounded-full px-2.5 py-1 text-xs font-black ${ready ? "bg-leaf/10 text-leaf" : "bg-amber/10 text-amber"}`}>
-        {ready ? "gespeichert" : "später"}
-      </span>
-    </div>
-  );
-}
+const enCopy: typeof deCopy = {
+  eyebrow: "First product",
+  title: "Create your first product record.",
+  intro: "A name and category are enough to start. You can add receipts, warranty details and more afterwards.",
+  nameLabel: "Product name",
+  namePlaceholder: "e.g. Bosch cordless drill",
+  categoryLabel: "Category",
+  categoryPlaceholder: "Select a category",
+  nameRequired: "Enter a product name.",
+  categoryRequired: "Select a category.",
+  optionalTitle: "Add more details",
+  optionalIntro: "Everything below is optional and can be changed later.",
+  manufacturerLabel: "Manufacturer",
+  modelLabel: "Model",
+  serialLabel: "Serial number",
+  purchaseDateLabel: "Purchase date",
+  merchantLabel: "Merchant",
+  priceLabel: "Price in EUR",
+  warrantyLabel: "Warranty until",
+  locationLabel: "Storage location",
+  barcodeLabel: "Barcode / GTIN",
+  notesLabel: "Note",
+  scanBarcode: "Scan barcode",
+  lookupBarcode: "Look up product data",
+  lookupBusy: "Looking up …",
+  barcodePrivacy: "Only when you choose “Look up product data” may the code be sent to a product catalogue.",
+  barcodeTooShort: "Enter at least four characters.",
+  barcodeNotFound: "No product data found. The barcode can still be saved.",
+  barcodeFound: "Available product data was added. Please review it.",
+  barcodeLookupFailed: "Lookup is unavailable right now. You can still save the product.",
+  save: "Save product",
+  saving: "Saving product …",
+  laterHint: "You can add missing details later."
+};

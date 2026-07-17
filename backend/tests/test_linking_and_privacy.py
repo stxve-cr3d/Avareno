@@ -23,7 +23,7 @@ def _insert_device(name: str = "HA Testlicht") -> str:
 
 
 def test_link_unlink_preserves_object_and_device(client):
-    item_id = client.post("/api/items", json={"name": "Link Testobjekt"}).json()["id"]
+    item_id = client.post("/api/items", json={"name": "Link Testobjekt", "category": "Sonstiges"}).json()["id"]
     device_id = _insert_device()
 
     linked = client.patch(f"/api/smart-home/devices/{device_id}/link", json={"itemId": item_id})
@@ -47,7 +47,7 @@ def test_link_rejects_foreign_or_missing_item(client):
 
 
 def test_link_suggestions_are_suggestions_only(client):
-    client.post("/api/items", json={"name": "Philips Lampe Flur", "itemType": "ELECTRONIC"})
+    client.post("/api/items", json={"name": "Philips Lampe Flur", "category": "Elektronik", "itemType": "ELECTRONIC"})
     device_id = _insert_device("Philips Lampe Flur")
     suggestions = client.get(f"/api/smart-home/devices/{device_id}/link-suggestions")
     assert suggestions.status_code == 200
@@ -65,7 +65,7 @@ def test_suggestions_for_unknown_device_404(client):
 
 
 def test_privacy_export_contains_user_data_no_secrets(client):
-    client.post("/api/items", json={"name": "Export Testobjekt"})
+    client.post("/api/items", json={"name": "Export Testobjekt", "category": "Sonstiges"})
     export = client.post("/api/privacy/export/request")
     assert export.status_code == 200, export.text
     text = export.text
@@ -74,8 +74,8 @@ def test_privacy_export_contains_user_data_no_secrets(client):
     assert "test-signing-secret" not in text
 
 
-def test_deletion_request_is_recorded_not_executed(client):
+def test_account_deletion_rejects_anonymous_requests(client):
     response = client.post("/api/privacy/deletion/request")
-    assert response.status_code in (200, 202)
-    # Data still present afterwards - deletion is request-only in the beta.
+    assert response.status_code == 401
+    # An unauthenticated request must not delete the local development user.
     assert client.get("/api/items").status_code == 200

@@ -1,5 +1,13 @@
 # AI Data Handling
 
+## Invite-only beta state
+
+Receipt Extraction, OCR and automatic document analysis are disabled by
+server-authoritative feature flags. The Receipt endpoint rejects before any
+database lookup, Storage read, quota consumption, background job or provider
+call. Uploads are never auto-processed or preview-generated. Do not configure
+an AI/OCR provider credential for this beta.
+
 Avareno may use AI-assisted extraction for Memory Build, receipts, warranties, products, documents, and support context. This document defines privacy and security rules for AI features.
 
 ## Core Rules

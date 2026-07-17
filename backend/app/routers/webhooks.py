@@ -4,6 +4,7 @@ import json
 
 from fastapi import APIRouter, HTTPException, Request
 
+from app.config import beta_features, require_beta_feature
 from app.db import db
 from app.services.billing import (
     ACTIVE_PROVIDER,
@@ -21,6 +22,7 @@ router = APIRouter()
 
 @router.post("/stripe")
 async def stripe_webhook(request: Request) -> dict:
+    require_beta_feature(beta_features().billing, detail="Billing is disabled for the private beta.")
     raw_body = await request.body()
     try:
         verify_stripe_signature(request.headers.get("Stripe-Signature"), raw_body)
@@ -49,4 +51,3 @@ async def stripe_webhook(request: Request) -> dict:
             if "event_record_id" in locals():
                 mark_event_processed(conn, event_record_id, "FAILED", str(exc))
             raise HTTPException(status_code=422, detail="Webhook could not be processed safely") from exc
-

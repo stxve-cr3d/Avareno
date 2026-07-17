@@ -26,7 +26,12 @@ def dashboard() -> dict:
         )
         for loop in loops:
             loop["item"] = (
-                row_to_dict(conn.execute('SELECT * FROM "Item" WHERE id = ?', (loop["itemId"],)).fetchone())
+                row_to_dict(
+                    conn.execute(
+                        'SELECT * FROM "Item" WHERE id = ? AND userId = ?',
+                        (loop["itemId"], user["id"]),
+                    ).fetchone()
+                )
                 if loop.get("itemId")
                 else None
             )
@@ -39,12 +44,22 @@ def dashboard() -> dict:
         )
         for reminder in reminders:
             reminder["item"] = (
-                row_to_dict(conn.execute('SELECT * FROM "Item" WHERE id = ?', (reminder["itemId"],)).fetchone())
+                row_to_dict(
+                    conn.execute(
+                        'SELECT * FROM "Item" WHERE id = ? AND userId = ?',
+                        (reminder["itemId"], user["id"]),
+                    ).fetchone()
+                )
                 if reminder.get("itemId")
                 else None
             )
             reminder["loop"] = (
-                row_to_dict(conn.execute('SELECT * FROM "Loop" WHERE id = ?', (reminder["loopId"],)).fetchone())
+                row_to_dict(
+                    conn.execute(
+                        'SELECT * FROM "Loop" WHERE id = ? AND userId = ?',
+                        (reminder["loopId"], user["id"]),
+                    ).fetchone()
+                )
                 if reminder.get("loopId")
                 else None
             )
@@ -54,7 +69,12 @@ def dashboard() -> dict:
         )
         incomplete_items = []
         for item in items:
-            documents = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ? AND vaultId IS NULL', (item["id"],)).fetchall())
+            documents = rows_to_dicts(
+                conn.execute(
+                    'SELECT * FROM "Document" WHERE itemId = ? AND userId = ? AND vaultId IS NULL',
+                    (item["id"], user["id"]),
+                ).fetchall()
+            )
             item["documents"] = documents
             item["missingFields"] = missing_fields(item, documents)
             if int(item["completenessScore"]) < 100:

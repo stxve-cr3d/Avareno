@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from app.db import db, row_to_dict, rows_to_dicts
 from app.dependencies import get_default_user
 from app.schemas import ItemCreate, ItemPatch, RepairLogCreate
+from app.services.authorization import require_owned_document, require_owned_household, require_owned_space
 from app.services.barcode_lookup import barcode_format, lookup_barcode, normalize_barcode
 from app.services.entitlements import PlanLimitExceeded, require_item_capacity
 from app.services.item_service import calculate_completeness_score, missing_fields
@@ -20,36 +21,73 @@ from app.utils import make_id, normalize_iso, now_iso, parse_iso
 router = APIRouter()
 
 
-def _documents(conn, item_id: str) -> list[dict]:
-    return rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ? AND vaultId IS NULL', (item_id,)).fetchall())
+def _documents(conn, item_id: str, user_id: str) -> list[dict]:
+    return rows_to_dicts(
+        conn.execute(
+            'SELECT * FROM "Document" WHERE itemId = ? AND userId = ? AND vaultId IS NULL',
+            (item_id, user_id),
+        ).fetchall()
+    )
 
 
-def _loops(conn, item_id: str) -> list[dict]:
-    return rows_to_dicts(conn.execute('SELECT * FROM "Loop" WHERE itemId = ? ORDER BY dueDate ASC', (item_id,)).fetchall())
+def _loops(conn, item_id: str, user_id: str) -> list[dict]:
+    return rows_to_dicts(
+        conn.execute(
+            'SELECT * FROM "Loop" WHERE itemId = ? AND userId = ? ORDER BY dueDate ASC',
+            (item_id, user_id),
+        ).fetchall()
+    )
 
 
-def _reminders(conn, item_id: str) -> list[dict]:
-    return rows_to_dicts(conn.execute('SELECT * FROM "Reminder" WHERE itemId = ? ORDER BY remindAt ASC', (item_id,)).fetchall())
+def _reminders(conn, item_id: str, user_id: str) -> list[dict]:
+    return rows_to_dicts(
+        conn.execute(
+            'SELECT * FROM "Reminder" WHERE itemId = ? AND userId = ? ORDER BY remindAt ASC',
+            (item_id, user_id),
+        ).fetchall()
+    )
 
 
-def _space(conn, space_id: str | None) -> dict | None:
+def _space(conn, space_id: str | None, user_id: str) -> dict | None:
     if not space_id:
         return None
-    return row_to_dict(conn.execute('SELECT * FROM "Space" WHERE id = ?', (space_id,)).fetchone())
+    return row_to_dict(
+        conn.execute(
+            '''SELECT s.* FROM "Space" s
+               JOIN "Household" h ON h.id = s.householdId
+               WHERE s.id = ? AND h.userId = ?''',
+            (space_id, user_id),
+        ).fetchone()
+    )
 
 
-def _household(conn, household_id: str | None) -> dict | None:
+def _household(conn, household_id: str | None, user_id: str) -> dict | None:
     if not household_id:
         return None
-    return row_to_dict(conn.execute('SELECT * FROM "Household" WHERE id = ?', (household_id,)).fetchone())
+    return row_to_dict(
+        conn.execute(
+            'SELECT * FROM "Household" WHERE id = ? AND userId = ?',
+            (household_id, user_id),
+        ).fetchone()
+    )
 
 
-def _activities(conn, item_id: str) -> list[dict]:
-    return rows_to_dicts(conn.execute('SELECT * FROM "ItemActivity" WHERE itemId = ? ORDER BY createdAt DESC', (item_id,)).fetchall())
+def _activities(conn, item_id: str, user_id: str) -> list[dict]:
+    return rows_to_dicts(
+        conn.execute(
+            'SELECT * FROM "ItemActivity" WHERE itemId = ? AND userId = ? ORDER BY createdAt DESC',
+            (item_id, user_id),
+        ).fetchall()
+    )
 
 
-def _repair_logs(conn, item_id: str) -> list[dict]:
-    return rows_to_dicts(conn.execute('SELECT * FROM "RepairLog" WHERE itemId = ? ORDER BY date DESC, createdAt DESC', (item_id,)).fetchall())
+def _repair_logs(conn, item_id: str, user_id: str) -> list[dict]:
+    return rows_to_dicts(
+        conn.execute(
+            'SELECT * FROM "RepairLog" WHERE itemId = ? AND userId = ? ORDER BY date DESC, createdAt DESC',
+            (item_id, user_id),
+        ).fetchall()
+    )
 
 
 def _has_document(documents: list[dict], document_type: str) -> bool:
@@ -74,13 +112,13 @@ def _document_attachments(documents: list[dict]) -> list[dict]:
     return attachments
 
 
-def _smart_home_devices(conn, item_id: str) -> list[dict]:
+def _smart_home_devices(conn, item_id: str, user_id: str) -> list[dict]:
     devices = rows_to_dicts(
         conn.execute(
             """SELECT * FROM "SmartHomeDevice"
-               WHERE itemId = ?
+               WHERE itemId = ? AND userId = ?
                ORDER BY provider ASC, name ASC""",
-            (item_id,),
+            (item_id, user_id),
         ).fetchall()
     )
     for device in devices:
@@ -108,9 +146,20 @@ def _default_household_id(conn, user_id: str) -> str | None:
     return household["id"] if household else None
 
 
-def _resolve_space_id(conn, household_id: str | None, location: str | None, requested_space_id: str | None = None) -> str | None:
+def _resolve_space_id(
+    conn,
+    user_id: str,
+    household_id: str | None,
+    location: str | None,
+    requested_space_id: str | None = None,
+) -> str | None:
     if requested_space_id:
-        return requested_space_id
+        return require_owned_space(
+            conn,
+            user_id,
+            requested_space_id,
+            household_id=household_id,
+        )["id"]
     if not household_id:
         return None
     if location:
@@ -131,19 +180,24 @@ def _resolve_space_id(conn, household_id: str | None, location: str | None, requ
     return space["id"] if space else None
 
 
-def _item_detail(conn, item_id: str) -> dict | None:
-    item = row_to_dict(conn.execute('SELECT * FROM "Item" WHERE id = ?', (item_id,)).fetchone())
+def _item_detail(conn, item_id: str, user_id: str) -> dict | None:
+    item = row_to_dict(
+        conn.execute(
+            'SELECT * FROM "Item" WHERE id = ? AND userId = ?',
+            (item_id, user_id),
+        ).fetchone()
+    )
     if not item:
         return None
-    documents = _documents(conn, item_id)
+    documents = _documents(conn, item_id, user_id)
     item["documents"] = documents
-    item["loops"] = _loops(conn, item_id)
-    item["reminders"] = _reminders(conn, item_id)
-    item["space"] = _space(conn, item.get("spaceId"))
-    item["household"] = _household(conn, item.get("householdId"))
-    item["activities"] = _activities(conn, item_id)
-    item["repairLogs"] = _repair_logs(conn, item_id)
-    item["smartHomeDevices"] = _smart_home_devices(conn, item_id)
+    item["loops"] = _loops(conn, item_id, user_id)
+    item["reminders"] = _reminders(conn, item_id, user_id)
+    item["space"] = _space(conn, item.get("spaceId"), user_id)
+    item["household"] = _household(conn, item.get("householdId"), user_id)
+    item["activities"] = _activities(conn, item_id, user_id)
+    item["repairLogs"] = _repair_logs(conn, item_id, user_id)
+    item["smartHomeDevices"] = _smart_home_devices(conn, item_id, user_id)
     item["missingFields"] = missing_fields(item, documents)
     return item
 
@@ -156,10 +210,10 @@ def list_items() -> list[dict]:
             conn.execute('SELECT * FROM "Item" WHERE userId = ? ORDER BY updatedAt DESC', (user["id"],)).fetchall()
         )
         for item in items:
-            docs = _documents(conn, item["id"])
+            docs = _documents(conn, item["id"], user["id"])
             item["documents"] = docs
-            item["loops"] = _loops(conn, item["id"])
-            item["space"] = _space(conn, item.get("spaceId"))
+            item["loops"] = _loops(conn, item["id"], user["id"])
+            item["space"] = _space(conn, item.get("spaceId"), user["id"])
             item["missingFields"] = missing_fields(item, docs)
         return items
 
@@ -183,7 +237,7 @@ def get_item(item_id: str) -> dict:
         )
         if not item:
             raise HTTPException(status_code=404, detail="Item not found")
-        detail = _item_detail(conn, item_id)
+        detail = _item_detail(conn, item_id, user["id"])
         return detail or item
 
 
@@ -198,7 +252,11 @@ def create_item(payload: ItemCreate) -> dict:
         now = now_iso()
         item_id = make_id()
         household_id = payload.householdId or _default_household_id(conn, user["id"])
-        space_id = _resolve_space_id(conn, household_id, payload.location, payload.spaceId)
+        if household_id:
+            require_owned_household(conn, user["id"], household_id)
+        if payload.documentId:
+            require_owned_document(conn, user["id"], payload.documentId, allow_vault=False)
+        space_id = _resolve_space_id(conn, user["id"], household_id, payload.location, payload.spaceId)
         receipt_docs = [{"type": "RECEIPT"}] if payload.documentId else []
         try:
             normalized_barcode = normalize_barcode(payload.barcode) if payload.barcode else None
@@ -267,10 +325,14 @@ def create_item(payload: ItemCreate) -> dict:
         )
 
         if payload.documentId:
-            conn.execute(
-                'UPDATE "Document" SET itemId = ?, type = ?, updatedAt = ? WHERE id = ?',
-                (item_id, "RECEIPT", now, payload.documentId),
+            cursor = conn.execute(
+                '''UPDATE "Document"
+                   SET itemId = ?, type = ?, updatedAt = ?
+                   WHERE id = ? AND userId = ? AND vaultId IS NULL''',
+                (item_id, "RECEIPT", now, payload.documentId, user["id"]),
             )
+            if cursor.rowcount != 1:
+                raise HTTPException(status_code=404, detail="Document not found")
             award_xp(conn, user_id=user["id"], item_id=item_id, action="upload_receipt", points=20)
 
         if item_data["warrantyUntil"]:
@@ -322,7 +384,14 @@ def create_item(payload: ItemCreate) -> dict:
                VALUES (?, ?, ?, ?, ?, ?)""",
             (make_id(), item_id, user["id"], "CREATED", "Item profile created.", now),
         )
-        return _item_detail(conn, item_id) or {}
+        conn.execute(
+            """UPDATE "User"
+               SET onboardingCompletedAt = COALESCE(onboardingCompletedAt, ?),
+                   updatedAt = ?
+               WHERE id = ?""",
+            (now, now, user["id"]),
+        )
+        return _item_detail(conn, item_id, user["id"]) or {}
 
 
 @router.get("/{item_id}/image-suggestion")
@@ -432,17 +501,28 @@ def patch_item(item_id: str, payload: ItemPatch) -> dict:
                 updates[key] = normalize_iso(updates[key])
         if "location" in updates or "spaceId" in updates or "householdId" in updates:
             household_id = updates.get("householdId") or item.get("householdId") or _default_household_id(conn, user["id"])
+            if household_id:
+                require_owned_household(conn, user["id"], household_id)
             updates["householdId"] = household_id
-            updates["spaceId"] = _resolve_space_id(conn, household_id, updates.get("location") or item.get("location"), updates.get("spaceId"))
+            updates["spaceId"] = _resolve_space_id(
+                conn,
+                user["id"],
+                household_id,
+                updates.get("location") or item.get("location"),
+                updates.get("spaceId"),
+            )
 
         next_item = {**item, **updates}
-        docs = _documents(conn, item_id)
+        docs = _documents(conn, item_id, user["id"])
         score = calculate_completeness_score(next_item, docs)
         updates["completenessScore"] = score
         updates["updatedAt"] = now_iso()
 
         assignments = ", ".join(f'"{key}" = ?' for key in updates)
-        conn.execute(f'UPDATE "Item" SET {assignments} WHERE id = ?', [*updates.values(), item_id])
+        conn.execute(
+            f'UPDATE "Item" SET {assignments} WHERE id = ? AND userId = ?',
+            [*updates.values(), item_id, user["id"]],
+        )
 
         if not item.get("serialNumber") and updates.get("serialNumber"):
             award_xp(conn, user_id=user["id"], item_id=item_id, action="add_serial_number", points=25)
@@ -454,7 +534,7 @@ def patch_item(item_id: str, payload: ItemPatch) -> dict:
         if int(item["completenessScore"]) < 100 and score == 100:
             award_xp(conn, user_id=user["id"], item_id=item_id, action="complete_item_profile", points=50)
 
-        return _item_detail(conn, item_id) or {}
+        return _item_detail(conn, item_id, user["id"]) or {}
 
 
 @router.post("/{item_id}/repairs", status_code=201)
@@ -516,7 +596,7 @@ def create_repair_log(item_id: str, payload: RepairLogCreate) -> dict:
                 ),
             )
         award_xp(conn, user_id=user["id"], item_id=item_id, action="add_repair_log", points=15)
-        return _item_detail(conn, item_id) or {}
+        return _item_detail(conn, item_id, user["id"]) or {}
 
 
 @router.post("/{item_id}/support-draft")
@@ -529,8 +609,8 @@ def create_support_draft(item_id: str) -> dict:
         if not item:
             raise HTTPException(status_code=404, detail="Item not found")
 
-        documents = _documents(conn, item_id)
-        repairs = _repair_logs(conn, item_id)
+        documents = _documents(conn, item_id, user["id"])
+        repairs = _repair_logs(conn, item_id, user["id"])
         latest_repair = repairs[0] if repairs else None
         attachments = _document_attachments(documents)
         has_receipt = _has_document(documents, "RECEIPT")

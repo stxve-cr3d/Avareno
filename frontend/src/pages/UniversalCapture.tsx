@@ -6,7 +6,7 @@ import { missingFieldLabel } from "../lib/uiText";
 import type { Item, ProductStructure, UniversalCaptureDraft } from "../lib/types";
 
 const examples = [
-  "LG OLED C3 im Wohnzimmer, gekauft bei MediaMarkt",
+  "Kaffeemaschine in der Küche, gekauft bei MediaMarkt",
   "Sofa im Wohnzimmer ohne Rechnung",
   "Bosch Waschmaschine im Keller mit Garantie",
   "E-Bike in der Garage, Seriennummer fehlt"
@@ -83,7 +83,7 @@ export function UniversalCapture() {
             className="capture-textarea"
             value={text}
             onChange={(event) => setText(event.target.value)}
-            placeholder="Beschreibe ein Objekt, z. B. „LG OLED C3 im Wohnzimmer, gekauft bei MediaMarkt“ — oder wähle unten ein Beispiel."
+            placeholder="Beschreibe ein Produkt, z. B. „Kaffeemaschine in der Küche, gekauft bei MediaMarkt“ — oder wähle unten ein Beispiel."
           />
 
           <select className="capture-select" value={spaceId} onChange={(event) => setSpaceId(event.target.value)}>

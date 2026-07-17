@@ -5,6 +5,7 @@ from fastapi import APIRouter, Query
 from app.db import db
 from app.dependencies import get_default_user
 from app.schemas import PlanActionCreate
+from app.services.authorization import require_owned_item
 from app.services.planning import list_notifications, list_planner_loops
 from app.utils import make_id, normalize_iso, now_iso
 
@@ -34,6 +35,8 @@ def planner(days: int = Query(default=14, ge=1, le=90)) -> dict:
 def create_plan_action(payload: PlanActionCreate) -> dict:
     with db() as conn:
         user = get_default_user(conn)
+        if payload.itemId:
+            require_owned_item(conn, user["id"], payload.itemId)
         now = now_iso()
         loop_id = make_id()
         due_date = normalize_iso(payload.dueDate)

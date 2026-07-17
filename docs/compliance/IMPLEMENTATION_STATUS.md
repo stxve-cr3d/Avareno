@@ -10,7 +10,9 @@ The remaining launch blockers are tracked in `docs/compliance/PRIVACY_RELEASE_BL
 - `/app/ich/privacy` / `/app/profile/privacy` contains a "Datenschutz & Kontrolle" section with active MVP controls where the local data model supports them.
 - JSON export is active for local database data from `/api/privacy/export/request`.
 - ZIP export bundle is active from `/api/privacy/export/bundle` with database JSON, manifest and available local uploaded document files.
-- Account deletion requests are recorded with a safe audit event, but full account deletion execution remains blocked.
+- Authenticated full account deletion removes private Supabase Storage objects,
+  Supabase public rows, local files/database rows and the Auth user last; a
+  controlled local integration test verifies the old token is rejected.
 - Uploaded documents can be deleted from item detail; local metadata, extracted fields and local upload files are removed after ownership/path checks.
 - Uploaded documents are opened through short-lived signed API download tickets in the item detail UI; the ownership-checked direct API download endpoint remains as backend fallback.
 - Uploads reject empty files, oversized files and files outside the allowlisted MIME/extension set.
@@ -33,10 +35,9 @@ The remaining launch blockers are tracked in `docs/compliance/PRIVACY_RELEASE_BL
 ## Not Implemented Yet
 
 - Production export jobs/status handling, provider-side exports and cross-user export tests.
-- Account deletion execution.
-- Supabase Auth user deletion and session revocation flow.
-- Production storage object deletion with signed path ownership checks.
-- Production private object storage/bucket verification and provider adapter.
+- Repeat account deletion and RLS/Storage isolation tests against the exact
+  intended beta project after applying its dashboard configuration.
+- Production backup deletion/restoration exclusions and provider retention.
 - Connector token encryption, rotation, revocation, and deletion.
 - Provider-side deletion/revocation.
 - Private Vault re-auth/PIN/passkey unlock.
@@ -49,7 +50,9 @@ The remaining launch blockers are tracked in `docs/compliance/PRIVACY_RELEASE_BL
 - Data categories touched: account/profile, email, avatar reference, object memory metadata, document/file metadata, local uploads, Supabase Storage buckets, AI-extracted facts, connector metadata, consent/audit records.
 - Storage impact: no new buckets were created. The local SQLite runtime/schema now include `PrivacyAuditEvent` and `ConsentEvent`; uploaded file deletion/download is limited to verified `/uploads/` paths through signed or authenticated API endpoints, and static `/uploads` is disabled by default.
 - Export impact: local database JSON export and local uploaded document ZIP bundle are active. Supabase/Auth provider exports, billing/customer portal exports, backup/export procedures, production job flow and cross-user tests remain open.
-- Deletion impact: document deletion and AI-extracted field deletion are executable for local MVP data. Account deletion is request-only until Auth, Storage, providers and backups are orchestrated.
+- Deletion impact: document deletion, AI-extracted field deletion and the full
+  local/Supabase account deletion sequence are executable. Future connector
+  providers and backup expiry/restoration remain open.
 - Third parties: Supabase, Cloudflare Turnstile, future AI provider, hosting, email, analytics, monitoring, affiliate providers remain draft/review items.
 - AI impact: new guardrails reject obvious secret-like keys and mark AI output as assisted/user-confirmable.
 - Connector risks: custom/public connector URLs must reject localhost, loopback, private ranges, link-local, metadata endpoints, non-http protocols, malformed URLs, credential URLs, and internal hostnames.
@@ -70,7 +73,8 @@ The remaining launch blockers are tracked in `docs/compliance/PRIVACY_RELEASE_BL
 ## Engineering Follow-Ups
 
 - Add production authenticated export jobs, private object storage adapter, provider receipts and cross-user tests.
-- Add account deletion orchestration only after Supabase Auth, Storage, provider revocation and backup policy are finalized.
+- Re-run account deletion after every target-project Auth, schema or bucket
+  policy change; define backup expiry/restoration handling.
 - Add Supabase migrations/RLS/storage policy updates for `PrivacyAuditEvent` and `ConsentEvent`.
 - Add tests for connector URL validation, document deletion, export ownership and privacy audit redaction.
 

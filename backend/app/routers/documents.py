@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +9,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from app.config import beta_features, require_beta_feature
 from app.db import db, row_to_dict, rows_to_dicts
 from app.dependencies import get_default_user
 from app.services.document_storage import (
@@ -28,14 +28,10 @@ router = APIRouter()
 DEFAULT_MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_UPLOAD_BYTES = DEFAULT_MAX_UPLOAD_BYTES
 ALLOWED_UPLOAD_EXTENSIONS = {
-    ".doc",
-    ".docx",
     ".jpeg",
     ".jpg",
     ".pdf",
     ".png",
-    ".txt",
-    ".webp",
 }
 
 
@@ -48,13 +44,16 @@ def _configured_max_upload_bytes() -> int:
 
 MAX_UPLOAD_BYTES = _configured_max_upload_bytes()
 ALLOWED_UPLOAD_MIME_TYPES = {
-    "application/msword",
     "application/pdf",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "image/jpeg",
     "image/png",
-    "image/webp",
-    "text/plain",
+}
+
+EXPECTED_MIME_BY_EXTENSION = {
+    ".pdf": "application/pdf",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
 }
 
 
@@ -82,6 +81,10 @@ async def upload_document(
     type: str = Form("OTHER"),
     itemId: str | None = Form(None),
 ) -> dict:
+    require_beta_feature(
+        beta_features().document_uploads,
+        detail="Document uploads are temporarily disabled.",
+    )
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file uploaded")
 
@@ -95,47 +98,60 @@ async def upload_document(
             if not item:
                 raise HTTPException(status_code=404, detail="Item not found")
 
-        UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
-        safe_name = re.sub(r"[^a-zA-Z0-9._-]", "-", file.filename)
-        safe_name = safe_name.strip(".-") or "document"
-        stored_name = f"{make_id()}-{safe_name}"
-        target = UPLOAD_ROOT / stored_name
         content = await file.read()
         _validate_upload_policy(file.filename, file.content_type, content)
         try:
             require_storage_capacity(conn, user, len(content))
         except PlanLimitExceeded as exc:
             raise HTTPException(status_code=402, detail=exc.payload()) from exc
-        # Compliance TODO: add malware scanning, private object storage,
-        # and deletion/export orchestration before accepting real user files.
-        target.write_bytes(content)
-
         now = now_iso()
         doc_id = make_id()
+        extension = Path(file.filename).suffix.lower()
+        stored_name = f"{doc_id}{extension}"
+        user_upload_root = UPLOAD_ROOT / user["id"]
+        user_upload_root.mkdir(parents=True, exist_ok=True)
+        target = user_upload_root / stored_name
+        temporary_target = user_upload_root / f".{stored_name}.uploading"
+        # Compliance TODO: magic-byte validation is active, but malware
+        # scanning is still an explicit beta risk documented in the release
+        # checklist. Files are private and are never auto-processed/previewed.
+        temporary_target.write_bytes(content)
+        temporary_target.replace(target)
+
         doc_type = type.upper()
-        conn.execute(
-            """INSERT INTO "Document"
-               (id, userId, itemId, type, fileName, filePath, mimeType, fileSize, createdAt, updatedAt)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                doc_id,
-                user["id"],
-                itemId,
-                doc_type,
-                file.filename,
-                f"/uploads/{stored_name}",
-                file.content_type or "application/octet-stream",
-                len(content),
-                now,
-                now,
-            ),
-        )
+        original_name = Path(file.filename).name[:180] or f"document{extension}"
+        try:
+            conn.execute(
+                """INSERT INTO "Document"
+                   (id, userId, itemId, type, fileName, filePath, mimeType, fileSize, createdAt, updatedAt)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    doc_id,
+                    user["id"],
+                    itemId,
+                    doc_type,
+                    original_name,
+                    f"/uploads/{user['id']}/{stored_name}",
+                    EXPECTED_MIME_BY_EXTENSION[extension],
+                    len(content),
+                    now,
+                    now,
+                ),
+            )
+        except Exception:
+            target.unlink(missing_ok=True)
+            raise
         if item:
-            docs = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ? AND vaultId IS NULL', (itemId,)).fetchall())
+            docs = rows_to_dicts(
+                conn.execute(
+                    'SELECT * FROM "Document" WHERE itemId = ? AND userId = ? AND vaultId IS NULL',
+                    (itemId, user["id"]),
+                ).fetchall()
+            )
             score = calculate_completeness_score(item, docs)
             conn.execute(
-                'UPDATE "Item" SET completenessScore = ?, updatedAt = ? WHERE id = ?',
-                (score, now, itemId),
+                'UPDATE "Item" SET completenessScore = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+                (score, now, itemId, user["id"]),
             )
             conn.execute(
                 """INSERT INTO "ItemActivity" (id, itemId, userId, type, message, createdAt)
@@ -144,11 +160,20 @@ async def upload_document(
             )
             points = 20 if doc_type == "RECEIPT" else 15 if doc_type in {"WARRANTY", "MANUAL", "DRIVER", "SOFTWARE"} else 10
             award_xp(conn, user_id=user["id"], item_id=itemId, action=f"upload_{doc_type.lower()}", points=points)
-        return row_to_dict(conn.execute('SELECT * FROM "Document" WHERE id = ?', (doc_id,)).fetchone()) or {}
+        return row_to_dict(
+            conn.execute(
+                'SELECT * FROM "Document" WHERE id = ? AND userId = ?',
+                (doc_id, user["id"]),
+            ).fetchone()
+        ) or {}
 
 
 @router.patch("/{document_id}/extracted-data")
 def update_extracted_data(document_id: str, payload: ExtractedDataPatch) -> dict:
+    require_beta_feature(
+        beta_features().document_processing,
+        detail="Document processing is disabled for the private beta.",
+    )
     with db() as conn:
         user = get_default_user(conn)
         document = row_to_dict(
@@ -172,7 +197,11 @@ def update_extracted_data(document_id: str, payload: ExtractedDataPatch) -> dict
         fields.append("updatedAt = ?")
         params.append(now)
         params.append(document_id)
-        conn.execute(f'UPDATE "Document" SET {", ".join(fields)} WHERE id = ?', tuple(params))
+        params.append(user["id"])
+        conn.execute(
+            f'UPDATE "Document" SET {", ".join(fields)} WHERE id = ? AND userId = ?',
+            tuple(params),
+        )
         record_privacy_audit_event(
             conn,
             user_id=user["id"],
@@ -181,7 +210,12 @@ def update_extracted_data(document_id: str, payload: ExtractedDataPatch) -> dict
             message="AI-extracted document fields corrected by user.",
             context={"document_id": document_id, "updated_fields": len(payload.model_fields_set)},
         )
-        return row_to_dict(conn.execute('SELECT * FROM "Document" WHERE id = ?', (document_id,)).fetchone()) or {}
+        return row_to_dict(
+            conn.execute(
+                'SELECT * FROM "Document" WHERE id = ? AND userId = ?',
+                (document_id, user["id"]),
+            ).fetchone()
+        ) or {}
 
 
 @router.get("/{document_id}/download")
@@ -194,6 +228,10 @@ def download_document(document_id: str) -> FileResponse:
 
 @router.post("/{document_id}/signed-download")
 def create_signed_document_download(document_id: str) -> dict:
+    require_beta_feature(
+        beta_features().public_document_links,
+        detail="Public document links are disabled for the private beta.",
+    )
     with db() as conn:
         user = get_default_user(conn)
         document = _document_for_user(conn, document_id, user["id"])
@@ -215,6 +253,10 @@ def create_signed_document_download(document_id: str) -> dict:
 
 @router.get("/signed-download/{token}")
 def signed_download_document(token: str) -> FileResponse:
+    require_beta_feature(
+        beta_features().public_document_links,
+        detail="Public document links are disabled for the private beta.",
+    )
     try:
         ticket = verify_signed_document_download_ticket(token)
     except TimeoutError as exc:
@@ -255,9 +297,17 @@ def delete_document(document_id: str) -> dict:
                 )
             item = row_to_dict(conn.execute('SELECT * FROM "Item" WHERE id = ? AND userId = ?', (item_id, user["id"])).fetchone())
             if item:
-                docs = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ? AND vaultId IS NULL', (item_id,)).fetchall())
+                docs = rows_to_dicts(
+                    conn.execute(
+                        'SELECT * FROM "Document" WHERE itemId = ? AND userId = ? AND vaultId IS NULL',
+                        (item_id, user["id"]),
+                    ).fetchall()
+                )
                 score = calculate_completeness_score(item, docs)
-                conn.execute('UPDATE "Item" SET completenessScore = ?, updatedAt = ? WHERE id = ?', (score, now_iso(), item_id))
+                conn.execute(
+                    'UPDATE "Item" SET completenessScore = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+                    (score, now_iso(), item_id, user["id"]),
+                )
 
         audit = record_privacy_audit_event(
             conn,
@@ -323,6 +373,8 @@ def _validate_upload_policy(file_name: str, content_type: str | None, content: b
     normalized_mime = (content_type or "").split(";", 1)[0].strip().lower()
     if normalized_mime not in ALLOWED_UPLOAD_MIME_TYPES:
         raise HTTPException(status_code=400, detail="File type is not allowed")
+    if EXPECTED_MIME_BY_EXTENSION.get(extension) != normalized_mime:
+        raise HTTPException(status_code=400, detail="File type does not match its extension")
 
     # Extension and Content-Type are both client-supplied and can be spoofed
     # (e.g. an .html/.js payload renamed to .pdf with a forged header). Verify
@@ -331,18 +383,11 @@ def _validate_upload_policy(file_name: str, content_type: str | None, content: b
         raise HTTPException(status_code=400, detail="File content does not match its extension")
 
 
-# Magic-byte signatures for every extension we accept. .txt has no reliable
-# binary signature by definition, so it is intentionally excluded here and
-# accepted on extension/MIME alone (nothing stronger exists to check).
 _MAGIC_BYTE_CHECKS: dict[str, Any] = {
     ".pdf": (lambda content: content.startswith(b"%PDF-")),
     ".png": (lambda content: content.startswith(b"\x89PNG\r\n\x1a\n")),
     ".jpg": (lambda content: content.startswith(b"\xff\xd8\xff")),
     ".jpeg": (lambda content: content.startswith(b"\xff\xd8\xff")),
-    ".webp": (lambda content: content[:4] == b"RIFF" and content[8:12] == b"WEBP"),
-    # .docx is a zip container (PK\x03\x04); .doc is a legacy OLE2 compound file.
-    ".docx": (lambda content: content.startswith(b"PK\x03\x04")),
-    ".doc": (lambda content: content.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")),
 }
 
 
@@ -355,7 +400,7 @@ def _content_matches_extension(extension: str, content: bytes) -> bool:
 
 # Compliance note: this validates that uploaded bytes genuinely are the file
 # type they claim to be (extension/MIME spoofing). It is NOT malware scanning -
-# a well-formed PDF/DOCX can still carry a malicious payload (macros, exploits
+# a well-formed PDF can still carry a malicious payload (exploits
 # embedded in a valid container). Real malware scanning needs an external
 # engine (e.g. a ClamAV daemon or a scanning API) that this environment does
 # not have; wire one in before accepting uploads from untrusted users at scale.

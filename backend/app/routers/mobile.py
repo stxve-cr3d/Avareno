@@ -26,7 +26,12 @@ def mobile_bootstrap() -> dict:
             ).fetchall()
         )
         for item in items:
-            documents = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ? AND vaultId IS NULL', (item["id"],)).fetchall())
+            documents = rows_to_dicts(
+                conn.execute(
+                    'SELECT * FROM "Document" WHERE itemId = ? AND userId = ? AND vaultId IS NULL',
+                    (item["id"], user["id"]),
+                ).fetchall()
+            )
             item["documents"] = documents
             item["missingFields"] = missing_fields(item, documents)
         notifications = list_notifications(conn, user["id"], days=30)
@@ -60,10 +65,17 @@ def register_mobile_device(payload: MobileDeviceRegister) -> dict:
         )
         if existing:
             conn.execute(
-                'UPDATE "DeviceToken" SET platform = ?, deviceName = ?, lastSeenAt = ?, updatedAt = ? WHERE id = ?',
-                (payload.platform, payload.deviceName, now, now, existing["id"]),
+                '''UPDATE "DeviceToken"
+                   SET platform = ?, deviceName = ?, lastSeenAt = ?, updatedAt = ?
+                   WHERE id = ? AND userId = ?''',
+                (payload.platform, payload.deviceName, now, now, existing["id"], user["id"]),
             )
-            return row_to_dict(conn.execute('SELECT * FROM "DeviceToken" WHERE id = ?', (existing["id"],)).fetchone()) or {}
+            return row_to_dict(
+                conn.execute(
+                    'SELECT * FROM "DeviceToken" WHERE id = ? AND userId = ?',
+                    (existing["id"], user["id"]),
+                ).fetchone()
+            ) or {}
 
         device_id = make_id()
         conn.execute(
@@ -72,4 +84,9 @@ def register_mobile_device(payload: MobileDeviceRegister) -> dict:
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (device_id, user["id"], payload.platform, payload.pushToken, payload.deviceName, now, now, now),
         )
-        return row_to_dict(conn.execute('SELECT * FROM "DeviceToken" WHERE id = ?', (device_id,)).fetchone()) or {}
+        return row_to_dict(
+            conn.execute(
+                'SELECT * FROM "DeviceToken" WHERE id = ? AND userId = ?',
+                (device_id, user["id"]),
+            ).fetchone()
+        ) or {}

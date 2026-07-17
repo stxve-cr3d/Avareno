@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
+from app.config import beta_features, require_beta_feature
 from app.db import db, row_to_dict, rows_to_dicts
 from app.dependencies import ensure_household_for_user, get_default_user
 from app.schemas import AffiliateClickCreate, HouseholdInviteCreate, ItemActivityCreate, PlanTierUpdate, SmartHomeConnectRequest, SpaceCreate
+from app.services.authorization import require_owned_item, require_owned_space
 from app.services.billing import BillingValidationError, plan_by_key
 from app.services.smart_home import connect_provider
 from app.services.structure import structure_payload
@@ -46,6 +48,13 @@ def create_space(payload: SpaceCreate) -> dict:
     with db() as conn:
         user = get_default_user(conn)
         household = _default_household(conn, user["id"])
+        if payload.parentId:
+            require_owned_space(
+                conn,
+                user["id"],
+                payload.parentId,
+                household_id=household["id"],
+            )
         now = now_iso()
         sort_order = conn.execute(
             'SELECT COUNT(*) AS count FROM "Space" WHERE householdId = ?',
@@ -57,11 +66,20 @@ def create_space(payload: SpaceCreate) -> dict:
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (space_id, household["id"], payload.parentId, payload.name, payload.type, sort_order + 1, now, now),
         )
-        return row_to_dict(conn.execute('SELECT * FROM "Space" WHERE id = ?', (space_id,)).fetchone()) or {}
+        return row_to_dict(
+            conn.execute(
+                'SELECT * FROM "Space" WHERE id = ? AND householdId = ?',
+                (space_id, household["id"]),
+            ).fetchone()
+        ) or {}
 
 
 @router.post("/household/invites", status_code=201)
 def invite_household_member(payload: HouseholdInviteCreate) -> dict:
+    require_beta_feature(
+        beta_features().household_sharing,
+        detail="Household sharing is disabled for the private beta.",
+    )
     with db() as conn:
         user = get_default_user(conn)
         household = _default_household(conn, user["id"])
@@ -81,7 +99,12 @@ def invite_household_member(payload: HouseholdInviteCreate) -> dict:
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (member_id, household["id"], None, payload.email, payload.name, payload.role, "INVITED", now, now),
         )
-        return row_to_dict(conn.execute('SELECT * FROM "HouseholdMember" WHERE id = ?', (member_id,)).fetchone()) or {}
+        return row_to_dict(
+            conn.execute(
+                'SELECT * FROM "HouseholdMember" WHERE id = ? AND householdId = ?',
+                (member_id, household["id"]),
+            ).fetchone()
+        ) or {}
 
 
 @router.patch("/plan")
@@ -119,7 +142,12 @@ def update_plan(payload: PlanTierUpdate) -> dict:
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (plan_id, user["id"], household["id"], "internal" if selected_plan.key == "free" else "stripe", selected_plan.key, selected_plan.key.upper(), "ACTIVE", selected_plan.item_limit, selected_plan.storage_limit_mb, now, now),
             )
-        return row_to_dict(conn.execute('SELECT * FROM "PlanSubscription" WHERE id = ?', (plan_id,)).fetchone()) or {}
+        return row_to_dict(
+            conn.execute(
+                'SELECT * FROM "PlanSubscription" WHERE id = ? AND userId = ?',
+                (plan_id, user["id"]),
+            ).fetchone()
+        ) or {}
 
 
 @router.post("/smart-home/connect", status_code=201)
@@ -143,17 +171,29 @@ def create_item_activity(item_id: str, payload: ItemActivityCreate) -> dict:
                VALUES (?, ?, ?, ?, ?, ?)""",
             (activity_id, item_id, user["id"], payload.type, payload.message, now_iso()),
         )
-        return row_to_dict(conn.execute('SELECT * FROM "ItemActivity" WHERE id = ?', (activity_id,)).fetchone()) or {}
+        return row_to_dict(
+            conn.execute(
+                'SELECT * FROM "ItemActivity" WHERE id = ? AND userId = ?',
+                (activity_id, user["id"]),
+            ).fetchone()
+        ) or {}
 
 
 @router.post("/affiliate/clicks", status_code=201)
 def record_affiliate_click(payload: AffiliateClickCreate) -> dict:
     with db() as conn:
         user = get_default_user(conn)
+        if payload.itemId:
+            require_owned_item(conn, user["id"], payload.itemId)
         click_id = make_id()
         conn.execute(
             """INSERT INTO "AffiliateClick" (id, userId, itemId, partnerSlug, targetUrl, source, createdAt)
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (click_id, user["id"], payload.itemId, payload.partnerSlug, payload.targetUrl, payload.source, now_iso()),
         )
-        return row_to_dict(conn.execute('SELECT * FROM "AffiliateClick" WHERE id = ?', (click_id,)).fetchone()) or {}
+        return row_to_dict(
+            conn.execute(
+                'SELECT * FROM "AffiliateClick" WHERE id = ? AND userId = ?',
+                (click_id, user["id"]),
+            ).fetchone()
+        ) or {}

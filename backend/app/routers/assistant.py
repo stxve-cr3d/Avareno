@@ -17,8 +17,24 @@ router = APIRouter()
 def _load_items(conn, user_id: str) -> list[dict]:
     items = rows_to_dicts(conn.execute('SELECT * FROM "Item" WHERE userId = ? ORDER BY updatedAt DESC', (user_id,)).fetchall())
     for item in items:
-        item["documents"] = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ? AND vaultId IS NULL', (item["id"],)).fetchall())
-        item["space"] = row_to_dict(conn.execute('SELECT * FROM "Space" WHERE id = ?', (item["spaceId"],)).fetchone()) if item.get("spaceId") else None
+        item["documents"] = rows_to_dicts(
+            conn.execute(
+                'SELECT * FROM "Document" WHERE itemId = ? AND userId = ? AND vaultId IS NULL',
+                (item["id"], user_id),
+            ).fetchall()
+        )
+        item["space"] = (
+            row_to_dict(
+                conn.execute(
+                    '''SELECT s.* FROM "Space" s
+                       JOIN "Household" h ON h.id = s.householdId
+                       WHERE s.id = ? AND h.userId = ?''',
+                    (item["spaceId"], user_id),
+                ).fetchone()
+            )
+            if item.get("spaceId")
+            else None
+        )
         item["missingFields"] = missing_fields(item, item["documents"])
     return items
 
@@ -129,7 +145,15 @@ def ask_avareno(payload: AssistantAskRequest) -> dict:
                 "confidence": 0.82,
             }
 
-        spaces = rows_to_dicts(conn.execute('SELECT * FROM "Space" ORDER BY name ASC').fetchall())
+        spaces = rows_to_dicts(
+            conn.execute(
+                '''SELECT s.* FROM "Space" s
+                   JOIN "Household" h ON h.id = s.householdId
+                   WHERE h.userId = ?
+                   ORDER BY s.name ASC''',
+                (user["id"],),
+            ).fetchall()
+        )
         matching_space = next((space for space in spaces if space["name"].lower() in question), None)
         if matching_space:
             space_items = [item for item in items if item.get("spaceId") == matching_space["id"] or item.get("location", "").lower() == matching_space["name"].lower()]

@@ -27,6 +27,8 @@ Privacy, security, and user control are product requirements, not add-ons.
 - auth provider metadata
 - privacy and motivation preferences
 - onboarding interests
+- onboarding started/completed/dismissed timestamps
+- first product-detail-open timestamp
 - passkey/provider status
 
 ### Billing And Subscriptions
@@ -88,6 +90,8 @@ Logs should contain safe operational facts only:
 - provider name where needed
 
 Logs must not contain raw document content, raw connector payloads, secrets, tokens, full email bodies, full receipt text, addresses, IDs, or private files.
+
+The first-product activation flow stores only server-owned routing timestamps on the user record and derives activation A/B from owned product/document creation. Aggregate reporting must not include product names, email addresses, filenames, document content, notes, barcodes, search terms or raw payloads. No third-party analytics SDK is required for this flow.
 
 ## Storage Areas
 
@@ -152,15 +156,19 @@ Current MVP implementation state:
 - local static `/uploads` serving is disabled by default and upload size/type allowlists are active
 - AI-extracted document fields can be deleted and corrected through backend controls
 - local connected-source metadata can be disconnected
-- account deletion is request-only and is not yet a full deletion orchestrator
+- authenticated account deletion executes the reviewed server-side sequence:
+  private Supabase Storage prefixes, Supabase public rows, local files and
+  user-owned database rows, absence verification, then Supabase Auth deletion
+- a restrictive active-Auth policy and a short-lived hashed backend tombstone
+  reject still-unexpired access tokens after deletion
+- first-product onboarding state is server-owned; product creation and linked document creation provide content-free activation A/B timestamps for aggregate reporting
 
 Open implementation requirements:
 
 - replace direct MVP ZIP/JSON export with authenticated export jobs, status tracking and production archive downloads
 - export production object-storage files or provide provider-side signed file download links
 - export AI-extracted metadata and user corrections
-- delete account and associated user data
-- delete account-related Supabase Auth/provider records and revoke sessions
+- define deletion propagation and restore exclusions for provider backups
 - disconnect connectors and delete/revoke stored provider tokens
 - define deletion behavior for backups
 - define deletion behavior for provider-side data
@@ -203,7 +211,8 @@ Public claims must be accurate. Do not claim "100% secure", "legally verified", 
 - Keep `docs/compliance/IMPLEMENTATION_STATUS.md` current whenever privacy/security foundations move from TODO to implemented.
 - Keep `docs/compliance/SUBPROCESSORS_DRAFT.md` current before enabling any new provider.
 - Build production data export job flow with status, retry, provider receipts and cross-user tests.
-- Build account deletion execution flow.
+- Re-test full account deletion against the exact beta project after every
+  schema, bucket or Auth configuration change.
 - Build connector token deletion/revocation flow.
 - Wire real consent-based processing into consent history.
 - Keep Privacy Center controls accurate as MVP controls move to production controls.

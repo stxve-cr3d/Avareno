@@ -12,8 +12,8 @@ const icons = {
 } as const;
 
 const typeLabels: Record<SearchResult["type"], string> = {
-  ITEM: "Objekt",
-  LOOP: "Loop",
+  ITEM: "Produkt",
+  LOOP: "Erinnerung",
   DOCUMENT: "Dokument",
   REMINDER: "Erinnerung"
 };
@@ -82,7 +82,7 @@ export function Search() {
           <div className="av-dashboard-title-row">
             <div>
               <h1>Alles finden</h1>
-              <p>Objekte, Loops, Dokumente und Erinnerungen an einem Ort.</p>
+              <p>Produkte, Dokumente und Erinnerungen an einem Ort.</p>
             </div>
           </div>
           <form className="av-search" onSubmit={submit}>
@@ -90,7 +90,7 @@ export function Search() {
             <input
               autoFocus
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Wonach suchst du? Name, Beleg, Raum, Garantie…"
+              placeholder="Wonach suchst du? Name, Hersteller, Seriennummer, Raum…"
               type="search"
               value={query}
             />
@@ -105,7 +105,7 @@ export function Search() {
             <h2>
               {status === "ready" && payload.results.length
                 ? `${payload.results.length} Treffer für „${payload.query}“`
-                : "Deine Objektsuche"}
+                : "Deine Produktsuche"}
             </h2>
           </div>
         </div>
@@ -133,7 +133,7 @@ export function Search() {
         ) : (
           <div className="av-empty">
             <p className="av-empty-title">Tippe, um zu suchen</p>
-            <div className="av-empty-body">Avareno durchsucht deine Objekte, Belege, Dokumente und Erinnerungen.</div>
+            <div className="av-empty-body">Avareno durchsucht deine Produkte, Belege, Dokumente und Erinnerungen.</div>
           </div>
         )}
       </article>

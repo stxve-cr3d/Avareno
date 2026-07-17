@@ -1,5 +1,18 @@
 # Avareno Auth Foundation
 
+## Invite-only beta profile (current release target)
+
+The 10–20-person beta uses Supabase email/password only. Public signup,
+Magic Link UI, phone/SMS, passkeys, OAuth, Household sharing, Billing, Receipt
+Extraction, OCR/document processing, public document links and inline document
+preview are disabled. `backend/app/config.py` is the server authority;
+`frontend/src/lib/betaFeatures.ts` only mirrors the presentation state.
+
+The backend must run with `AVARENO_REQUIRE_AUTH=1` and refuses to boot in
+invite-only mode without it. Users are provisioned through a trusted Supabase
+admin/invite workflow. Exact dashboard and deployment settings are tracked in
+`docs/beta-release-supabase-checklist.md`.
+
 ## Provider
 
 Avareno uses Supabase Auth as the production auth provider. The frontend uses the official `@supabase/supabase-js` client for:
@@ -42,6 +55,8 @@ Use `backend/.env.example` as the production template.
 - `SUPABASE_PUBLISHABLE_KEY`
 - optional `SUPABASE_JWT_SECRET` for legacy/shared-secret JWT verification
 - `SUPABASE_JWT_AUDIENCE=authenticated`
+- `SUPABASE_SERVICE_ROLE_KEY` only for the server-side full account-deletion
+  orchestrator; never expose or log it
 
 When auth is required, `/api/*` requests need a Supabase bearer token. The frontend adds the current Supabase access token automatically. The backend validates the token with Supabase Auth using `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY`, or with `SUPABASE_JWT_SECRET` when explicitly provided. The backend mirrors the Supabase `sub` claim into the local `User.id` so existing user-owned queries continue to isolate by user id.
 
@@ -161,21 +176,27 @@ Local passkey settings:
 
 ## Profile And RLS Notes
 
-The frontend profile is derived from Supabase Auth user metadata for the MVP:
+Display preferences and basic profile presentation are currently derived from Supabase Auth user metadata for the MVP:
 
 - `display_name`
 - `avatar_url`
 - `private_profile`
 - `motivation_enabled`
 - `leaderboard_enabled`
-- `onboarding_completed`
 - `avareno_interests`
 
 Phone-auth users may not have an email address. Do not require email for authorization checks; use the Supabase Auth user id (`sub`) and a future RLS-backed profile table.
 
+First-product onboarding status is not sourced from `user_metadata` or `localStorage`. Supabase `user_metadata` is user-editable and must not be trusted for routing, authorization or security decisions. The authenticated app backend owns `onboardingStartedAt`, `onboardingCompletedAt`, `onboardingDismissedAt` and `firstProductDetailOpenedAt`; product/document existence is checked within the same user scope. Legacy `onboarding_completed` metadata may remain during migration but is not the source of truth.
+
+When backend token verification uses the Supabase Auth user endpoint, the trusted Supabase `created_at` value is mirrored into the local user record so time-to-first-product starts at account creation. Legacy shared-secret JWT verification may not expose that field; its fallback starts when the local user row is first created and should not be used for exact registration-funnel reporting without an authoritative auth-created timestamp.
+
 For production Supabase tables, add a `profiles` table keyed by `auth.users.id`, enable RLS, and require `auth.uid() = auth_user_id` for select/update. Keep service-role access server-side only.
 
-The current SQLite MVP schema is mirrored by `docs/supabase-rls-foundation.sql` as a first Supabase Postgres RLS baseline. Apply it only after the matching public tables exist, then run Supabase advisors before production use.
+The executable Postgres/RLS source of truth is under `supabase/migrations/`.
+The similarly named files under `docs/` are pointers only and must not be
+applied as policy drafts. Run the controlled two-user QA after every migration
+or policy change.
 
 ## Security Notes
 
@@ -185,3 +206,36 @@ The current SQLite MVP schema is mirrored by `docs/supabase-rls-foundation.sql` 
 - Passwords are handled only by Supabase Auth.
 - Tokens are managed by the Supabase client and sent to the backend as bearer tokens for API calls.
 - The FastAPI auth guard is enabled with `AVARENO_REQUIRE_AUTH=1`.
+
+## Object Authorization Boundary
+
+Authentication does not authorize access to a client-supplied object id by itself. Backend queries must bind the resource id and the verified Supabase `sub` (or an explicitly supported tenant relationship) in the same server-side authorization boundary. Missing and inaccessible resources use the same not-found response.
+
+For `/api/extract/receipt` specifically:
+
+- the invite-beta kill-switch rejects the request before database, resource,
+  Storage, quota, job or provider access;
+- the route requires a verified session/JWT;
+- the document and its server-stored upload path are resolved only after authorization;
+- the document owner may process it;
+- a Household OWNER or active EDITOR may process a linked non-Vault document only when document, item and household ownership form a consistent chain;
+- VIEWER, inactive membership and all household access to Vault documents are denied;
+- provider calls and quota consumption occur after authorization;
+- the final document update repeats the same authorization predicate and verifies that exactly one row changed.
+
+The same rule applies to relationship inputs such as `documentId`, `itemId`, `householdId`, `spaceId` and `parentId`: validate the target and its parent/tenant relationship before insert or update, and tenant-scope the final write.
+
+## Account deletion and old sessions
+
+`POST /api/privacy/deletion/request` is an authenticated execution endpoint,
+not a request queue. It fails closed unless the server-only Supabase admin
+configuration is available. It deletes the user's private Storage prefixes,
+Supabase public rows, local files and user-owned database rows, verifies
+absence, and deletes the Supabase Auth user last. The process is idempotent for
+server retries.
+
+Supabase access JWTs can remain cryptographically valid until expiry after an
+Auth user is deleted. A restrictive `beta_auth_user_active()` RLS/Storage
+policy and a short-lived hashed backend revocation tombstone therefore reject
+the old subject immediately without retaining the raw Auth id in the
+tombstone.

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.config import beta_features, require_beta_feature
 from app.db import db
 from app.dependencies import get_default_user, require_authenticated_user
 from app.schemas import BillingCheckoutRequest, BillingPortalRequest, DevPlanSetRequest
@@ -26,7 +27,11 @@ from app.services.billing import (
 )
 from app.services.entitlements import usage_summary
 
-router = APIRouter()
+def _require_billing_enabled() -> None:
+    require_beta_feature(beta_features().billing, detail="Billing is disabled for the private beta.")
+
+
+router = APIRouter(dependencies=[Depends(_require_billing_enabled)])
 
 
 def _is_production() -> bool:

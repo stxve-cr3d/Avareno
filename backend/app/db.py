@@ -45,6 +45,33 @@ def ensure_runtime_schema(conn: sqlite3.Connection) -> None:
         columns = {row["name"] for row in conn.execute('PRAGMA table_info("Item")').fetchall()}
     except sqlite3.OperationalError:
         return
+    user_columns = {row["name"] for row in conn.execute('PRAGMA table_info("User")').fetchall()}
+    activation_columns = {
+        "onboardingStartedAt": "TEXT",
+        "onboardingCompletedAt": "TEXT",
+        "onboardingDismissedAt": "TEXT",
+        "firstProductDetailOpenedAt": "TEXT",
+    }
+    for name, definition in activation_columns.items():
+        if user_columns and name not in user_columns:
+            conn.execute(f'ALTER TABLE "User" ADD COLUMN "{name}" {definition}')
+    if user_columns:
+        # Legacy users who already created a real product must never be pushed
+        # back through first-run onboarding. Backfill an explicit server-side
+        # completion timestamp once; future routing no longer depends on item
+        # existence alone.
+        conn.execute(
+            """UPDATE "User"
+               SET onboardingCompletedAt = (
+                 SELECT MIN("Item".createdAt)
+                 FROM "Item"
+                 WHERE "Item".userId = "User".id
+               )
+               WHERE onboardingCompletedAt IS NULL
+                 AND EXISTS (
+                   SELECT 1 FROM "Item" WHERE "Item".userId = "User".id
+                 )"""
+        )
     if columns and "imageUrl" not in columns:
         conn.execute('ALTER TABLE "Item" ADD COLUMN "imageUrl" TEXT')
     item_columns = {
@@ -85,12 +112,28 @@ def ensure_runtime_schema(conn: sqlite3.Connection) -> None:
             )"""
         )
     _ensure_privacy_tables(conn)
+    _ensure_auth_revocation_table(conn)
     _ensure_product_tables(conn)
     _ensure_smart_home_tables(conn)
     _ensure_social_tables(conn)
     _ensure_vault_and_usage_tables(conn)
     _ensure_default_product_structure(conn)
     _ensure_default_smart_home_devices(conn)
+
+
+def _ensure_auth_revocation_table(conn: sqlite3.Connection) -> None:
+    # Short-lived, pseudonymous tombstones stop a still-unexpired access JWT
+    # from recreating a locally deleted account. There is deliberately no FK
+    # to User: this guard must outlive the deleted profile for the token TTL.
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS "AuthRevocation" (
+          "subjectHash" TEXT NOT NULL PRIMARY KEY,
+          "expiresAt" TEXT NOT NULL,
+          "createdAt" TEXT NOT NULL
+        )"""
+    )
+    conn.execute('CREATE INDEX IF NOT EXISTS "AuthRevocation_expiresAt_idx" ON "AuthRevocation" ("expiresAt")')
+    conn.execute('DELETE FROM "AuthRevocation" WHERE expiresAt <= ?', (now_iso(),))
 
 
 def _ensure_vault_and_usage_tables(conn: sqlite3.Connection) -> None:

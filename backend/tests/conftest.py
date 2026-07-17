@@ -24,6 +24,12 @@ os.environ["AVARENO_CONNECTOR_SECRET_KEY"] = "test-connector-key"
 os.environ["AVARENO_MAX_UPLOAD_BYTES"] = str(64 * 1024)  # 64 KB cap for upload tests
 os.environ.pop("AVARENO_ENV", None)
 os.environ.pop("AVARENO_REQUIRE_AUTH", None)
+os.environ["BETA_INVITE_ONLY"] = "false"
+os.environ["ENABLE_RECEIPT_EXTRACTION"] = "true"
+os.environ["ENABLE_DOCUMENT_PROCESSING"] = "true"
+os.environ["ENABLE_PUBLIC_DOCUMENT_LINKS"] = "true"
+os.environ["ENABLE_BILLING"] = "true"
+os.environ["ENABLE_DOCUMENT_UPLOADS"] = "true"
 os.environ.pop("AVARENO_ENABLE_STATIC_UPLOADS", None)
 os.environ.pop("ANTHROPIC_API_KEY", None)  # extraction must use the mock in tests
 

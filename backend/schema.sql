@@ -29,6 +29,10 @@ CREATE TABLE "User" (
   "email" TEXT NOT NULL UNIQUE,
   "xp" INTEGER NOT NULL DEFAULT 0,
   "level" INTEGER NOT NULL DEFAULT 1,
+  "onboardingStartedAt" TEXT,
+  "onboardingCompletedAt" TEXT,
+  "onboardingDismissedAt" TEXT,
+  "firstProductDetailOpenedAt" TEXT,
   "createdAt" TEXT NOT NULL,
   "updatedAt" TEXT NOT NULL
 );
@@ -217,7 +221,7 @@ CREATE TABLE "Item" (
   "reorderUrl" TEXT,
   "affiliateUrl" TEXT,
   "affiliateProvider" TEXT,
-  "visibility" TEXT NOT NULL DEFAULT 'HOUSEHOLD',
+  "visibility" TEXT NOT NULL DEFAULT 'PRIVATE',
   "completenessScore" INTEGER NOT NULL DEFAULT 0,
   "status" TEXT NOT NULL DEFAULT 'ACTIVE',
   "createdAt" TEXT NOT NULL,

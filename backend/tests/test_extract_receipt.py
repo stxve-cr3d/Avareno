@@ -1,8 +1,11 @@
-"""Receipt extraction router: mock fallback without key, Claude path wiring
-(mocked — no network), and error mapping."""
+"""Receipt extraction router: honest 503 without a configured service,
+Claude path wiring (mocked — no network), and error mapping."""
 
 from __future__ import annotations
 
+import pytest
+
+from app.dependencies import get_default_user
 from app.routers import extract as extract_router
 from app.services.claude_extraction import ExtractionError
 
@@ -20,13 +23,17 @@ CLAUDE_FIELDS = {
 }
 
 
-def test_extract_receipt_uses_mock_without_key(client):
-    response = client.post("/api/extract/receipt", json={"text": "MediaMarkt LG OLED C3 1499 EUR"})
-    assert response.status_code == 200
-    body = response.json()
-    assert body["merchant"] == "MediaMarkt"
-    assert body["aiAssisted"] is True
-    assert "extractedText" in body
+@pytest.fixture(autouse=True)
+def authenticated_extraction_unit(monkeypatch):
+    """These focused wiring tests mock auth; the two-user suite uses JWTs."""
+    monkeypatch.setattr(extract_router, "require_authenticated_user", get_default_user)
+
+
+def test_extract_receipt_returns_503_without_key(client):
+    # No ANTHROPIC_API_KEY configured: the API must not invent receipt data.
+    response = client.post("/api/extract/receipt", json={"text": "MediaMarkt Kaffeemaschine 349 EUR"})
+    assert response.status_code == 503
+    assert "manuell" in response.json()["detail"]
 
 
 def test_extract_receipt_claude_path_wiring(client, monkeypatch):

@@ -128,12 +128,55 @@ Update if affected:
 - Needs lawyer/DSB review first: yes / no
 - Notes:
 
+## Completed Review: First Product Activation Flow
+
+- Feature name: First Product Activation Flow
+- Owner: Engineering/Product
+- Route/module: `/onboarding`, `/app/capture/item`, `/app/capture/item/success/:id`, `/app/capture/receipt`, `GET/POST /api/me/activation`
+- Backend/API changes: server-owned onboarding timestamps and aggregate activation summary; product creation completes activation A; product-linked document upload completes activation B through existing document storage
+- Database/storage changes: four nullable timestamps on the user record (`onboardingStartedAt`, `onboardingCompletedAt`, `onboardingDismissedAt`, `firstProductDetailOpenedAt`); no event stream, document content, filename, product name, email or search term is added to activation telemetry
+- Third-party providers: none added; optional barcode catalogue lookup remains a separate explicit user action
+- Launch state: scoped invite beta; local account deletion and RLS/Storage
+  isolation are implemented and tested; target-project verification,
+  malware-scanning, backup policy and legal review remain release gates
+
+Required questions:
+
+1. Personal data: account id, registration timestamp, four onboarding/action timestamps, product/object fields entered by the user and an optional product-linked document.
+2. Purpose: route a new user through the shortest useful setup, preserve resume/skip state and measure aggregate time to first real product/document.
+3. Avoid collection: activation can be derived partly from product/document creation; only the minimum explicit routing timestamps are stored, with no clickstream.
+4. Data minimization: two required product fields; optional details are collapsed; activation reporting excludes names, email addresses, filenames, document content, barcodes, notes and raw request payloads.
+5. Storage: activation timestamps and product metadata in the app database; optional files in the existing private document storage path.
+6. Retention: activation timestamps currently follow account retention. A shorter analytics retention or anonymised aggregate policy must be decided before production analytics use.
+7. Export: the existing account/database export includes the user and product/document records; the activation timestamps must remain included when production export replaces the MVP bundle.
+8. Deletion: product/document deletion and authenticated full account deletion
+   include activation timestamps; target-project and backup propagation still
+   require operational verification.
+9. Third-party sharing: none for onboarding/activation. Barcode catalogue lookup can share the entered code only after the user explicitly chooses the lookup action.
+10. AI: no AI or automatic document analysis is used in the activation flow.
+11. Consent/legal basis: no separate analytics consent is assumed because the timestamps are used for essential product routing and aggregate service improvement; legal-basis wording still requires lawyer/DSB review before production analytics.
+12. Connected accounts: no.
+13. Sensitive/private documents: optional uploaded files may be sensitive; no automatic Vault import or AI analysis occurs.
+14. Tokens/secrets/API credentials: none added; auth tokens remain handled by the existing authenticated API client.
+15. Logs: no new product names, filenames, document contents, email addresses, barcodes or request payloads are logged.
+16. Abuse/security risks: cross-user access, forged activation state, duplicate submissions and malicious uploads. Mitigations include server-owned status, ownership checks, synchronous duplicate guards, upload type/size validation and private download paths. Malware scanning and production two-user RLS/storage tests remain open.
+
+Decision:
+
+- Privacy review complete: yes for the scoped beta flow
+- Safe to implement now: yes for scoped beta
+- Needs lawyer/DSB review first: yes before public production analytics/privacy claims
+- Notes: Activation reporting must remain aggregate and content-free. Do not enable a general event-tracking SDK for this flow without a new privacy review.
+
 ## Completed Review: MVP Privacy Controls Foundation
 
 - Feature name: MVP Privacy Controls Foundation
 - Owner: Engineering/Product
 - Route/module: `backend/app/routers/privacy.py`, `backend/app/routers/documents.py`, `frontend/src/pages/Rewards.tsx`, `frontend/src/pages/ItemDetail.tsx`
-- Backend/API changes: JSON export request, local ZIP export bundle, account deletion request logging, local connector disconnect, AI-extracted data deletion/correction, document deletion, ownership-checked local document download, upload size/type policy
+- Backend/API changes: JSON export request, local ZIP export bundle, executed
+  full account deletion, local connector disconnect, AI-extracted data
+  deletion/correction, document deletion, ownership-checked local document
+  download, upload size/type policy
 - Database/storage changes: `PrivacyAuditEvent`, `ConsentEvent`, deletion/download of verified local `/uploads` files through signed/authenticated API endpoints; static `/uploads` disabled by default
 - Third-party providers: none added
 - Launch state: MVP/internal; production launch still blocked by Auth, Storage, provider revocation, backups and legal review
@@ -147,7 +190,9 @@ Required questions:
 5. Storage: local SQLite for privacy audit/consent metadata; local `/uploads` for current MVP files through short-lived signed or authenticated API downloads by default.
 6. Retention: audit/consent retention remains TODO; document deletion removes local file and row where requested.
 7. Export: local database JSON export and local uploaded document ZIP bundle are active; provider-side exports, backup handling and production job flow remain open.
-8. Deletion: document and extracted-data deletion are active; account deletion is request-only until orchestration is complete.
+8. Deletion: document/extracted-data deletion and full authenticated account
+   deletion are active. Backup expiry and future provider-side deletion remain
+   operational/legal follow-ups.
 9. Third-party sharing: none added.
 10. AI: no real provider added; existing mock extraction fields can be corrected or deleted.
 11. Consent/legal basis: consent table exists; actual consent UX/legal basis still requires review before production flows.
@@ -162,7 +207,9 @@ Decision:
 - Privacy review complete: yes for scoped MVP controls
 - Safe to implement now: yes for local MVP controls
 - Needs lawyer/DSB review first: yes before public launch claims or production enablement
-- Notes: Do not present this as full GDPR readiness. Keep account deletion, provider revocation, production export jobs/provider exports, Vault protections, retention and backups open until production architecture is finished and reviewed.
+- Notes: Do not present this as full GDPR readiness. Keep provider revocation,
+  production export jobs/provider exports, Vault protections, retention and
+  backups open until production architecture is finished and reviewed.
 
 ## Completed Review: Supabase Phone/SMS OTP Auth
 
@@ -379,3 +426,42 @@ Decision:
 - Safe to implement now: yes
 - Needs lawyer/DSB review first: yes before real provider connections, production token storage, command execution or public claims of working integrations
 - Notes: keep Home Graph useful even when devices are not controllable; do not implement real control for locks, cameras, alarms, heaters, ovens or similar safety-critical devices without a dedicated safety/security review.
+
+## Completed Review: Object Authorization Remediation
+
+- Feature name: Defensive object authorization remediation
+- Owner: Engineering/Security
+- Route/module: backend resource routers/services, especially `/api/extract/receipt`
+- Backend/API changes: server-side ownership and relationship checks; generic not-found responses for missing and inaccessible objects
+- Database/storage changes: none
+- Third-party providers: none added
+- Launch state: local remediation covered by controlled anonymous/User A/User B JWT regression tests
+
+Required questions:
+
+1. Personal data: existing document, item, household, space, reminder, Vault and smart-home identifiers and metadata are accessed; no new data category is collected.
+2. Purpose: prevent one authenticated user from reading, linking, processing or changing another user's objects through client-supplied ids.
+3. Avoid collection: yes; the remediation adds checks only.
+4. Data minimization: authorization queries return only rows inside the verified user or permitted household boundary; denied requests return no resource metadata.
+5. Storage: unchanged existing SQLite/upload storage.
+6. Retention: unchanged.
+7. Export: unchanged; existing user-scoped export remains applicable.
+8. Deletion: unchanged; delete operations are additionally tenant-scoped.
+9. Third-party sharing: no new sharing. Receipt processing is server-disabled
+   before resource or provider access in the invite beta.
+10. AI: disabled for the invite beta; no document reaches an extraction
+    provider.
+11. Consent/legal basis: no new processing purpose. A new privacy review is
+    required before enabling extraction.
+12. Connected accounts: existing smart-home relationships are additionally user-scoped; no connector scope is expanded.
+13. Sensitive/private documents: yes. Vault documents are never exposed through household membership; receipt access uses owner or active Household OWNER/EDITOR rights.
+14. Tokens/secrets/API credentials: identity comes from a verified session/JWT; no token or secret is logged or persisted by this change.
+15. Logs: no new content logging.
+16. Abuse/security risks: IDOR/BOLA, cross-tenant relation injection, confused-deputy writes and metadata disclosure. Mitigations are combined id/tenant predicates, relationship validation before work, and repeated authorization on final document updates.
+
+Decision:
+
+- Privacy review complete: yes
+- Safe to implement now: yes, as a defensive remediation
+- Needs lawyer/DSB review first: no additional review introduced by this remediation
+- Notes: production deployment must keep `AVARENO_REQUIRE_AUTH=1`; retain the controlled two-user regression in CI.

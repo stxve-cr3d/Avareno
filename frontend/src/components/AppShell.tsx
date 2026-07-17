@@ -1,31 +1,40 @@
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Archive, ChevronDown, FileText, FolderLock, Home, LifeBuoy, LogOut, MessageSquareText, Package, PenLine, Plus, ReceiptText, Search, ShieldCheck, UserRound, UsersRound, X } from "lucide-react";
+import { BellRing, ChevronDown, FileText, FolderLock, Home, LogOut, MessageSquareText, Package, PenLine, Plus, ReceiptText, Search, ShieldCheck, UserRound, UsersRound, X } from "lucide-react";
 import { Suspense, useEffect, useRef, useState } from "react";
 import avarenoMark from "../assets/avareno-test-logo.png";
+import { getActivationSummary } from "../lib/activation";
 import { useAuth } from "../lib/authProvider";
+import { betaFeatures } from "../lib/betaFeatures";
 import { CommandPalette } from "./CommandPalette";
 
 const nav = [
-  { to: "/app", label: "Zuhause", icon: Home },
-  { to: "/app/dinge", label: "Objekte", icon: Archive, activePaths: ["/app/dinge", "/app/items"] },
-  { to: "/app/resolve", label: "Offene Punkte", icon: LifeBuoy },
-  { to: "/app/care", label: "Erinnerungen", icon: PenLine },
-  { to: "/app/profile", label: "Profil", icon: UserRound, activePaths: ["/app/profile", "/app/ich", "/app/rewards", "/app/friends", "/app/settings"] }
+  { to: "/app", label: "Übersicht", icon: Home },
+  { to: "/app/dinge", label: "Meine Produkte", icon: Package, activePaths: ["/app/dinge", "/app/items"] },
+  { to: "/app/reports/home-binder", label: "Dokumente", icon: FileText },
+  { to: "/app/care", label: "Erinnerungen", icon: BellRing }
 ];
 
 const captureOptions = [
-  { label: "Smart erfassen", helper: "Ein Flow für Foto, Beleg, Text und Barcode", to: "/app/capture", icon: Plus },
-  { label: "Objekt", helper: "Produkt oder Gerät als Objektprofil anlegen", to: "/app/capture/item", icon: Package },
-  { label: "Beleg", helper: "Kaufbeleg speichern und mit einem Objekt verbinden", to: "/app/capture/receipt", icon: ReceiptText },
+  // Disabled for the focused Avareno beta. Kept for a later product phase.
+  ...(betaFeatures.universalCapture
+    ? [{ label: "Smart erfassen", helper: "Ein Flow für Foto, Beleg, Text und Barcode", to: "/app/capture", icon: Plus }]
+    : []),
+  { label: "Produkt hinzufügen", helper: "Produkt oder Gerät manuell oder per Barcode erfassen", to: "/app/capture/item", icon: Package },
+  { label: "Beleg", helper: "Rechnung oder Kassenbeleg speichern und einem Produkt zuordnen", to: "/app/capture/receipt", icon: ReceiptText },
   { label: "Dokument", helper: "Anleitung, Garantie oder Vertrag hochladen", to: "/app/capture/receipt", icon: FileText },
-  { label: "Erinnerung", helper: "Service, Frist oder Rückgabe festhalten", to: "/app/capture/loop", icon: PenLine },
-  { label: "Nachricht", helper: "Notiz in eine Erinnerung verwandeln", to: "/app/capture/message", icon: MessageSquareText }
+  { label: "Erinnerung", helper: "Garantieende, Service oder Frist festhalten", to: "/app/capture/loop", icon: PenLine },
+  // Disabled for the focused Avareno beta. Kept for a later product phase.
+  ...(betaFeatures.messageCapture
+    ? [{ label: "Nachricht", helper: "Notiz in eine Erinnerung verwandeln", to: "/app/capture/message", icon: MessageSquareText }]
+    : [])
 ];
 
 export function AppShell() {
   const [open, setOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [activationChecked, setActivationChecked] = useState(false);
+  const [activationTarget, setActivationTarget] = useState<string | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const captureModalRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
@@ -34,6 +43,38 @@ export function AppShell() {
   const isMarketingSurface = ["/", "/pricing", "/impressum", "/datenschutz", "/cookies"].includes(location.pathname) || location.pathname.startsWith("/checkout/");
   const isAuthSurface = ["/login", "/signup", "/forgot-password", "/reset-password", "/auth/callback", "/auth/verify-email", "/onboarding"].includes(location.pathname);
   const isProtectedSurface = !isMarketingSurface && !isAuthSurface;
+
+  useEffect(() => {
+    if (!isProtectedSurface || auth.status !== "authenticated") {
+      setActivationChecked(false);
+      setActivationTarget(null);
+      return;
+    }
+
+    let active = true;
+    setActivationChecked(false);
+    getActivationSummary()
+      .then((summary) => {
+        if (!active) return;
+        if (summary.nextPath === "/onboarding") {
+          setActivationTarget("/onboarding");
+        } else if (location.pathname === "/app" && summary.nextPath.startsWith("/app/capture/item")) {
+          setActivationTarget(summary.nextPath);
+        } else {
+          setActivationTarget(null);
+        }
+        setActivationChecked(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setActivationTarget(null);
+        setActivationChecked(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [auth.profile?.id, auth.status, isProtectedSurface, location.pathname]);
 
   useEffect(() => {
     setProfileMenuOpen(false);
@@ -171,6 +212,14 @@ export function AppShell() {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
+  if (isProtectedSurface && auth.status === "authenticated" && !activationChecked) {
+    return <AuthRouteLoading />;
+  }
+
+  if (isProtectedSurface && activationTarget) {
+    return <Navigate to={activationTarget} replace />;
+  }
+
   const isSmartSurface =
     location.pathname === "/smart-home" ||
     location.pathname === "/app" ||
@@ -248,20 +297,25 @@ export function AppShell() {
                   </div>
                   <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" tabIndex={-1} to="/app/ich/settings">
                     <UserRound size={15} />
-                    Profil bearbeiten
+                    Konto & Einstellungen
                   </Link>
-                  <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" tabIndex={-1} to="/app/ich/friends">
-                    <UsersRound size={15} />
-                    Freunde
-                  </Link>
+                  {/* Disabled for the focused Avareno beta. Kept for a later product phase. */}
+                  {betaFeatures.community ? (
+                    <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" tabIndex={-1} to="/app/ich/friends">
+                      <UsersRound size={15} />
+                      Freunde
+                    </Link>
+                  ) : null}
                   <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" tabIndex={-1} to="/app/ich/privacy">
                     <ShieldCheck size={15} />
                     Privatsphäre
                   </Link>
-                  <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" tabIndex={-1} to="/app/vault">
-                    <FolderLock size={15} />
-                    Private Vault
-                  </Link>
+                  {betaFeatures.vault ? (
+                    <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" tabIndex={-1} to="/app/vault">
+                      <FolderLock size={15} />
+                      Private Vault
+                    </Link>
+                  ) : null}
                   <Link onClick={() => setProfileMenuOpen(false)} role="menuitem" tabIndex={-1} to="/">
                     <Home size={15} />
                     Website
@@ -347,14 +401,12 @@ export function AppShell() {
 }
 
 function currentSectionLabel(pathname: string) {
-  if (pathname === "/app") return "Zuhause";
-  if (pathname.startsWith("/app/dinge") || pathname.startsWith("/app/items")) return "Objekte";
-  if (pathname.startsWith("/app/resolve")) return "Offene Punkte";
+  if (pathname === "/app") return "Übersicht";
+  if (pathname.startsWith("/app/dinge") || pathname.startsWith("/app/items")) return "Meine Produkte";
   if (pathname.startsWith("/app/care")) return "Erinnerungen";
-  if (pathname.startsWith("/app/smart-home") || pathname.startsWith("/app/home-graph")) return "Smart Home";
   if (pathname.startsWith("/app/capture")) return "Erfassen";
   if (pathname.startsWith("/app/reports/home-binder")) return "Dokumente";
-  if (pathname.startsWith("/app/vault")) return "Private Vault";
+  if (pathname.startsWith("/app/search")) return "Suche";
   if (pathname.startsWith("/app/ich") || pathname.startsWith("/app/profile")) return "Profil";
   return "Avareno";
 }

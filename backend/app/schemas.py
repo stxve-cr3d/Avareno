@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ReceiptExtractRequest(BaseModel):
@@ -10,8 +10,8 @@ class ReceiptExtractRequest(BaseModel):
 
 
 class ItemCreate(BaseModel):
-    name: str
-    category: str = "Other"
+    name: str = Field(min_length=1, max_length=160)
+    category: str = Field(min_length=1, max_length=80)
     householdId: str | None = None
     spaceId: str | None = None
     itemType: str = "THING"
@@ -36,8 +36,13 @@ class ItemCreate(BaseModel):
     reorderUrl: str | None = None
     affiliateUrl: str | None = None
     affiliateProvider: str | None = None
-    visibility: str = "HOUSEHOLD"
+    visibility: str = "PRIVATE"
     documentId: str | None = None
+
+    @field_validator("name", "category", mode="before")
+    @classmethod
+    def strip_required_text(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
 
 
 class ItemPatch(BaseModel):

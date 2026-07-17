@@ -73,7 +73,9 @@ export function Items() {
       if (status === "OPEN" && openPointsOf(item) === 0) return false;
       if (status === "COMPLETE" && (item.completenessScore ?? 0) < 100) return false;
       if (q) {
-        const haystack = [item.name, item.model, item.manufacturer, item.category, item.merchant, item.itemType].join(" ").toLowerCase();
+        const haystack = [item.name, item.model, item.manufacturer, item.serialNumber, item.category, item.merchant, item.itemType, item.location, item.space?.name]
+          .join(" ")
+          .toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
@@ -87,25 +89,25 @@ export function Items() {
   const hasItems = items.length > 0;
 
   if (loading) {
-    return <ConsoleSkeleton label="Objekte werden geladen…" />;
+    return <ConsoleSkeleton label="Produkte werden geladen…" />;
   }
 
   return (
     <main className="av-console av-library">
       <section className="av-console-top">
         <div className="av-dashboard-header">
-          <span className="av-console-kicker">Objektbibliothek</span>
+          <span className="av-console-kicker">Meine Produkte</span>
           <div className="av-dashboard-title-row">
             <div>
-              <h1>Objekte</h1>
-              <p>Alle gespeicherten Objekte, Belege, Garantien und offenen Punkte.</p>
+              <h1>Meine Produkte</h1>
+              <p>Alle gespeicherten Produkte mit Belegen, Garantien und Dokumenten.</p>
             </div>
             <Link className="av-console-primary" to="/app/capture/item">
-              Objekt erfassen <Plus size={14} />
+              Produkt hinzufügen <Plus size={14} />
             </Link>
           </div>
-          <div className="av-status-grid av-status-grid-4" aria-label="Objekt-Statusübersicht">
-            <StatusSummaryCard label="Objekte" value={items.length} />
+          <div className="av-status-grid av-status-grid-4" aria-label="Produkt-Statusübersicht">
+            <StatusSummaryCard label="Produkte" value={items.length} />
             <StatusSummaryCard label="Dokumente" value={documentCount} />
             <StatusSummaryCard label="Aufmerksamkeit" value={needsAttentionCount} tone={needsAttentionCount > 0 ? "warning" : "neutral"} />
           </div>
@@ -118,16 +120,16 @@ export function Items() {
             <div className="av-console-section-head">
               <div>
                 <span>Filter</span>
-                <h2>Objekte eingrenzen</h2>
+                <h2>Produkte eingrenzen</h2>
               </div>
-              <Link to="/app/capture/receipt">Rechnung scannen</Link>
+              {hasItems ? <Link to="/app/capture/receipt">Beleg hochladen</Link> : null}
             </div>
 
             <div className="av-search">
               <Search size={15} />
               <input
                 type="search"
-                placeholder="Objekt, Modell, Beleg oder Kategorie suchen"
+                placeholder="Produkt, Hersteller, Modell oder Seriennummer suchen"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
@@ -163,8 +165,8 @@ export function Items() {
           <article className="av-console-section">
             <div className="av-console-section-head">
               <div>
-                <span>Objektgedächtnis</span>
-                <h2>{filtered.length === 1 ? "1 gespeichertes Objekt" : `${filtered.length} gespeicherte Objekte`}</h2>
+                <span>Bestand</span>
+                <h2>{filtered.length === 1 ? "1 gespeichertes Produkt" : `${filtered.length} gespeicherte Produkte`}</h2>
               </div>
             </div>
 
@@ -179,7 +181,6 @@ export function Items() {
                     icon={categoryIcon(categoryBucket(item))}
                     identityLine={identityLine(item)}
                     locationLine={item.space?.name ?? item.location ?? item.category}
-                    smartHomeStatus={smartHomeStatus(item)}
                     missingLabel={missingLabel(item)}
                     completeness={item.completenessScore ?? 0}
                     invoicePresent={hasReceipt(item)}
@@ -201,15 +202,17 @@ export function Items() {
             primary
             to="/app/capture/item"
             icon={<Package size={16} />}
-            title="Objekt erfassen"
-            body="Produkt, Beleg, Garantie und offene Punkte strukturiert starten."
+            title="Produkt hinzufügen"
+            body="Produkt oder Gerät mit Beleg, Garantie und Seriennummer speichern."
           />
-          <QuickActionCard
-            to="/app/capture/receipt"
-            icon={<ScanLine size={16} />}
-            title="Beleg nachtragen"
-            body="Rechnung oder Nachweis mit einem bestehenden Objekt verbinden."
-          />
+          {hasItems ? (
+            <QuickActionCard
+              to="/app/capture/receipt"
+              icon={<ScanLine size={16} />}
+              title="Beleg nachtragen"
+              body="Rechnung oder Nachweis mit einem bestehenden Produkt verbinden."
+            />
+          ) : null}
         </aside>
       </div>
     </main>
@@ -222,11 +225,11 @@ function LibraryEmpty() {
   return (
     <div className="av-empty-rich av-empty-start">
       <div className="av-empty-copy">
-        <h3>Noch keine Objekte gespeichert</h3>
-        <p>Füge dein erstes echtes Objekt hinzu. Danach bleiben Belege, Garantie, Dokumente, Smart-Home-Verknüpfungen und offene Punkte damit verbunden.</p>
+        <h3>Noch keine Produkte gespeichert.</h3>
+        <p>Füge dein erstes Produkt hinzu und speichere Rechnung, Garantie und Seriennummer an einem Ort.</p>
         <div className="av-empty-actions">
-          <ActionButton to="/app/capture/item" icon={<Plus size={15} />}>Objekt erfassen</ActionButton>
-          <SecondaryAction to="/app/capture/receipt" icon={<ScanLine size={15} />}>Rechnung scannen</SecondaryAction>
+          <ActionButton to="/app/capture/item" icon={<Plus size={15} />}>Produkt hinzufügen</ActionButton>
+          <SecondaryAction to="/onboarding?resume=1">Geführten Einstieg öffnen</SecondaryAction>
         </div>
       </div>
     </div>
@@ -237,7 +240,7 @@ function FilteredEmpty({ onReset }: { onReset: () => void }) {
   return (
     <div className="av-empty">
       <p className="av-empty-title">Keine Treffer</p>
-      <div className="av-empty-body">Ändere Suche oder Filter, um andere Objekte zu sehen.</div>
+      <div className="av-empty-body">Ändere Suche oder Filter, um andere Produkte zu sehen.</div>
       <div style={{ marginTop: "1rem", display: "flex", justifyContent: "center" }}>
         <SecondaryAction onClick={onReset}>Filter zurücksetzen</SecondaryAction>
       </div>
@@ -288,17 +291,6 @@ function sortItems(a: Item, b: Item, sort: SortMode) {
 
 function identityLine(item: Item) {
   return [item.manufacturer, item.model].filter(Boolean).join(" / ") || item.itemType || "Objekt";
-}
-
-function smartHomeStatus(item: Item) {
-  const devices = item.smartHomeDevices ?? [];
-  if (!devices.length) return "Nicht verbunden";
-  const controllable = devices.some((device) => {
-    const text = `${device.name} ${device.deviceType}`.toLowerCase();
-    const capabilities = device.capabilities.map((capability) => capability.toLowerCase());
-    return text.includes("tv") || text.includes("samsung") || capabilities.includes("switch") || capabilities.includes("switchlevel");
-  });
-  return controllable ? "Steuerbar" : "Verbunden";
 }
 
 function missingLabel(item: Item) {

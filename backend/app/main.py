@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.auth import auth_middleware
+from app.config import beta_features
 from app.services.document_storage import UPLOAD_ROOT
 from app.routers import assistant, billing, capture, dashboard, documents, extract, friends, items, loops, me, mobile, notifications, planner, privacy, reports, rewards, search, smart_home, structure, vaults, webhooks
 
@@ -39,6 +40,13 @@ app.middleware("http")(auth_middleware)
 _auth_required = os.environ.get("AVARENO_REQUIRE_AUTH") == "1"
 _static_uploads_requested = os.environ.get("AVARENO_ENABLE_STATIC_UPLOADS", "").strip().lower() in {"1", "true", "yes", "on"}
 _is_production = os.environ.get("AVARENO_ENV", os.environ.get("ENV", "")).strip().lower() in {"production", "prod"}
+_beta = beta_features()
+
+if _beta.invite_only and not _auth_required:
+    raise RuntimeError(
+        "AVARENO_REQUIRE_AUTH=1 is required when BETA_INVITE_ONLY=true. "
+        "Refusing to start an invite-only beta with optional authentication."
+    )
 
 if _is_production and not _auth_required:
     # This app stores private receipts, warranties, personal documents and

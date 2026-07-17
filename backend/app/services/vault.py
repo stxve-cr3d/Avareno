@@ -174,7 +174,10 @@ def list_vaults(conn: sqlite3.Connection, user_id: str) -> list[dict[str, Any]]:
         conn.execute('SELECT * FROM "Vault" WHERE userId = ? ORDER BY createdAt ASC', (user_id,)).fetchall()
     )
     for vault in vaults:
-        count = conn.execute('SELECT COUNT(*) AS n FROM "Document" WHERE vaultId = ?', (vault["id"],)).fetchone()
+        count = conn.execute(
+            'SELECT COUNT(*) AS n FROM "Document" WHERE vaultId = ? AND userId = ?',
+            (vault["id"], user_id),
+        ).fetchone()
         vault["documentCount"] = int(count["n"]) if count else 0
     return vaults
 
@@ -189,7 +192,12 @@ def create_vault(conn: sqlite3.Connection, user_id: str, name: str) -> dict[str,
         'INSERT INTO "Vault" (id, userId, name, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)',
         (vault_id, user_id, cleaned, now, now),
     )
-    return row_to_dict(conn.execute('SELECT * FROM "Vault" WHERE id = ?', (vault_id,)).fetchone()) or {}
+    return row_to_dict(
+        conn.execute(
+            'SELECT * FROM "Vault" WHERE id = ? AND userId = ?',
+            (vault_id, user_id),
+        ).fetchone()
+    ) or {}
 
 
 def rename_vault(conn: sqlite3.Connection, user_id: str, vault_id: str, name: str) -> dict[str, Any]:
@@ -197,15 +205,26 @@ def rename_vault(conn: sqlite3.Connection, user_id: str, vault_id: str, name: st
     cleaned = name.strip()
     if not cleaned:
         raise VaultError("Vault braucht einen Namen.")
-    conn.execute('UPDATE "Vault" SET name = ?, updatedAt = ? WHERE id = ?', (cleaned, now_iso(), vault["id"]))
-    return row_to_dict(conn.execute('SELECT * FROM "Vault" WHERE id = ?', (vault_id,)).fetchone()) or {}
+    conn.execute(
+        'UPDATE "Vault" SET name = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+        (cleaned, now_iso(), vault["id"], user_id),
+    )
+    return row_to_dict(
+        conn.execute(
+            'SELECT * FROM "Vault" WHERE id = ? AND userId = ?',
+            (vault_id, user_id),
+        ).fetchone()
+    ) or {}
 
 
 def delete_vault(conn: sqlite3.Connection, user_id: str, vault_id: str) -> None:
     vault = _vault_for_user(conn, user_id, vault_id)
     # Documents leave the vault but are never deleted with it.
-    conn.execute('UPDATE "Document" SET vaultId = NULL, updatedAt = ? WHERE vaultId = ?', (now_iso(), vault["id"]))
-    conn.execute('DELETE FROM "Vault" WHERE id = ?', (vault["id"],))
+    conn.execute(
+        'UPDATE "Document" SET vaultId = NULL, updatedAt = ? WHERE vaultId = ? AND userId = ?',
+        (now_iso(), vault["id"], user_id),
+    )
+    conn.execute('DELETE FROM "Vault" WHERE id = ? AND userId = ?', (vault["id"], user_id))
 
 
 def vault_documents(conn: sqlite3.Connection, user_id: str, vault_id: str) -> list[dict[str, Any]]:
@@ -225,8 +244,16 @@ def assign_document(conn: sqlite3.Connection, user_id: str, vault_id: str, docum
     )
     if not document:
         raise VaultError("Dokument nicht gefunden.")
-    conn.execute('UPDATE "Document" SET vaultId = ?, updatedAt = ? WHERE id = ?', (vault["id"], now_iso(), document_id))
-    return row_to_dict(conn.execute('SELECT * FROM "Document" WHERE id = ?', (document_id,)).fetchone()) or {}
+    conn.execute(
+        'UPDATE "Document" SET vaultId = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+        (vault["id"], now_iso(), document_id, user_id),
+    )
+    return row_to_dict(
+        conn.execute(
+            'SELECT * FROM "Document" WHERE id = ? AND userId = ?',
+            (document_id, user_id),
+        ).fetchone()
+    ) or {}
 
 
 def remove_document(conn: sqlite3.Connection, user_id: str, vault_id: str, document_id: str) -> dict[str, Any]:
@@ -239,8 +266,16 @@ def remove_document(conn: sqlite3.Connection, user_id: str, vault_id: str, docum
     )
     if not document:
         raise VaultError("Dokument nicht in diesem Vault.")
-    conn.execute('UPDATE "Document" SET vaultId = NULL, updatedAt = ? WHERE id = ?', (now_iso(), document_id))
-    return row_to_dict(conn.execute('SELECT * FROM "Document" WHERE id = ?', (document_id,)).fetchone()) or {}
+    conn.execute(
+        'UPDATE "Document" SET vaultId = NULL, updatedAt = ? WHERE id = ? AND userId = ? AND vaultId = ?',
+        (now_iso(), document_id, user_id, vault["id"]),
+    )
+    return row_to_dict(
+        conn.execute(
+            'SELECT * FROM "Document" WHERE id = ? AND userId = ?',
+            (document_id, user_id),
+        ).fetchone()
+    ) or {}
 
 
 def _vault_for_user(conn: sqlite3.Connection, user_id: str, vault_id: str) -> dict[str, Any]:

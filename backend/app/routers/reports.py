@@ -26,10 +26,26 @@ def home_binder() -> dict:
         spaces: dict[str, dict] = {}
 
         for item in items:
-            documents = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ? AND vaultId IS NULL', (item["id"],)).fetchall())
+            documents = rows_to_dicts(
+                conn.execute(
+                    'SELECT * FROM "Document" WHERE itemId = ? AND userId = ? AND vaultId IS NULL',
+                    (item["id"], user["id"]),
+                ).fetchall()
+            )
             item["documents"] = documents
             item["missingFields"] = missing_fields(item, documents)
-            item["space"] = row_to_dict(conn.execute('SELECT * FROM "Space" WHERE id = ?', (item["spaceId"],)).fetchone()) if item.get("spaceId") else None
+            item["space"] = (
+                row_to_dict(
+                    conn.execute(
+                        '''SELECT s.* FROM "Space" s
+                           JOIN "Household" h ON h.id = s.householdId
+                           WHERE s.id = ? AND h.userId = ?''',
+                        (item["spaceId"], user["id"]),
+                    ).fetchone()
+                )
+                if item.get("spaceId")
+                else None
+            )
             total_value += float(item.get("price") or 0)
             missing_total += len(item["missingFields"])
             warranty = parse_iso(item.get("warrantyUntil"))

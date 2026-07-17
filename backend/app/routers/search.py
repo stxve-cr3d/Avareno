@@ -27,7 +27,12 @@ def search(q: str = Query("", min_length=0)) -> dict:
 
         items = rows_to_dicts(conn.execute('SELECT * FROM "Item" WHERE userId = ?', (user["id"],)).fetchall())
         for item in items:
-            docs = rows_to_dicts(conn.execute('SELECT * FROM "Document" WHERE itemId = ? AND vaultId IS NULL', (item["id"],)).fetchall())
+            docs = rows_to_dicts(
+                conn.execute(
+                    'SELECT * FROM "Document" WHERE itemId = ? AND userId = ? AND vaultId IS NULL',
+                    (item["id"], user["id"]),
+                ).fetchall()
+            )
             if _contains(
                 [
                     item.get("name"),

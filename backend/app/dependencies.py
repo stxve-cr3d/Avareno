@@ -83,6 +83,8 @@ def _get_or_create_auth_user(conn: sqlite3.Connection) -> dict | None:
     metadata = claims.get("user_metadata") if isinstance(claims.get("user_metadata"), dict) else {}
     display_name = metadata.get("display_name") or metadata.get("full_name") or metadata.get("name")
     now = now_iso()
+    auth_created_at = claims.get("auth_created_at")
+    created_at = auth_created_at if isinstance(auth_created_at, str) and auth_created_at.strip() else now
     try:
         conn.execute(
             'INSERT INTO "User" (id, name, email, xp, level, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -92,7 +94,7 @@ def _get_or_create_auth_user(conn: sqlite3.Connection) -> dict | None:
                 local_email,
                 0,
                 1,
-                now,
+                created_at,
                 now,
             ),
         )
@@ -109,7 +111,7 @@ def _get_or_create_auth_user(conn: sqlite3.Connection) -> dict | None:
                 local_email,
                 0,
                 1,
-                now,
+                created_at,
                 now,
             ),
         )

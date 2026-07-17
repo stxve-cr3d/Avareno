@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextvars
+import hashlib
 import json
 import os
 from typing import Any
@@ -67,6 +68,10 @@ async def auth_middleware(request: Request, call_next):
         if required:
             return JSONResponse({"detail": "Invalid or expired access token"}, status_code=401)
         return await call_next(request)
+
+    subject = claims.get("sub")
+    if isinstance(subject, str) and await run_in_threadpool(is_auth_subject_revoked, subject):
+        return JSONResponse({"detail": "Invalid or expired access token"}, status_code=401)
 
     request.state.auth_claims = claims
     request.state.auth_user_id = claims.get("sub")
@@ -149,6 +154,7 @@ def _verify_supabase_access_token_with_auth_server(token: str, supabase_url: str
         "aud": payload.get("aud") or "authenticated",
         "role": payload.get("role") or "authenticated",
         "email": payload.get("email"),
+        "auth_created_at": payload.get("created_at"),
         "iss": f"{supabase_url.rstrip('/')}/auth/v1",
         "user_metadata": payload.get("user_metadata") if isinstance(payload.get("user_metadata"), dict) else {},
         "app_metadata": payload.get("app_metadata") if isinstance(payload.get("app_metadata"), dict) else {},
@@ -175,3 +181,20 @@ def _bearer_token(auth_header: str) -> str | None:
         return None
     token = auth_header[len(prefix):].strip()
     return token or None
+
+
+def auth_subject_hash(subject: str) -> str:
+    return hashlib.sha256(f"avareno-auth-revocation:v1:{subject}".encode("utf-8")).hexdigest()
+
+
+def is_auth_subject_revoked(subject: str) -> bool:
+    # Local import avoids an auth <-> database import cycle during app boot.
+    from app.db import db
+    from app.utils import now_iso
+
+    with db() as conn:
+        row = conn.execute(
+            'SELECT 1 FROM "AuthRevocation" WHERE subjectHash = ? AND expiresAt > ? LIMIT 1',
+            (auth_subject_hash(subject), now_iso()),
+        ).fetchone()
+        return bool(row)

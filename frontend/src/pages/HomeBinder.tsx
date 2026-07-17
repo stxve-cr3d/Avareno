@@ -78,9 +78,9 @@ export function HomeBinder() {
     <main className="documents-page">
       <section className="documents-hero">
         <div>
-          <span>Hausakte</span>
+          <span>Dokumente & Belege</span>
           <h1>Dokumente</h1>
-          <p>Belege, Garantien und wichtige Nachweise bleiben bei den Objekten, zu denen sie gehören.</p>
+          <p>Belege, Garantien und wichtige Nachweise bleiben bei den Produkten, zu denen sie gehören.</p>
         </div>
       </section>
 
@@ -90,8 +90,8 @@ export function HomeBinder() {
           <h2>{report.summary.readiness}% vollständig</h2>
           <p>
             {missingItems.length > 0
-              ? `${missingItems.length} Objekte brauchen noch einen Beleg, eine Garantie oder einen Standort.`
-              : "Alle wichtigen Objekte haben aktuell genug Kontext für Garantie, Versicherung und Support."}
+              ? `${missingItems.length} ${missingItems.length === 1 ? "Produkt braucht" : "Produkte brauchen"} noch einen Beleg, eine Garantie oder einen Standort.`
+              : "Alle wichtigen Produkte haben aktuell genug Kontext für Garantie, Versicherung und Support."}
           </p>
           <ProgressBar value={report.summary.readiness} />
         </div>
@@ -103,7 +103,7 @@ export function HomeBinder() {
 
       <section className="documents-stats" aria-label="Dokumente Überblick">
         <DocumentStat icon={<FileText size={18} />} label="Dokumente" value={String(archive.length)} />
-        <DocumentStat icon={<Archive size={18} />} label="Objekte" value={String(report.summary.itemCount)} />
+        <DocumentStat icon={<Archive size={18} />} label="Produkte" value={String(report.summary.itemCount)} />
         <DocumentStat icon={<ShieldCheck size={18} />} label="Geschützt" value={String(report.summary.protectedCount)} />
         <DocumentStat icon={<FileCheck2 size={18} />} label="Offen" value={String(report.summary.missingDataPoints)} />
       </section>
@@ -153,8 +153,8 @@ export function HomeBinder() {
         <article className="documents-panel documents-main-list">
           <div className="documents-panel-head">
             <div>
-              <span>Produktakten</span>
-              <h2>Wichtige Objekte</h2>
+              <span>Produkte</span>
+              <h2>Wichtige Produkte</h2>
             </div>
             <Link to="/app/dinge">Alle anzeigen</Link>
           </div>
@@ -201,7 +201,7 @@ export function HomeBinder() {
               <div className="documents-space-row" key={space.name}>
                 <div>
                   <strong>{space.name}</strong>
-                  <small>{space.itemCount} Objekte</small>
+                  <small>{space.itemCount} {space.itemCount === 1 ? "Produkt" : "Produkte"}</small>
                 </div>
                 <span>{Math.round(space.value)} EUR</span>
               </div>
@@ -218,9 +218,9 @@ function DocumentsEmpty() {
     <main className="documents-page">
       <section className="documents-hero">
         <div>
-          <span>Hausakte</span>
+          <span>Dokumente & Belege</span>
           <h1>Dokumente</h1>
-          <p>Belege, Garantien und wichtige Nachweise bleiben bei den Objekten, zu denen sie gehören.</p>
+          <p>Belege, Garantien und wichtige Nachweise bleiben bei den Produkten, zu denen sie gehören.</p>
         </div>
       </section>
 
@@ -228,21 +228,21 @@ function DocumentsEmpty() {
         <div className="av-empty-rich">
           <div className="av-empty-visual">
             <ObjectMemoryGraph
-              title="LG OLED C3"
-              category="Beispiel · Hausakte eines Objekts"
+              title="Kaffeemaschine"
+              category="Beispiel · Dokumente eines Produkts"
               icon={<Package size={14} />}
               edges={[
                 { tone: "green", label: "Rechnung gespeichert" },
-                { tone: "amber", label: "Garantie bis 2027" },
+                { tone: "amber", label: "Garantie hinterlegt" },
                 { tone: "neutral", label: "Anleitung verbunden" }
               ]}
             />
           </div>
           <div className="av-empty-copy">
-            <h3>Noch keine Dokumente abgelegt</h3>
-            <p>Lade Belege, Garantien, Anleitungen oder wichtige PDFs hoch. Du kannst sie mit Produkten verbinden — sie bleiben bei dem Objekt, zu dem sie gehören.</p>
+            <h3>Noch keine Dokumente gespeichert.</h3>
+            <p>Lade eine Rechnung, Garantie oder Anleitung zu einem Produkt hoch — sie bleibt bei dem Produkt, zu dem sie gehört.</p>
             <div className="av-empty-actions">
-              <ActionButton to="/app/capture/item" icon={<Plus size={15} />}>Erstes Objekt erfassen</ActionButton>
+              <ActionButton to="/app/capture/item" icon={<Plus size={15} />}>Erstes Produkt hinzufügen</ActionButton>
               <SecondaryAction to="/app/capture/receipt" icon={<ScanLine size={15} />}>Beleg hochladen</SecondaryAction>
             </div>
           </div>

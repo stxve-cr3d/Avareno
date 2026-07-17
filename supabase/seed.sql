@@ -1,0 +1,1 @@
+-- Intentionally empty. Security QA creates and removes two controlled users.

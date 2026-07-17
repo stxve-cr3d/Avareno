@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, ScanBarcode, X } from "lucide-react";
+import { useLanguage } from "../lib/language";
 
 const preferredFormats: BarcodeDetectorFormat[] = ["qr_code", "ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "itf"];
 
@@ -10,10 +11,12 @@ type Props = {
 };
 
 export function BarcodeScannerDialog({ onClose, onDetected, open }: Props) {
+  const { language } = useLanguage();
+  const copy = language === "de" ? deCopy : enCopy;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const frameRef = useRef<number | null>(null);
-  const [message, setMessage] = useState("Kamera startet...");
+  const [message, setMessage] = useState(copy.starting);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -30,18 +33,18 @@ export function BarcodeScannerDialog({ onClose, onDetected, open }: Props) {
 
     async function startScanner() {
       setError("");
-      setMessage("Kamera startet...");
+      setMessage(copy.starting);
 
       if (!navigator.mediaDevices?.getUserMedia) {
-        setError("Dein Browser kann die Kamera hier nicht öffnen. Füge den Barcode stattdessen manuell ein.");
-        setMessage("Manuelle Eingabe verfügbar");
+        setError(copy.cameraUnsupported);
+        setMessage(copy.manualAvailable);
         return;
       }
 
       const BarcodeDetectorConstructor = window.BarcodeDetector;
       if (!BarcodeDetectorConstructor) {
-        setError("Automatisches Barcode-Scannen wird in diesem Browser noch nicht unterstützt. Füge den Barcode stattdessen manuell ein.");
-        setMessage("Manuelle Eingabe verfügbar");
+        setError(copy.scannerUnsupported);
+        setMessage(copy.manualAvailable);
         return;
       }
 
@@ -68,7 +71,7 @@ export function BarcodeScannerDialog({ onClose, onDetected, open }: Props) {
         if (!video) return;
         video.srcObject = stream;
         await video.play();
-        setMessage("Halte QR-Code oder Barcode in den Rahmen");
+        setMessage(copy.holdCode);
 
         const scan = async () => {
           if (cancelled || !videoRef.current) return;
@@ -90,9 +93,9 @@ export function BarcodeScannerDialog({ onClose, onDetected, open }: Props) {
 
         frameRef.current = requestAnimationFrame(scan);
       } catch (caught) {
-        const detail = caught instanceof Error && caught.name === "NotAllowedError" ? "Die Kamerafreigabe wurde abgelehnt." : "Die Kamera konnte nicht gestartet werden.";
-        setError(`${detail} Füge den Barcode stattdessen manuell ein.`);
-        setMessage("Manuelle Eingabe verfügbar");
+        const detail = caught instanceof Error && caught.name === "NotAllowedError" ? copy.permissionDenied : copy.cameraFailed;
+        setError(`${detail} ${copy.manualFallback}`);
+        setMessage(copy.manualAvailable);
         stop();
       }
     }
@@ -102,7 +105,7 @@ export function BarcodeScannerDialog({ onClose, onDetected, open }: Props) {
       cancelled = true;
       stop();
     };
-  }, [onDetected, open]);
+  }, [copy.cameraFailed, copy.cameraUnsupported, copy.holdCode, copy.manualAvailable, copy.manualFallback, copy.permissionDenied, copy.scannerUnsupported, copy.starting, onDetected, open]);
 
   if (!open) return null;
 
@@ -111,8 +114,8 @@ export function BarcodeScannerDialog({ onClose, onDetected, open }: Props) {
       <div className="mx-auto mt-8 max-w-lg overflow-hidden rounded-lg border border-white/12 bg-[#101111] text-white shadow-[0_32px_100px_rgba(0,0,0,0.42)] md:mt-20" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-4 p-4">
           <div>
-            <p className="text-xs font-bold uppercase text-white/50">Barcode-Scan</p>
-            <h2 className="mt-1 text-2xl font-semibold">Produkt finden</h2>
+            <p className="text-xs font-bold uppercase text-white/50">{copy.eyebrow}</p>
+            <h2 className="mt-1 text-2xl font-semibold">{copy.title}</h2>
           </div>
           <button className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/10 text-white/75 transition hover:bg-white/16 hover:text-white" onClick={onClose} type="button">
             <X size={18} />
@@ -126,7 +129,7 @@ export function BarcodeScannerDialog({ onClose, onDetected, open }: Props) {
           </div>
           <div className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-full bg-black/60 px-3 py-2 text-xs font-semibold text-white/82">
             <Camera size={14} />
-            Live-Kamera
+            {copy.liveCamera}
           </div>
         </div>
 
@@ -138,7 +141,7 @@ export function BarcodeScannerDialog({ onClose, onDetected, open }: Props) {
             <div>
               <p className="text-sm font-semibold">{message}</p>
               <p className="mt-1 text-sm font-medium leading-6 text-white/58">
-                QR-, EAN-, UPC- und GTIN-Codes werden unterstützt, wenn dein Browser natives Scannen freigibt.
+                {copy.formats}
               </p>
             </div>
           </div>
@@ -148,3 +151,33 @@ export function BarcodeScannerDialog({ onClose, onDetected, open }: Props) {
     </div>
   );
 }
+
+const deCopy = {
+  starting: "Kamera startet …",
+  cameraUnsupported: "Dein Browser kann die Kamera hier nicht öffnen. Füge den Barcode stattdessen manuell ein.",
+  scannerUnsupported: "Automatisches Barcode-Scannen wird in diesem Browser noch nicht unterstützt. Füge den Barcode stattdessen manuell ein.",
+  manualAvailable: "Manuelle Eingabe verfügbar",
+  holdCode: "Halte QR-Code oder Barcode in den Rahmen",
+  permissionDenied: "Die Kamerafreigabe wurde abgelehnt.",
+  cameraFailed: "Die Kamera konnte nicht gestartet werden.",
+  manualFallback: "Füge den Barcode stattdessen manuell ein.",
+  eyebrow: "Barcode-Scan",
+  title: "Produkt finden",
+  liveCamera: "Live-Kamera",
+  formats: "QR-, EAN-, UPC- und GTIN-Codes werden unterstützt, wenn dein Browser natives Scannen freigibt."
+};
+
+const enCopy: typeof deCopy = {
+  starting: "Starting camera …",
+  cameraUnsupported: "Your browser cannot open the camera here. Enter the barcode manually instead.",
+  scannerUnsupported: "Automatic barcode scanning is not supported in this browser yet. Enter the barcode manually instead.",
+  manualAvailable: "Manual entry available",
+  holdCode: "Hold the QR code or barcode inside the frame",
+  permissionDenied: "Camera permission was denied.",
+  cameraFailed: "The camera could not be started.",
+  manualFallback: "Enter the barcode manually instead.",
+  eyebrow: "Barcode scan",
+  title: "Find product",
+  liveCamera: "Live camera",
+  formats: "QR, EAN, UPC and GTIN codes are supported when your browser provides native scanning."
+};

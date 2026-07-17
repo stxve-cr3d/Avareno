@@ -43,11 +43,16 @@ def mark_notification_read(notification_id: str) -> dict:
         if not reminder:
             raise HTTPException(status_code=404, detail="Notification not found")
         conn.execute(
-            'UPDATE "Reminder" SET status = ?, updatedAt = ? WHERE id = ?',
-            ("SENT", now_iso(), notification_id),
+            'UPDATE "Reminder" SET status = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+            ("SENT", now_iso(), notification_id, user["id"]),
         )
-        updated = row_to_dict(conn.execute('SELECT * FROM "Reminder" WHERE id = ?', (notification_id,)).fetchone())
-        return enrich_reminder(conn, updated or reminder)
+        updated = row_to_dict(
+            conn.execute(
+                'SELECT * FROM "Reminder" WHERE id = ? AND userId = ?',
+                (notification_id, user["id"]),
+            ).fetchone()
+        )
+        return enrich_reminder(conn, updated or reminder, user["id"])
 
 
 @router.post("/{notification_id}/dismiss")
@@ -63,11 +68,16 @@ def dismiss_notification(notification_id: str) -> dict:
         if not reminder:
             raise HTTPException(status_code=404, detail="Notification not found")
         conn.execute(
-            'UPDATE "Reminder" SET status = ?, updatedAt = ? WHERE id = ?',
-            ("CANCELLED", now_iso(), notification_id),
+            'UPDATE "Reminder" SET status = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+            ("CANCELLED", now_iso(), notification_id, user["id"]),
         )
-        updated = row_to_dict(conn.execute('SELECT * FROM "Reminder" WHERE id = ?', (notification_id,)).fetchone())
-        return enrich_reminder(conn, updated or reminder)
+        updated = row_to_dict(
+            conn.execute(
+                'SELECT * FROM "Reminder" WHERE id = ? AND userId = ?',
+                (notification_id, user["id"]),
+            ).fetchone()
+        )
+        return enrich_reminder(conn, updated or reminder, user["id"])
 
 
 @router.post("/{notification_id}/snooze")
@@ -84,13 +94,18 @@ def snooze_notification(notification_id: str, payload: NotificationSnoozeRequest
             raise HTTPException(status_code=404, detail="Notification not found")
         remind_at = normalize_iso(payload.remindAt)
         conn.execute(
-            'UPDATE "Reminder" SET status = ?, remindAt = ?, updatedAt = ? WHERE id = ?',
-            ("ACTIVE", remind_at, now_iso(), notification_id),
+            'UPDATE "Reminder" SET status = ?, remindAt = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+            ("ACTIVE", remind_at, now_iso(), notification_id, user["id"]),
         )
         if reminder.get("loopId"):
             conn.execute(
-                'UPDATE "Loop" SET status = ?, reminderAt = ?, updatedAt = ? WHERE id = ?',
-                ("SNOOZED", remind_at, now_iso(), reminder["loopId"]),
+                'UPDATE "Loop" SET status = ?, reminderAt = ?, updatedAt = ? WHERE id = ? AND userId = ?',
+                ("SNOOZED", remind_at, now_iso(), reminder["loopId"], user["id"]),
             )
-        updated = row_to_dict(conn.execute('SELECT * FROM "Reminder" WHERE id = ?', (notification_id,)).fetchone())
-        return enrich_reminder(conn, updated or reminder)
+        updated = row_to_dict(
+            conn.execute(
+                'SELECT * FROM "Reminder" WHERE id = ? AND userId = ?',
+                (notification_id, user["id"]),
+            ).fetchone()
+        )
+        return enrich_reminder(conn, updated or reminder, user["id"])

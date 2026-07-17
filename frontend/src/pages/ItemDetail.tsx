@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import QRCode from "qrcode";
@@ -46,7 +46,10 @@ import {
   Wrench
 } from "lucide-react";
 import { api, apiResourceUrl, dateInputValue, isoDate } from "../lib/api";
+import { recordActivationAction } from "../lib/activation";
+import { betaFeatures } from "../lib/betaFeatures";
 import { getAuthAccessToken } from "../lib/authClient";
+import { useLanguage } from "../lib/language";
 import { productQrUrl } from "../lib/productQr";
 import { missingFieldLabel } from "../lib/uiText";
 import type { Document as MemoryDocument, Item, Loop, RepairLog, SmartHomeDevice, SupportDraft, SupportDraftAttachment } from "../lib/types";
@@ -64,12 +67,6 @@ import {
 } from "../components/app/AppKit";
 import type { GraphEdge } from "../components/app/AppKit";
 import { InlineNotice, SuggestionPanel } from "../components/app/Notifications";
-
-type ImageSuggestion = {
-  imageUrl: string;
-  sourceName: string;
-  sourceUrl: string;
-};
 
 type RecommendationTab = "spare" | "buy" | "print" | "check";
 
@@ -142,15 +139,31 @@ type ProductSupportSuggestion = {
 };
 
 const documentTypes = ["RECEIPT", "WARRANTY", "MANUAL", "DRIVER", "SOFTWARE", "OTHER"] as const;
+const documentTypeLabels: Record<(typeof documentTypes)[number], string> = {
+  RECEIPT: "Rechnung / Beleg",
+  WARRANTY: "Garantienachweis",
+  MANUAL: "Bedienungsanleitung",
+  DRIVER: "Treiber",
+  SOFTWARE: "Software",
+  OTHER: "Sonstiges Dokument"
+};
 
 export function ItemDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { language } = useLanguage();
+  const routeState = location.state as {
+    activationOrigin?: string;
+    documentAdded?: boolean;
+    justCreated?: boolean;
+  } | null;
+  const activationRecordedRef = useRef(false);
   // First-value moment: shown once right after this object was created.
   const [showCreatedNotice, setShowCreatedNotice] = useState<boolean>(
-    Boolean((location.state as { justCreated?: boolean } | null)?.justCreated)
+    Boolean(routeState?.justCreated)
   );
+  const [showDocumentNotice, setShowDocumentNotice] = useState(Boolean(routeState?.documentAdded));
   const [item, setItem] = useState<Item | null>(null);
   const [serialNumber, setSerialNumber] = useState("");
   const [ownershipForm, setOwnershipForm] = useState<OwnershipForm>({
@@ -173,7 +186,6 @@ export function ItemDetail() {
     supportContact: ""
   });
   const [reminderTitle, setReminderTitle] = useState("");
-  const [imageSource, setImageSource] = useState<ImageSuggestion | null>(null);
   const [reorderUrl, setReorderUrl] = useState("");
   const [affiliateUrl, setAffiliateUrl] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
@@ -236,36 +248,16 @@ export function ItemDetail() {
   }, [id]);
 
   useEffect(() => {
+    if (routeState?.activationOrigin !== "first-product" || activationRecordedRef.current) return;
+    activationRecordedRef.current = true;
+    void recordActivationAction("product_detail_opened").catch(() => undefined);
+  }, [routeState?.activationOrigin]);
+
+  useEffect(() => {
     if (!reviewDocumentId || !item?.documents?.some((document) => document.id === reviewDocumentId)) {
       setReviewDocumentId(null);
     }
   }, [item?.documents, reviewDocumentId]);
-
-  useEffect(() => {
-    if (!item || item.imageUrl) return;
-    let ignore = false;
-
-    async function fillProductImage() {
-      if (!item) return;
-      try {
-        const suggestion = await api<ImageSuggestion>(`/api/items/${item.id}/image-suggestion`);
-        if (ignore) return;
-        setImageSource(suggestion);
-        const updated = await api<Item>(`/api/items/${item.id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ imageUrl: suggestion.imageUrl })
-        });
-        if (!ignore) setItem(updated);
-      } catch {
-        if (!ignore) setImageSource(null);
-      }
-    }
-
-    void fillProductImage();
-    return () => {
-      ignore = true;
-    };
-  }, [item?.id, item?.imageUrl]);
 
   async function saveSerial() {
     if (!item) return;
@@ -408,8 +400,10 @@ export function ItemDetail() {
       data.append("itemId", item.id);
       await api("/api/documents/upload", { method: "POST", body: data });
       setDocumentFile(null);
-      setDetailMessage(`${documentType.toLowerCase()} hochgeladen`);
+      setDetailMessage("Dokument gespeichert");
       await load();
+    } catch {
+      setDetailMessage("Das Dokument konnte nicht gespeichert werden. Die Produktakte bleibt unverändert.");
     } finally {
       setBusy("");
     }
@@ -685,8 +679,8 @@ export function ItemDetail() {
 
   return (
     <main className="av-page">
-      <Link className="av-back" to="/app/items">
-        <ArrowLeft size={15} /> Zurück zu Objekte
+      <Link className="av-back" to="/app/dinge">
+        <ArrowLeft size={15} /> Zurück zu Meine Produkte
       </Link>
 
       <AppPageHeader
@@ -697,7 +691,7 @@ export function ItemDetail() {
           receiptPresent ? (
             <ActionButton to="/app/care" icon={<BellRing size={15} />}>Erinnerung öffnen</ActionButton>
           ) : (
-            <ActionButton to="/app/capture/receipt" icon={<Plus size={15} />}>Beleg hinzufügen</ActionButton>
+            <ActionButton to={`/app/capture/receipt?itemId=${encodeURIComponent(item.id)}`} icon={<Plus size={15} />}>Beleg hinzufügen</ActionButton>
           )
         }
       />
@@ -707,7 +701,8 @@ export function ItemDetail() {
         <a href="#object-documents">Dokumente</a>
         <a href="#object-warranty">Garantie</a>
         <a href="#object-service">Service</a>
-        <a href="#object-smart-home">Smart Home</a>
+        {/* Disabled for the focused Avareno beta. Kept for a later product phase. */}
+        {betaFeatures.smartHome ? <a href="#object-smart-home">Smart Home</a> : null}
         <a href="#object-notes">Notizen</a>
       </nav>
 
@@ -715,10 +710,26 @@ export function ItemDetail() {
         <div className="av-detail-notices">
           <InlineNotice
             variant="success"
-            title="Avareno merkt sich das jetzt für dich."
-            description="Beleg, Garantie, Dokumente und offene Punkte bleiben mit diesem Objekt verbunden — und du siehst hier, was noch fehlt."
-            actionLabel="Verstanden"
+            title={language === "de" ? "Dein Produkt ist gespeichert." : "Your product is saved."}
+            description={language === "de"
+              ? "Fehlende Angaben kannst du später ergänzen. Belege, Garantien und Dokumente bleiben mit dieser Produktakte verbunden."
+              : "You can add missing details later. Receipts, warranty details and documents remain linked to this product record."}
+            actionLabel={language === "de" ? "Verstanden" : "Got it"}
             onAction={() => setShowCreatedNotice(false)}
+          />
+        </div>
+      ) : null}
+
+      {showDocumentNotice ? (
+        <div className="av-detail-notices">
+          <InlineNotice
+            variant="success"
+            title={language === "de" ? "Dokument gespeichert." : "Document saved."}
+            description={language === "de"
+              ? "Die Datei ist dieser Produktakte zugeordnet. Angaben kannst du manuell ergänzen."
+              : "The file is linked to this product record. You can add details manually."}
+            actionLabel={language === "de" ? "Verstanden" : "Got it"}
+            onAction={() => setShowDocumentNotice(false)}
           />
         </div>
       ) : null}
@@ -731,7 +742,7 @@ export function ItemDetail() {
               title="Beleg fehlt"
               description={`Für ${item.name} ist noch kein Kaufnachweis gespeichert.`}
               actionLabel="Beleg hinzufügen"
-              actionTo="/app/capture/receipt"
+              actionTo={`/app/capture/receipt?itemId=${encodeURIComponent(item.id)}`}
             />
           ) : null}
           {warrantyNeedsAttention ? (
@@ -761,7 +772,7 @@ export function ItemDetail() {
             ) : (
               <div className="av-profile-image-empty">
                 <ImageOff size={26} />
-                <span>Produktfoto wird gesucht</span>
+                <span>Kein Produktbild hinterlegt</span>
               </div>
             )}
           </div>
@@ -780,7 +791,7 @@ export function ItemDetail() {
               <MetadataRow label="Marke / Modell" value={identity} />
               <MetadataRow label="Gekauft bei" value={item.merchant ?? "Unbekannt"} />
               <MetadataRow label="Gekauft am" value={formatDate(item.purchaseDate)} />
-              <MetadataRow label="Preis" value={`${item.price ?? 0} ${item.currency}`} />
+              <MetadataRow label="Preis" value={item.price == null ? "Nicht hinterlegt" : `${item.price} ${item.currency}`} />
               <MetadataRow label="Standort" value={item.space?.name ?? item.location ?? "Unbekannt"} />
             </dl>
           </div>
@@ -793,12 +804,29 @@ export function ItemDetail() {
           </div>
           <div className="av-profile-block">
             <span className="av-label-sm">Garantie</span>
-            <WarrantyTimeline
-              elapsedPct={warrantyElapsedPct(item.purchaseDate, item.warrantyUntil)}
-              daysLeft={wDays}
-              purchaseLabel={`Kauf · ${formatDate(item.purchaseDate)}`}
-              endLabel={`Ende · ${formatDate(item.warrantyUntil)}`}
-            />
+            {item.warrantyUntil ? (
+              <WarrantyTimeline
+                elapsedPct={warrantyElapsedPct(item.purchaseDate, item.warrantyUntil)}
+                daysLeft={wDays}
+                purchaseLabel={`Kauf · ${formatDate(item.purchaseDate)}`}
+                endLabel={`Ende · ${formatDate(item.warrantyUntil)}`}
+              />
+            ) : (
+              <div className="mt-3 rounded-lg border border-line av-surface p-3">
+                <p className="text-sm font-black text-ink">Garantieende noch nicht bestimmbar.</p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-muted">Ergänze Kaufdatum oder Garantieende, sobald du den Nachweis zur Hand hast.</p>
+                <button
+                  className="mt-3 text-xs font-black text-leaf"
+                  type="button"
+                  onClick={() => {
+                    setOwnershipEditing(true);
+                    document.getElementById("object-overview")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                >
+                  Kaufdatum und Garantie ergänzen
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -827,7 +855,7 @@ export function ItemDetail() {
                   <EditableDetailField icon={<CreditCard size={18} />} label={`Gezahlt (${item.currency})`} value={ownershipForm.price} onChange={(value) => updateOwnershipField("price", value)} placeholder="0.00" type="number" />
                   <EditableDetailField icon={<ShieldCheck size={18} />} label="Garantie bis" value={ownershipForm.warrantyUntil} onChange={(value) => updateOwnershipField("warrantyUntil", value)} type="date" />
                   <EditableDetailField icon={<Package size={18} />} label="Marke" value={ownershipForm.manufacturer} onChange={(value) => updateOwnershipField("manufacturer", value)} placeholder="Samsung" />
-                  <EditableDetailField icon={<Package size={18} />} label="Modell" value={ownershipForm.model} onChange={(value) => updateOwnershipField("model", value)} placeholder="OLED, Modellnummer..." />
+                  <EditableDetailField icon={<Package size={18} />} label="Modell" value={ownershipForm.model} onChange={(value) => updateOwnershipField("model", value)} placeholder="Modellnummer..." />
                   <EditableDetailField icon={<ClipboardCheck size={18} />} label="Seriennummer" value={ownershipForm.serialNumber} onChange={(value) => updateOwnershipField("serialNumber", value)} placeholder="Seriennummer" />
                   <EditableDetailField icon={<ScanBarcode size={18} />} label="Barcode / GTIN" value={ownershipForm.barcode} onChange={(value) => updateOwnershipField("barcode", value)} placeholder="EAN / GTIN" />
                   <EditableDetailField icon={<MapPin size={18} />} label="Standort" value={ownershipForm.location} onChange={(value) => updateOwnershipField("location", value)} placeholder="Wohnzimmer" />
@@ -842,7 +870,7 @@ export function ItemDetail() {
                 <>
                   <DetailRow icon={<Store size={18} />} label="Gekauft bei" onClick={() => setOwnershipEditing(true)} value={item.merchant ?? "Unbekannt"} />
                   <DetailRow icon={<CalendarClock size={18} />} label="Gekauft am" onClick={() => setOwnershipEditing(true)} value={formatDate(item.purchaseDate)} />
-                  <DetailRow icon={<CreditCard size={18} />} label="Gezahlt" onClick={() => setOwnershipEditing(true)} value={`${item.price ?? 0} ${item.currency}`} />
+                  <DetailRow icon={<CreditCard size={18} />} label="Gezahlt" onClick={() => setOwnershipEditing(true)} value={item.price == null ? "Nicht hinterlegt" : `${item.price} ${item.currency}`} />
                   <DetailRow icon={<ShieldCheck size={18} />} label="Garantie bis" onClick={() => setOwnershipEditing(true)} value={formatDate(item.warrantyUntil)} />
                   <DetailRow icon={<Package size={18} />} label="Marke / Modell" onClick={() => setOwnershipEditing(true)} value={identity} />
                   <DetailRow icon={<ClipboardCheck size={18} />} label="Seriennummer" onClick={() => setOwnershipEditing(true)} value={item.serialNumber ?? "Fehlt"} />
@@ -906,7 +934,7 @@ export function ItemDetail() {
                       label="Support-Kontakt"
                       value={passportLinks.supportContact}
                       onChange={(value) => setPassportLinks((current) => ({ ...current, supportContact: value }))}
-                      placeholder="LG Support, support@example.com, case portal"
+                      placeholder="Hersteller-Support, support@example.com"
                     />
                   </div>
                 </div>
@@ -968,21 +996,31 @@ export function ItemDetail() {
             )}
           </section>
 
-          <ProductRecommendationPanel item={item} tab={recommendationTab} setTab={setRecommendationTab} />
+          {/* Disabled for the focused Avareno beta: the curated examples were
+              LG-specific demo data, not a real parts search. Kept for a later
+              product phase. */}
+          {betaFeatures.recommendations ? (
+            <ProductRecommendationPanel item={item} tab={recommendationTab} setTab={setRecommendationTab} />
+          ) : null}
 
           <section className="object-panel rounded-lg p-4 md:p-5" id="object-documents">
             <div className="flex items-start justify-between gap-3">
               <SectionTitle eyebrow="Nachweise" title="Belege und Dokumente" icon={<ReceiptText size={19} />} />
-              <button
-                className="profile-secondary-action is-muted"
-                onClick={() => {
-                  if (documentsEditing) setDocumentFile(null);
-                  setDocumentsEditing((current) => !current);
-                }}
-                type="button"
-              >
-                {documentsEditing ? <Lock size={15} /> : <Pencil size={15} />} {documentsEditing ? "Sperren" : "Bearbeiten"}
-              </button>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Link className="profile-secondary-action is-muted" to={`/app/capture/receipt?itemId=${encodeURIComponent(item.id)}`}>
+                  <Plus size={15} /> Dokument hinzufügen
+                </Link>
+                <button
+                  className="profile-secondary-action is-muted"
+                  onClick={() => {
+                    if (documentsEditing) setDocumentFile(null);
+                    setDocumentsEditing((current) => !current);
+                  }}
+                  type="button"
+                >
+                  {documentsEditing ? <Lock size={15} /> : <Pencil size={15} />} {documentsEditing ? "Sperren" : "Bearbeiten"}
+                </button>
+              </div>
             </div>
             {documentsEditing ? (
               <div className="mt-5 rounded-lg border border-line av-surface p-3">
@@ -995,7 +1033,7 @@ export function ItemDetail() {
                       <input
                         className="hidden"
                         type="file"
-                        accept="image/*,.pdf,.txt,.doc,.docx"
+                        accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
                         onChange={(event) => setDocumentFile(event.target.files?.[0] ?? null)}
                       />
                     </span>
@@ -1009,7 +1047,7 @@ export function ItemDetail() {
                     >
                       {documentTypes.map((type) => (
                         <option key={type} value={type}>
-                          {type}
+                          {documentTypeLabels[type]}
                         </option>
                       ))}
                     </select>
@@ -1080,9 +1118,9 @@ export function ItemDetail() {
               <div className="mt-4 rounded-lg border border-line av-surface p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <span className="text-[0.68rem] font-black uppercase tracking-[0.08em] text-muted">KI-Extraktion prüfen</span>
+                    <span className="text-[0.68rem] font-black uppercase tracking-[0.08em] text-muted">Gespeicherte Dokumentdaten prüfen</span>
                     <h3 className="mt-1 text-base font-black text-ink">{reviewDocument.fileName}</h3>
-                    <p className="mt-1 text-sm font-semibold leading-6 text-muted">Korrigiere nur die gespeicherten Extraktionsdaten. Die Originaldatei bleibt unverändert.</p>
+                    <p className="mt-1 text-sm font-semibold leading-6 text-muted">Falls bereits strukturierte Daten gespeichert sind, kannst du sie hier korrigieren. Die Originaldatei bleibt unverändert.</p>
                   </div>
                   <button
                     className="rounded-md border border-line px-3 py-2 text-xs font-black text-muted transition hover:border-leaf hover:text-leaf"
@@ -1221,6 +1259,8 @@ export function ItemDetail() {
         </div>
 
         <aside className="space-y-5 lg:sticky lg:top-28 lg:self-start">
+          {/* Disabled for the focused Avareno beta. Kept for a later product phase. */}
+          {betaFeatures.smartHome ? (
           <section className="object-panel rounded-lg p-4" id="object-smart-home">
             <SectionTitle eyebrow="Smart-Gerät" title="Gerätesteuerung" icon={<RadioTower size={19} />} />
             <div className="mt-5 grid gap-3">
@@ -1290,6 +1330,7 @@ export function ItemDetail() {
               </Link>
             </div>
           </section>
+          ) : null}
 
           <section className="object-panel rounded-lg p-4" id="item-care-reminder">
             <ProductQrPanel item={item} />
