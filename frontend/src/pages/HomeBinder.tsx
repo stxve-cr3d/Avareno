@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Archive, BookOpen, ChevronRight, FileCheck2, FileText, Home, Package, Plus, ReceiptText, ScanLine, ShieldCheck } from "lucide-react";
+import { Archive, BookOpen, ChevronRight, FileCheck2, FileText, Home, Package, Plus, ReceiptText, ScanLine, Search, ShieldCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api, isoDate } from "../lib/api";
 import type { Document as MemoryDocument, HomeBinderReport } from "../lib/types";
-import { ProgressBar } from "../components/ProgressBar";
 import { ActionButton, ObjectMemoryGraph, SecondaryAction } from "../components/app/AppKit";
 
 /* Flat archive entry: a document plus the object it belongs to. */
@@ -50,16 +49,13 @@ function receiptSummary(document: MemoryDocument): string | null {
 
 export function HomeBinder() {
   const [report, setReport] = useState<HomeBinderReport | null>(null);
+  const [query, setQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("ALL");
 
   useEffect(() => {
     api<HomeBinderReport>("/api/reports/home-binder").then(setReport).catch(console.error);
   }, []);
 
-  const missingItems = useMemo(
-    () => report?.items.filter((item) => !item.binderStatus.insuranceReady) ?? [],
-    [report]
-  );
-  const focusItem = missingItems[0] ?? report?.items[0];
 
   const archive = useMemo<ArchiveEntry[]>(() => {
     if (!report) return [];
@@ -68,149 +64,164 @@ export function HomeBinder() {
     );
   }, [report]);
 
+  const filteredArchive = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase("de");
+    return archive.filter(({ document, itemName }) => {
+      if (typeFilter !== "ALL") {
+        const type = document.type.toUpperCase();
+        if (typeFilter === "OTHER") {
+          if (["RECEIPT", "WARRANTY", "MANUAL"].includes(type)) return false;
+        } else if (type !== typeFilter) {
+          return false;
+        }
+      }
+      if (!normalizedQuery) return true;
+      return [document.fileName, documentTypeLabel(document.type), itemName]
+        .some((value) => value.toLocaleLowerCase("de").includes(normalizedQuery));
+    });
+  }, [archive, query, typeFilter]);
+
   if (!report) return <div className="documents-loading">Dokumente werden geladen...</div>;
 
   if (report.items.length === 0) {
     return <DocumentsEmpty />;
   }
 
+  const productsWithReceipt = report.items.filter((entry) =>
+    (entry.documents ?? []).some((document) => document.type.toUpperCase() === "RECEIPT")
+  ).length;
+  const monthGroups = groupByMonth(filteredArchive);
+
   return (
-    <main className="documents-page">
-      <section className="documents-hero">
+    <main className="documents-page is-canvas">
+      <header className="documents-header">
         <div>
-          <span>Dokumente & Belege</span>
           <h1>Dokumente</h1>
-          <p>Belege, Garantien und wichtige Nachweise bleiben bei den Produkten, zu denen sie gehören.</p>
+          <p>Belege, Garantien und Anleitungen — verbunden mit den Produkten, zu denen sie gehören.</p>
         </div>
-      </section>
-
-      <section className="documents-focus">
-        <div>
-          <span>Heute sinnvoll</span>
-          <h2>{report.summary.readiness}% vollständig</h2>
-          <p>
-            {missingItems.length > 0
-              ? `${missingItems.length} ${missingItems.length === 1 ? "Produkt braucht" : "Produkte brauchen"} noch einen Beleg, eine Garantie oder einen Standort.`
-              : "Alle wichtigen Produkte haben aktuell genug Kontext für Garantie, Versicherung und Support."}
-          </p>
-          <ProgressBar value={report.summary.readiness} />
-        </div>
-        <Link className="documents-primary-action" to={focusItem ? `/app/dinge/${focusItem.id}` : "/app/dinge"}>
-          Fehlende Punkte prüfen
-          <ChevronRight size={16} />
+        <Link className="av-btn av-btn-primary" to="/app/capture/receipt">
+          <Plus size={18} aria-hidden="true" />
+          Beleg hochladen
         </Link>
-      </section>
+      </header>
 
-      <section className="documents-stats" aria-label="Dokumente Überblick">
-        <DocumentStat icon={<FileText size={18} />} label="Dokumente" value={String(archive.length)} />
-        <DocumentStat icon={<Archive size={18} />} label="Produkte" value={String(report.summary.itemCount)} />
-        <DocumentStat icon={<ShieldCheck size={18} />} label="Geschützt" value={String(report.summary.protectedCount)} />
-        <DocumentStat icon={<FileCheck2 size={18} />} label="Offen" value={String(report.summary.missingDataPoints)} />
-      </section>
-
-      <section className="documents-panel">
-        <div className="documents-panel-head">
-          <div>
-            <span>Archiv</span>
-            <h2>Gespeicherte Dokumente</h2>
-          </div>
-          <Link to="/app/capture/receipt">Beleg hochladen</Link>
+      <div className="documents-toolbar">
+        <label className="documents-search">
+          <Search aria-hidden="true" size={17} />
+          <span className="sr-only">Dokumente durchsuchen</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Datei, Dokumenttyp oder Produkt suchen"
+          />
+        </label>
+        <div className="documents-type-filter" role="group" aria-label="Nach Dokumenttyp filtern">
+          {[
+            { id: "ALL", label: "Alle" },
+            { id: "RECEIPT", label: "Belege" },
+            { id: "WARRANTY", label: "Garantien" },
+            { id: "MANUAL", label: "Anleitungen" },
+            { id: "OTHER", label: "Sonstiges" }
+          ].map((entry) => (
+            <button
+              aria-pressed={typeFilter === entry.id}
+              className={`documents-type-chip${typeFilter === entry.id ? " is-active" : ""}`}
+              key={entry.id}
+              onClick={() => setTypeFilter(entry.id)}
+              type="button"
+            >
+              {entry.label}
+            </button>
+          ))}
         </div>
-        {archive.length ? (
-          <div className="documents-item-list">
-            {archive.map(({ document, itemId, itemName }) => {
-              const summary = receiptSummary(document);
-              return (
-                <Link className="documents-item-row" key={document.id} to={`/app/dinge/${itemId}`}>
-                  <span className="documents-row-icon">{documentTypeIcon(document.type)}</span>
-                  <span className="documents-row-copy">
-                    <strong>{document.fileName}</strong>
-                    <small>
-                      {documentTypeLabel(document.type)} · gehört zu {itemName}
-                      {summary ? ` · ${summary}` : ""}
-                    </small>
-                    {!document.extractedJson && document.type.toUpperCase() === "RECEIPT" ? (
-                      <span className="documents-row-signals">
-                        <em>Daten noch nicht ausgelesen</em>
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="documents-pill is-ready">Verknüpft</span>
-                  <ChevronRight size={16} />
-                </Link>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="av-empty">
-            <p className="av-empty-title">Noch keine Dokumente gespeichert.</p>
-            <div className="av-empty-body">Belege, Garantien und Anleitungen, die du hochlädst oder erfasst, erscheinen hier — verbunden mit dem Objekt, zu dem sie gehören.</div>
-          </div>
-        )}
-      </section>
+      </div>
 
-      <section className="documents-grid">
-        <article className="documents-panel documents-main-list">
-          <div className="documents-panel-head">
-            <div>
-              <span>Produkte</span>
-              <h2>Wichtige Produkte</h2>
-            </div>
-            <Link to="/app/dinge">Alle anzeigen</Link>
-          </div>
-          <div className="documents-item-list">
-            {report.items.slice(0, 6).map((item) => (
-              <Link className="documents-item-row" key={item.id} to={`/app/dinge/${item.id}`}>
-                <span className="documents-row-icon">
-                  <Package size={17} />
-                </span>
-                <span className="documents-row-copy">
-                  <strong>{item.name}</strong>
-                  <small>
-                    {item.space?.name ?? item.location ?? "Kein Raum"} / {displayDate(item.warrantyUntil)}
-                  </small>
-                  <span className="documents-row-signals">
-                    <em className={item.binderStatus.hasProof ? "is-ready" : ""}>
-                      <ReceiptText size={12} /> {item.binderStatus.hasProof ? `${item.documents?.length ?? 0} Dokumente` : "Beleg fehlt"}
-                    </em>
-                    <em className={item.binderStatus.warrantySoon ? "is-warn" : item.binderStatus.warrantyActive ? "is-ready" : ""}>
-                      <ShieldCheck size={12} /> {item.binderStatus.warrantySoon ? "Garantie bald" : item.binderStatus.warrantyActive ? "Garantie aktiv" : "Garantie offen"}
-                    </em>
-                    {item.missingFields?.length ? <em>{item.missingFields.length} fehlende Daten</em> : null}
-                  </span>
-                </span>
-                <span className={item.binderStatus.insuranceReady ? "documents-pill is-ready" : "documents-pill"}>
-                  {item.binderStatus.insuranceReady ? "Bereit" : "Fehlt"}
-                </span>
-                <ChevronRight size={16} />
-              </Link>
-            ))}
-          </div>
-        </article>
+      {productsWithReceipt < report.items.length ? (
+        <p className="documents-completeness">
+          <ShieldCheck size={15} aria-hidden="true" />
+          {productsWithReceipt} von {report.items.length} Produkten {productsWithReceipt === 1 ? "besitzt" : "besitzen"} einen Beleg.
+          <Link to="/app/capture/receipt">Beleg nachtragen</Link>
+        </p>
+      ) : null}
 
-        <article className="documents-panel documents-space-panel">
-          <div className="documents-panel-head">
-            <div>
-              <span>Räume</span>
-              <h2>Wo es liegt</h2>
-            </div>
-            <Home size={18} />
-          </div>
-          <div className="documents-space-list">
-            {report.spaces.slice(0, 5).map((space) => (
-              <div className="documents-space-row" key={space.name}>
-                <div>
-                  <strong>{space.name}</strong>
-                  <small>{space.itemCount} {space.itemCount === 1 ? "Produkt" : "Produkte"}</small>
-                </div>
-                <span>{Math.round(space.value)} EUR</span>
-              </div>
-            ))}
-          </div>
-        </article>
-      </section>
+      {archive.length === 0 ? (
+        <div className="av-empty">
+          <p className="av-empty-title">Noch keine Dokumente gespeichert.</p>
+          <div className="av-empty-body">Belege, Garantien und Anleitungen, die du hochlädst oder erfasst, erscheinen hier — verbunden mit dem Produkt, zu dem sie gehören.</div>
+        </div>
+      ) : monthGroups.length === 0 ? (
+        <div className="av-empty">
+          <p className="av-empty-title">Keine passenden Dokumente.</p>
+          <div className="av-empty-body">Prüfe den Suchbegriff oder den Typfilter.</div>
+        </div>
+      ) : (
+        <div className="documents-archive">
+          {monthGroups.map((group) => (
+            <section className="documents-month" key={group.key} aria-label={group.label}>
+              <h2>{group.label}</h2>
+              <ul>
+                {group.entries.map(({ document, itemId, itemName }) => {
+                  const summary = receiptSummary(document);
+                  return (
+                    <li key={document.id}>
+                      <Link className="documents-row" to={`/app/dinge/${itemId}`}>
+                        <span className={`documents-row-type is-${documentTone(document.type)}`} aria-hidden="true">
+                          {documentTypeIcon(document.type)}
+                        </span>
+                        <span className="documents-row-copy">
+                          <strong>{document.fileName}</strong>
+                          <small>
+                            {documentTypeLabel(document.type)} · {itemName}
+                            {summary ? ` · ${summary}` : ""}
+                          </small>
+                        </span>
+                        <span className="documents-row-facts">
+                          {displayDate(document.createdAt)}
+                          {displayDocumentFileSize(document) ? ` · ${displayDocumentFileSize(document)}` : ""}
+                        </span>
+                        <ChevronRight size={16} aria-hidden="true" />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
     </main>
   );
+}
+
+/* Month buckets, newest first — the archive reads as a timeline. */
+function groupByMonth(entries: ArchiveEntry[]) {
+  const formatter = new Intl.DateTimeFormat("de-DE", { month: "long", year: "numeric" });
+  const groups = new Map<string, { key: string; label: string; entries: ArchiveEntry[]; time: number }>();
+  for (const entry of entries) {
+    const raw = entry.document.createdAt;
+    const date = raw ? new Date(raw) : null;
+    const valid = date && !Number.isNaN(date.getTime());
+    const key = valid ? `${date.getFullYear()}-${date.getMonth()}` : "unknown";
+    const label = valid ? formatter.format(date) : "Ohne Datum";
+    const bucket = groups.get(key) ?? { key, label, entries: [], time: valid ? new Date(date.getFullYear(), date.getMonth(), 1).getTime() : 0 };
+    bucket.entries.push(entry);
+    groups.set(key, bucket);
+  }
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      entries: [...group.entries].sort((a, b) => (b.document.createdAt ?? "").localeCompare(a.document.createdAt ?? ""))
+    }))
+    .sort((a, b) => b.time - a.time);
+}
+
+function documentTone(type: string) {
+  const upper = type.toUpperCase();
+  if (upper === "RECEIPT") return "amber";
+  if (upper === "WARRANTY") return "green";
+  if (upper === "MANUAL") return "blue";
+  return "neutral";
 }
 
 function DocumentsEmpty() {
@@ -252,16 +263,21 @@ function DocumentsEmpty() {
   );
 }
 
-function DocumentStat({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
-  return (
-    <div className="documents-stat">
-      <span>{icon}</span>
-      <small>{label}</small>
-      <strong>{value}</strong>
-    </div>
-  );
-}
 
 function displayDate(value?: string | null) {
   return isoDate(value);
+}
+
+/* Null when unknown — the row omits the size instead of repeating
+   "Größe unbekannt" under every document. */
+function displayFileSize(value?: number | null): string | null {
+  if (!value || value < 1) return null;
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / (1024 * 1024)).toLocaleString("de-DE", { maximumFractionDigits: 1 })} MB`;
+}
+
+function displayDocumentFileSize(document: MemoryDocument) {
+  const value = (document as MemoryDocument & { fileSize?: number | null }).fileSize;
+  return displayFileSize(value);
 }

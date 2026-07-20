@@ -55,7 +55,7 @@ export function Capture() {
               <p className="text-sm font-black text-moss">Universal-Einwurf</p>
               <h1 className="mt-2 max-w-2xl text-3xl font-black leading-tight md:text-5xl">Wirf es rein. avareno macht daraus Erinnerung.</h1>
             </div>
-            <span className="hidden h-16 w-16 place-items-center rounded-full bg-leaf text-white shadow-lift md:grid">
+            <span className="hidden h-16 w-16 place-items-center rounded-full bg-leaf text-[color:var(--av-primary-foreground)] shadow-lift md:grid">
               <UploadCloud size={28} />
             </span>
           </div>
@@ -107,7 +107,7 @@ export function Capture() {
 
           <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <button
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-leaf px-6 text-sm font-black text-white shadow-lift disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-leaf px-6 text-sm font-black text-[color:var(--av-primary-foreground)] shadow-lift disabled:cursor-not-allowed disabled:opacity-50"
               onClick={submit}
               disabled={!text.trim() || busy}
             >
@@ -127,7 +127,7 @@ export function Capture() {
                   <p className="text-sm font-black">{result.kind} gesichert</p>
                   <p className="mt-1 text-xl font-black text-ink">{result.title}</p>
                   <p className="mt-1 text-sm font-bold text-ink/58">{result.summary}</p>
-                  <button className="mt-4 rounded-full bg-leaf px-4 py-2 text-sm font-black text-white" onClick={() => navigate(result.route)}>
+                  <button className="mt-4 rounded-full bg-leaf px-4 py-2 text-sm font-black text-[color:var(--av-primary-foreground)]" onClick={() => navigate(result.route)}>
                     Öffnen
                   </button>
                 </div>

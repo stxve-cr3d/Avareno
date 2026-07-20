@@ -1,28 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import {
-  ArrowDownAZ,
-  House,
-  Monitor,
-  Package,
-  Plus,
-  ScanLine,
-  Search,
-  Volume2,
-  Wrench
-} from "lucide-react";
+import { ArrowDownAZ, Plus, Search } from "lucide-react";
 import { Link } from "react-router-dom";
-import { api, isoDate } from "../lib/api";
+import { api } from "../lib/api";
 import type { Item, ProductStructure } from "../lib/types";
-import { missingFieldLabel } from "../lib/uiText";
 import {
   ActionButton,
   ConsoleSkeleton,
-  ObjectMemoryCard,
-  QuickActionCard,
-  SecondaryAction,
-  StatusSummaryCard
+  SecondaryAction
 } from "../components/app/AppKit";
+import { ProductObjectCard, hasReceipt, warrantyDaysLeft } from "../components/ProductObjectCard";
 
 type StatusFilter = "ALL" | "MISSING_RECEIPT" | "WARRANTY_SOON" | "OPEN" | "COMPLETE";
 type SortMode = "UPDATED" | "NAME" | "OPEN" | "COMPLETE";
@@ -30,8 +17,8 @@ type SortMode = "UPDATED" | "NAME" | "OPEN" | "COMPLETE";
 const statusFilters: { id: StatusFilter; label: string }[] = [
   { id: "ALL", label: "Alle" },
   { id: "MISSING_RECEIPT", label: "Beleg fehlt" },
-  { id: "WARRANTY_SOON", label: "Garantie läuft bald ab" },
-  { id: "OPEN", label: "Offen" },
+  { id: "WARRANTY_SOON", label: "Garantie endet bald" },
+  { id: "OPEN", label: "Angaben fehlen" },
   { id: "COMPLETE", label: "Vollständig" }
 ];
 
@@ -40,7 +27,7 @@ type Category = (typeof categories)[number];
 
 const sortOptions: { id: SortMode; label: string }[] = [
   { id: "UPDATED", label: "Zuletzt aktualisiert" },
-  { id: "OPEN", label: "Offene Punkte" },
+  { id: "OPEN", label: "Fehlende Angaben" },
   { id: "COMPLETE", label: "Vollständigkeit" },
   { id: "NAME", label: "Name" }
 ];
@@ -83,9 +70,6 @@ export function Items() {
     return [...result].sort((a, b) => sortItems(a, b, sort));
   }, [category, items, query, sort, status]);
 
-  const documentCount = items.reduce((sum, item) => sum + (item.documents?.length ?? 0), 0);
-  const openTotal = items.reduce((sum, item) => sum + openPointsOf(item), 0);
-  const needsAttentionCount = items.filter((item) => openPointsOf(item) > 0 || warrantySoon(item)).length;
   const hasItems = items.length > 0;
 
   if (loading) {
@@ -94,127 +78,86 @@ export function Items() {
 
   return (
     <main className="av-console av-library">
-      <section className="av-console-top">
-        <div className="av-dashboard-header">
-          <span className="av-console-kicker">Meine Produkte</span>
-          <div className="av-dashboard-title-row">
-            <div>
-              <h1>Meine Produkte</h1>
-              <p>Alle gespeicherten Produkte mit Belegen, Garantien und Dokumenten.</p>
-            </div>
-            <Link className="av-console-primary" to="/app/capture/item">
-              Produkt hinzufügen <Plus size={14} />
-            </Link>
-          </div>
-          <div className="av-status-grid av-status-grid-4" aria-label="Produkt-Statusübersicht">
-            <StatusSummaryCard label="Produkte" value={items.length} />
-            <StatusSummaryCard label="Dokumente" value={documentCount} />
-            <StatusSummaryCard label="Aufmerksamkeit" value={needsAttentionCount} tone={needsAttentionCount > 0 ? "warning" : "neutral"} />
-          </div>
+      <header className="mem-home-head">
+        <div className="mem-home-head-copy">
+          <span className="av-page-kicker">Produktarchiv</span>
+          <h1 className="av-page-title">Meine Produkte</h1>
+          <p className="av-page-sub">Alle gespeicherten Produkte mit Belegen, Garantien und Dokumenten.</p>
         </div>
-      </section>
-
-      <div className="av-console-grid">
-        <div className="av-console-main">
-          <article className="av-console-section av-library-tools">
-            <div className="av-console-section-head">
-              <div>
-                <span>Filter</span>
-                <h2>Produkte eingrenzen</h2>
-              </div>
-              {hasItems ? <Link to="/app/capture/receipt">Beleg hochladen</Link> : null}
-            </div>
-
-            <div className="av-search">
-              <Search size={15} />
-              <input
-                type="search"
-                placeholder="Produkt, Hersteller, Modell oder Seriennummer suchen"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </div>
-
-            <div className="av-filters">
-              <FilterRow label="Status">
-                {statusFilters.map((filter) => (
-                  <FilterChip key={filter.id} active={status === filter.id} onClick={() => setStatus(filter.id)}>
-                    {filter.label}
-                  </FilterChip>
-                ))}
-              </FilterRow>
-              <FilterRow label="Kategorie">
-                <FilterChip active={category === "ALL"} onClick={() => setCategory("ALL")}>Alle</FilterChip>
-                {categories.map((cat) => (
-                  <FilterChip key={cat} active={category === cat} onClick={() => setCategory(cat)}>
-                    {cat}
-                  </FilterChip>
-                ))}
-              </FilterRow>
-              <label className="av-sort-control">
-                <span><ArrowDownAZ size={14} /> Sortieren</span>
-                <select value={sort} onChange={(event) => setSort(event.target.value as SortMode)}>
-                  {sortOptions.map((option) => (
-                    <option key={option.id} value={option.id}>{option.label}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </article>
-
-          <article className="av-console-section">
-            <div className="av-console-section-head">
-              <div>
-                <span>Bestand</span>
-                <h2>{filtered.length === 1 ? "1 gespeichertes Produkt" : `${filtered.length} gespeicherte Produkte`}</h2>
-              </div>
-            </div>
-
-            {filtered.length ? (
-              <div className="av-things-grid">
-                {filtered.map((item) => (
-                  <ObjectMemoryCard
-                    key={item.id}
-                    to={`/app/dinge/${item.id}`}
-                    category={categoryBucket(item)}
-                    name={item.name}
-                    icon={categoryIcon(categoryBucket(item))}
-                    identityLine={identityLine(item)}
-                    locationLine={item.space?.name ?? item.location ?? item.category}
-                    missingLabel={missingLabel(item)}
-                    completeness={item.completenessScore ?? 0}
-                    invoicePresent={hasReceipt(item)}
-                    warranty={warrantyShort(item)}
-                    openPoints={openPointsOf(item)}
-                  />
-                ))}
-              </div>
-            ) : hasItems ? (
-              <FilteredEmpty onReset={() => { setStatus("ALL"); setCategory("ALL"); setQuery(""); }} />
-            ) : (
-              <LibraryEmpty />
-            )}
-          </article>
+        <div className="mem-home-head-actions">
+          <Link className="av-btn av-btn-primary" to="/app/capture/item">
+            <Plus size={18} aria-hidden="true" />
+            Produkt hinzufügen
+          </Link>
         </div>
+      </header>
 
-        <aside className="av-console-side">
-          <QuickActionCard
-            primary
-            to="/app/capture/item"
-            icon={<Package size={16} />}
-            title="Produkt hinzufügen"
-            body="Produkt oder Gerät mit Beleg, Garantie und Seriennummer speichern."
-          />
-          {hasItems ? (
-            <QuickActionCard
-              to="/app/capture/receipt"
-              icon={<ScanLine size={16} />}
-              title="Beleg nachtragen"
-              body="Rechnung oder Nachweis mit einem bestehenden Produkt verbinden."
+      {hasItems ? (
+        <section className="av-library-tools" aria-label="Suche und Filter">
+          <div className="av-search">
+            <Search size={15} aria-hidden="true" />
+            <input
+              type="search"
+              placeholder="Produkt, Hersteller, Modell oder Seriennummer suchen"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
             />
-          ) : null}
-        </aside>
-      </div>
+          </div>
+
+          <div className="av-filters">
+            <FilterRow label="Status">
+              {statusFilters.map((filter) => (
+                <FilterChip key={filter.id} active={status === filter.id} onClick={() => setStatus(filter.id)}>
+                  {filter.label}
+                </FilterChip>
+              ))}
+            </FilterRow>
+            <FilterRow label="Kategorie">
+              <FilterChip active={category === "ALL"} onClick={() => setCategory("ALL")}>Alle</FilterChip>
+              {categories.map((cat) => (
+                <FilterChip key={cat} active={category === cat} onClick={() => setCategory(cat)}>
+                  {cat}
+                </FilterChip>
+              ))}
+            </FilterRow>
+            <label className="av-sort-control">
+              <span><ArrowDownAZ size={14} aria-hidden="true" /> Sortieren</span>
+              <select value={sort} onChange={(event) => setSort(event.target.value as SortMode)}>
+                {sortOptions.map((option) => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="av-library-stock" aria-live="polite">
+        {hasItems ? (
+          <h2 className="av-library-count">
+            {filtered.length === items.length
+              ? (items.length === 1 ? "1 gespeichertes Produkt" : `${items.length} gespeicherte Produkte`)
+              : `${filtered.length} von ${items.length} Produkten`}
+          </h2>
+        ) : null}
+
+        {filtered.length ? (
+          <div className="mem-product-grid is-archive">
+            {filtered.map((item, index) => (
+              <ProductObjectCard
+                key={item.id}
+                item={item}
+                to={`/app/dinge/${item.id}`}
+                featured={index === 0 && sort === "UPDATED" && status === "ALL" && category === "ALL" && !query.trim() && filtered.length > 2}
+              />
+            ))}
+          </div>
+        ) : hasItems ? (
+          <FilteredEmpty onReset={() => { setStatus("ALL"); setCategory("ALL"); setQuery(""); }} />
+        ) : (
+          <LibraryEmpty />
+        )}
+      </section>
     </main>
   );
 }
@@ -248,13 +191,7 @@ function FilteredEmpty({ onReset }: { onReset: () => void }) {
   );
 }
 
-/* ── Object-memory derivations ──────────────────────────────── */
-
-function hasReceipt(item: Item): boolean {
-  const docs = item.documents ?? [];
-  if (docs.some((doc) => (doc.type ?? "").toUpperCase() === "RECEIPT")) return true;
-  return docs.length > 0;
-}
+/* ── Archive derivations ────────────────────────────────────── */
 
 function openPointsOf(item: Item): number {
   return (
@@ -264,22 +201,9 @@ function openPointsOf(item: Item): number {
   );
 }
 
-function warrantyDays(item: Item): number | null {
-  if (!item.warrantyUntil) return null;
-  return Math.ceil((new Date(item.warrantyUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-}
-
 function warrantySoon(item: Item): boolean {
-  const days = warrantyDays(item);
+  const days = warrantyDaysLeft(item);
   return days !== null && days >= 0 && days < 60;
-}
-
-function warrantyShort(item: Item): { text: string; urgent?: boolean } {
-  const days = warrantyDays(item);
-  if (days === null) return { text: "Unbekannt" };
-  if (days < 0) return { text: "Abgelaufen", urgent: true };
-  if (days < 60) return { text: `${days} Tage`, urgent: true };
-  return { text: `bis ${isoDate(item.warrantyUntil)}` };
 }
 
 function sortItems(a: Item, b: Item, sort: SortMode) {
@@ -289,17 +213,6 @@ function sortItems(a: Item, b: Item, sort: SortMode) {
   return 0;
 }
 
-function identityLine(item: Item) {
-  return [item.manufacturer, item.model].filter(Boolean).join(" / ") || item.itemType || "Objekt";
-}
-
-function missingLabel(item: Item) {
-  const missing = item.missingFields ?? [];
-  if (!missing.length) return "Keine";
-  const first = missingFieldLabel(missing[0]);
-  return missing.length === 1 ? first : `${first} +${missing.length - 1}`;
-}
-
 function categoryBucket(item: Item): Category {
   const s = `${item.category ?? ""} ${item.itemType ?? ""} ${item.name ?? ""}`.toLowerCase();
   if (/tv|fernseh|oled|media|monitor|display|beamer/.test(s)) return "TV / Media";
@@ -307,16 +220,6 @@ function categoryBucket(item: Item): Category {
   if (/haushalt|kitchen|küche|kueche|wasch|appliance|staubsauger|haus/.test(s)) return "Haushalt";
   if (/werkstatt|tool|werkzeug|repair|printer|drucker|maschine|bike|fahrrad|garten/.test(s)) return "Werkstatt";
   return "Sonstiges";
-}
-
-function categoryIcon(category: Category): ReactNode {
-  switch (category) {
-    case "TV / Media": return <Monitor size={14} />;
-    case "Audio": return <Volume2 size={14} />;
-    case "Werkstatt": return <Wrench size={14} />;
-    case "Haushalt": return <House size={14} />;
-    default: return <Package size={14} />;
-  }
 }
 
 /* ── Small building blocks ──────────────────────────────────── */

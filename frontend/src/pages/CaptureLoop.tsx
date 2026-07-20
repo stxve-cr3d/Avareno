@@ -47,7 +47,7 @@ export function CaptureLoop() {
       <section className="care-focus">
         <div>
           <span>Neue Erinnerung</span>
-          <h2>Ein offener Punkt reicht.</h2>
+          <h2>Eine Erinnerung genügt.</h2>
           <p>Halte nur fest, was wirklich wieder auftauchen muss. Details kannst du später ergänzen.</p>
         </div>
         <button className="care-primary-action" disabled={!title.trim()} onClick={createLoop} type="button">

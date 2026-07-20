@@ -55,7 +55,7 @@ const privacySections = [
   {
     icon: <FileText size={19} />,
     title: "App-Inhalte",
-    text: "Avareno kann Objekte, Dokumente, Garantien, Erinnerungen, Räume und Notizen speichern. Vor Produktivbetrieb muss festgelegt werden, wo diese Daten liegen und wie lange sie gespeichert bleiben."
+    text: "Avareno kann Produkte, Dokumente, Garantien, Erinnerungen, Räume und Notizen speichern. Vor Produktivbetrieb muss festgelegt werden, wo diese Daten liegen und wie lange sie gespeichert bleiben."
   },
   {
     icon: <LockKeyhole size={19} />,
@@ -417,6 +417,44 @@ export function CookiesPage() {
           <p>
             Technisch notwendige Speicherung für Login und Sicherheit braucht keinen Marketing-Consent, muss aber transparent erklärt werden. Sobald Analyse, Marketing, externe Medien oder ähnliche Dienste hinzukommen, sollte ein Consent-Flow mit echten Kategorien und Widerruf eingebaut werden.
           </p>
+        </div>
+      </section>
+    </MarketingPageFrame>
+  );
+}
+
+export function TermsPage() {
+  usePageTitle("Nutzungsbedingungen");
+
+  return (
+    <MarketingPageFrame>
+      <StandardHero
+        eyebrow="Nutzungsbedingungen"
+        title="Bedingungen für die geschlossene Beta."
+        text="Avareno befindet sich in einer invite-only Beta. Verbindliche Bedingungen für einen späteren öffentlichen oder kostenpflichtigen Launch sind noch nicht freigegeben."
+      >
+        <DraftNotice />
+      </StandardHero>
+      <section className="avareno-standard-panel">
+        <div className="avareno-standard-copy">
+          <p>Beta-Status</p>
+          <h2>Transparent statt vorgetäuscht final.</h2>
+        </div>
+        <div className="avareno-privacy-list">
+          <article>
+            <span><ShieldCheck size={19} /></span>
+            <div>
+              <h3>Invite-only</h3>
+              <p>Neue Konten werden für die geschlossene Beta gezielt bereitgestellt. Es gibt keinen offenen öffentlichen Registrierungsanspruch.</p>
+            </div>
+          </article>
+          <article>
+            <span><Scale size={19} /></span>
+            <div>
+              <h3>Kein Ersatz für finale AGB</h3>
+              <p>Vor einem Paid Launch werden AGB, Widerruf, Kündigung, Haftung und Preisangaben fachlich geprüft und an dieser Stelle vollständig veröffentlicht.</p>
+            </div>
+          </article>
         </div>
       </section>
     </MarketingPageFrame>

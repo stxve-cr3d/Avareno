@@ -31,7 +31,7 @@ export function LoopCard({ loop, onComplete }: { loop: Loop; onComplete?: (id: s
         </span>
       </Link>
       {onComplete ? (
-        <button className="shrink-0 rounded-md bg-leaf px-3 py-3 text-xs font-black text-white transition hover:bg-moss" onClick={() => onComplete(loop.id)}>
+        <button className="shrink-0 rounded-md bg-leaf px-3 py-3 text-xs font-black text-[color:var(--av-primary-foreground)] transition hover:bg-moss" onClick={() => onComplete(loop.id)}>
           <span className="hidden sm:inline">Close +{loop.xpReward}</span>
           <CheckCircle2 className="sm:hidden" size={16} />
         </button>

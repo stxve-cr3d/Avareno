@@ -12,7 +12,7 @@ type ThemeContextValue = {
 };
 
 const themeStorageKey = "avareno-theme";
-const defaultThemePreference: ThemePreference = "system";
+const defaultThemePreference: ThemePreference = "light";
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -38,7 +38,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     document.documentElement.style.colorScheme = actualTheme;
     window.localStorage.setItem(themeStorageKey, themePreference);
 
-    const themeColor = actualTheme === "dark" ? "#141414" : "#f5f7f5";
+    const themeColor = actualTheme === "dark" ? "#101311" : "#f7f8f5";
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", themeColor);
   }, [actualTheme, themePreference]);
 

@@ -41,7 +41,9 @@ import {
   removeFriend
 } from "../lib/friendsApi";
 import type { ApiCircle, ApiFriend, ApiInvite, SelfProgress } from "../lib/friendsApi";
-import type { PrivacyDataOverviewItem, PrivacySummary } from "../lib/types";
+import type { Item, PrivacyDataOverviewItem, PrivacySummary } from "../lib/types";
+import { ActivityModule } from "../components/ActivityHeatmap";
+import { ProfileAchievements } from "../components/ProfileAchievements";
 
 const preferenceKey = "avareno-private-motivation-preferences";
 
@@ -182,11 +184,17 @@ export function Rewards() {
         <div className="profile-avatar" aria-hidden="true">
           {profile.avatarUrl ? <img src={profile.avatarUrl} alt="" /> : profile.displayName.slice(0, 1).toUpperCase()}
         </div>
-        <div>
-          <h1>Ich</h1>
-          <p>{profile.displayName}</p>
-          <span>{profile.email}</span>
+        <div className="profile-hero-copy">
+          <span className="profile-hero-kicker">Profil</span>
+          <h1>{profile.displayName}</h1>
+          <p>
+            {profile.email}
+            {profile.createdAt ? ` · Mitglied seit ${memberSinceLabel(profile.createdAt)}` : ""}
+          </p>
         </div>
+        <Link className="profile-secondary-action profile-hero-edit" to={location.pathname.startsWith("/app") ? "/app/settings" : "/settings/account"}>
+          Profil bearbeiten
+        </Link>
       </section>
 
       {/* Friends/XP are disabled for the focused Avareno beta. Kept for a later product phase. */}
@@ -215,7 +223,7 @@ export function Rewards() {
       <ProfileSectionNav app={location.pathname.startsWith("/app")} basePath={profileBasePath} />
 
       {section === "overview" ? (
-        <ProfileOverview basePath={profileBasePath} friendCount={friends.length} preferences={preferences} />
+        <ProfileOverview basePath={profileBasePath} friendCount={friends.length} />
       ) : null}
 
       {section === "friends" ? (
@@ -279,23 +287,51 @@ function ProfileSectionNav({ app, basePath }: { app: boolean; basePath: string }
   );
 }
 
+/* Profile overview: activity year view, real milestones and archive facts.
+   Household/friends stay hidden while the community layer is disabled —
+   no fake people, no empty placeholder cards (Overhaul §11). */
 function ProfileOverview({
   basePath,
-  friendCount,
-  preferences
+  friendCount
 }: {
   basePath: string;
   friendCount: number;
-  preferences: MotivationPrivacyPreferences;
 }) {
+  const [items, setItems] = useState<Item[]>([]);
+
+  useEffect(() => {
+    api<Item[]>("/api/items").then(setItems).catch(() => setItems([]));
+  }, []);
+
+  const documentCount = items.reduce((sum, item) => sum + (item.documents?.length ?? 0), 0);
+  const completeCount = items.filter((item) => (item.missingFields?.length ?? 0) === 0).length;
+
   return (
-    <section className="profile-overview-grid">
-      {/* Disabled for the focused Avareno beta. Kept for a later product phase. */}
+    <div className="profile-overview">
+      <ActivityModule defaultPeriod={365} />
+
+      <ProfileAchievements items={items} />
+
+      <section className="profile-facts" aria-label="Dein Archiv in Zahlen">
+        <Link className="profile-fact" to="/app/dinge">
+          <strong>{items.length}</strong>
+          <span>{items.length === 1 ? "Produkt im Archiv" : "Produkte im Archiv"}</span>
+        </Link>
+        <Link className="profile-fact" to="/app/reports/home-binder">
+          <strong>{documentCount}</strong>
+          <span>{documentCount === 1 ? "Dokument gespeichert" : "Dokumente gespeichert"}</span>
+        </Link>
+        <Link className="profile-fact" to="/app/dinge">
+          <strong>{completeCount}</strong>
+          <span>{completeCount === 1 ? "vollständige Produktakte" : "vollständige Produktakten"}</span>
+        </Link>
+      </section>
+
       {betaFeatures.community ? (
         <article className="profile-panel">
           <div className="profile-panel-head">
             <div>
-              <span>Nächster Bereich</span>
+              <span>Gemeinsam</span>
               <h2>Freundeskreis</h2>
               <p>
                 {friendCount === 0
@@ -305,31 +341,34 @@ function ProfileOverview({
             </div>
             <UserPlus size={18} />
           </div>
-          <div className="profile-preview-row">
-            <span>{friendCount} verbunden</span>
-            <span>Privater Kreis</span>
-          </div>
           <Link className="profile-secondary-action" to={`${basePath}/friends`}>Freunde ansehen</Link>
         </article>
       ) : null}
 
-      <article className="profile-panel">
-        <div className="profile-panel-head">
-          <div>
-            <span>Datenschutz</span>
-            <h2>Kontrolle</h2>
-            <p>Sichtbarkeit, Export, Löschung und AI-Verarbeitung werden hier getrennt vorbereitet.</p>
-          </div>
-          <LockKeyhole size={18} />
-        </div>
-        <div className="profile-preview-row">
-          <span>Privat als Standard</span>
-          <span>Export in Vorbereitung</span>
-        </div>
-        <Link className="profile-secondary-action" to={`${basePath}/privacy`}>Datenschutz prüfen</Link>
-      </article>
-    </section>
+      <section className="profile-shortcuts" aria-label="Weitere Bereiche">
+        <Link className="profile-shortcut" to={`${basePath}/privacy`}>
+          <LockKeyhole size={17} aria-hidden="true" />
+          <span>
+            <strong>Datenschutz & Kontrolle</strong>
+            <small>Datenüberblick, Export und Löschung an einem Ort.</small>
+          </span>
+        </Link>
+        <Link className="profile-shortcut" to="/app/settings">
+          <ShieldCheck size={17} aria-hidden="true" />
+          <span>
+            <strong>Konto & Sicherheit</strong>
+            <small>Profil, Sprache, Darstellung und Login-Methoden.</small>
+          </span>
+        </Link>
+      </section>
+    </div>
   );
+}
+
+function memberSinceLabel(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("de-DE", { month: "long", year: "numeric" }).format(date);
 }
 
 function FriendsPanel({
@@ -844,7 +883,7 @@ function PrivacyCenterPanel({
         </PrivacySection>
 
         <PrivacySection icon={<Download size={18} />} label="Export" title="Kopie deiner Daten">
-          <p>Erhalte eine Kopie deiner gespeicherten Objekte, Dokument-Metadaten und Einstellungen.</p>
+          <p>Erhalte eine Kopie deiner gespeicherten Produkte, Dokument-Metadaten und Einstellungen.</p>
           <button
             className="profile-primary-action privacy-action-button"
             disabled={!summary.export.ready || busyAction === "export"}
@@ -945,30 +984,34 @@ function PrivacyCenterPanel({
           )}
         </PrivacySection>
 
-        <PrivacySection icon={<LockKeyhole size={18} />} label="Freigaben" title="Freundeskreis sichtbar halten">
-          <div className="privacy-toggle-list">
-            <PrivacyToggle
-              checked={preferences.leaderboardEnabled}
-              label="Fortschritt mit Freunden teilen"
-              note="Aus: Freunde sehen nur, dass ihr verbunden seid — keine Werte. Serverseitig durchgesetzt."
-              onChange={(checked) => onChange({ leaderboardEnabled: checked })}
-            />
-            <PrivacyToggle
-              checked={preferences.hideXpFromFriends}
-              disabled={!preferences.leaderboardEnabled}
-              label="Meine XP vor Freunden verbergen"
-              note="Freunde sehen dann nur, dass du privat bleibst."
-              onChange={(checked) => onChange({ hideXpFromFriends: checked })}
-            />
-            <PrivacyToggle
-              checked={preferences.hideStreakFromFriends}
-              disabled={!preferences.leaderboardEnabled}
-              label="Meinen Streak vor Freunden verbergen"
-              note="Private Standardeinstellung für sensible Fortschrittsdaten."
-              onChange={(checked) => onChange({ hideStreakFromFriends: checked })}
-            />
-          </div>
-        </PrivacySection>
+        {/* Friend-sharing controls only make sense while the community layer
+            is enabled; in the invite beta the section stays hidden. */}
+        {betaFeatures.community ? (
+          <PrivacySection icon={<LockKeyhole size={18} />} label="Freigaben" title="Freundeskreis sichtbar halten">
+            <div className="privacy-toggle-list">
+              <PrivacyToggle
+                checked={preferences.leaderboardEnabled}
+                label="Fortschritt mit Freunden teilen"
+                note="Aus: Freunde sehen nur, dass ihr verbunden seid — keine Werte. Serverseitig durchgesetzt."
+                onChange={(checked) => onChange({ leaderboardEnabled: checked })}
+              />
+              <PrivacyToggle
+                checked={preferences.hideXpFromFriends}
+                disabled={!preferences.leaderboardEnabled}
+                label="Meine XP vor Freunden verbergen"
+                note="Freunde sehen dann nur, dass du privat bleibst."
+                onChange={(checked) => onChange({ hideXpFromFriends: checked })}
+              />
+              <PrivacyToggle
+                checked={preferences.hideStreakFromFriends}
+                disabled={!preferences.leaderboardEnabled}
+                label="Meinen Streak vor Freunden verbergen"
+                note="Private Standardeinstellung für sensible Fortschrittsdaten."
+                onChange={(checked) => onChange({ hideStreakFromFriends: checked })}
+              />
+            </div>
+          </PrivacySection>
+        ) : null}
 
         <PrivacySection danger icon={<Trash2 size={18} />} label="Kritischer Bereich" title="Account und Daten löschen">
           <p>Eine Löschung muss Nutzerprofil, Auth-User, Objekte, Dokumente, extrahierte Metadaten, Erinnerungen, Care/Resolve-Daten, Connector-Tokens, Logs, Storage-Objekte und Backup-Regeln abdecken.</p>
@@ -1027,12 +1070,20 @@ function PrivacySection({
   );
 }
 
+/* Backend labels still speak the old "Objekte" vocabulary; the display
+   layer translates known entries into product language. */
+const privacyDataLabels: Record<string, { label: string; note?: string }> = {
+  items: { label: "Gespeicherte Produkte", note: "Produktakten mit Kategorien, Seriennummern, Garantie- und Care-Kontext." },
+  documents: { label: "Dokumente & Belege" }
+};
+
 function PrivacyDataRow({ item }: { item: PrivacyDataOverviewItem }) {
+  const mapped = privacyDataLabels[item.id];
   return (
     <div className="privacy-data-row">
       <div>
-        <strong>{item.label}</strong>
-        <small>{item.note}</small>
+        <strong>{mapped?.label ?? item.label}</strong>
+        <small>{mapped?.note ?? item.note}</small>
       </div>
       <span>{item.value}</span>
     </div>
@@ -1088,7 +1139,7 @@ function buildPrivacyFallback(displayName: string): PrivacySummary {
     generatedAt: new Date().toISOString(),
     implementationState: "FOUNDATION_ONLY",
     dataOverview: [
-      { id: "items", label: "Gespeicherte Objekte", value: 0, status: "TODO", note: `${displayName}s Objekt-Speicher wird geladen, sobald das Backend erreichbar ist.` },
+      { id: "items", label: "Gespeicherte Produkte", value: 0, status: "TODO", note: `${displayName}s Objekt-Speicher wird geladen, sobald das Backend erreichbar ist.` },
       { id: "documents", label: "Dokumente / Belege", value: 0, status: "TODO", note: "Dokument-Metadaten und Upload-Speicher sind im Exportplan vorgesehen." },
       { id: "sources", label: "Verbundene Quellen", value: 0, status: "TODO", note: "Connect-Quellen werden erst nach bewusster Verknüpfung angezeigt." },
       { id: "ai-analysis", label: "KI-Analyse", value: 0, status: "TODO", note: "Analyse bleibt kontrolliert und korrigierbar." },

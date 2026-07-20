@@ -15,7 +15,6 @@ import {
   FileText,
   Hammer,
   Home,
-  ImageOff,
   LifeBuoy,
   Link2,
   Lock,
@@ -61,12 +60,11 @@ import {
   ActionButton,
   AppPageHeader,
   MetadataRow,
-  ObjectMemoryGraph,
   ProgressLine,
   WarrantyTimeline
 } from "../components/app/AppKit";
-import type { GraphEdge } from "../components/app/AppKit";
 import { InlineNotice, SuggestionPanel } from "../components/app/Notifications";
+import { categoryIcon } from "../components/ProductObjectCard";
 
 type RecommendationTab = "spare" | "buy" | "print" | "check";
 
@@ -642,7 +640,8 @@ export function ItemDetail() {
   const loops = item.loops ?? [];
   const repairLogs = item.repairLogs ?? [];
   const missing = item.missingFields ?? [];
-  const identity = [item.manufacturer, item.model].filter(Boolean).join(" / ") || item.category;
+  const identityParts = [item.manufacturer, item.model].filter(Boolean);
+  const identity = identityParts.length ? identityParts.join(" · ") : null;
   const shopUrl = item.affiliateUrl || item.reorderUrl;
   const hasManualDocument = hasDocumentType(documents, "MANUAL");
   const hasDriverDocument = hasDocumentType(documents, "DRIVER");
@@ -660,23 +659,6 @@ export function ItemDetail() {
   const receiptPresent = hasDocumentType(documents, "RECEIPT") || documents.length > 0;
   const wDays = warrantyDaysLeft(item.warrantyUntil);
   const warrantyNeedsAttention = typeof wDays === "number" && wDays >= 0 && wDays < 60 && dismissedWarrantyItemId !== item.id;
-  const openCount =
-    loops.filter((loop) => loop.status === "OPEN").length +
-    repairLogs.filter((repair) => repair.status !== "RESOLVED").length +
-    missing.length;
-  const profileEdges: GraphEdge[] = [
-    { tone: receiptPresent ? "green" : "red", label: receiptPresent ? "Beleg gespeichert" : "Beleg fehlt" },
-    { tone: "neutral", label: `${documents.length} Dokument${documents.length === 1 ? "" : "e"}` },
-    wDays === null
-      ? { tone: "neutral", label: "Garantie unbekannt" }
-      : wDays < 0
-        ? { tone: "red", label: "Garantie abgelaufen" }
-        : wDays < 60
-          ? { tone: "amber", label: `Garantie endet in ${wDays} Tagen` }
-          : { tone: "neutral", label: `Garantie bis ${formatDate(item.warrantyUntil)}` },
-    ...(openCount > 0 ? [{ tone: "teal" as const, label: `${openCount} offener Punkt${openCount === 1 ? "" : "e"}` }] : [])
-  ];
-
   return (
     <main className="av-page">
       <Link className="av-back" to="/app/dinge">
@@ -739,7 +721,7 @@ export function ItemDetail() {
           {!receiptPresent ? (
             <InlineNotice
               variant="warning"
-              title="Beleg fehlt"
+              title="Beleg noch nicht hinterlegt"
               description={`Für ${item.name} ist noch kein Kaufnachweis gespeichert.`}
               actionLabel="Beleg hinzufügen"
               actionTo={`/app/capture/receipt?itemId=${encodeURIComponent(item.id)}`}
@@ -763,46 +745,44 @@ export function ItemDetail() {
         </div>
       ) : null}
 
-      {/* Object Memory Profile hero */}
+      {/* Product record hero: identity, completeness in plain language, warranty. */}
       <section className="av-profile-hero">
         <div className="av-profile-identity">
           <div className="av-profile-image">
             {item.imageUrl ? (
               <img src={item.imageUrl} alt={item.name} />
             ) : (
-              <div className="av-profile-image-empty">
-                <ImageOff size={26} />
-                <span>Kein Produktbild hinterlegt</span>
+              <div className="av-profile-image-empty is-calm">
+                <span className="av-profile-image-icon" aria-hidden="true">{categoryIcon(item, 44)}</span>
+                <span>Noch kein Produktbild</span>
               </div>
             )}
           </div>
           <div className="av-profile-facts">
             <div className="av-profile-complete">
               <div className="av-profile-complete-head">
-                <span>Was Avareno kennt</span>
-                <strong>{item.completenessScore}%</strong>
+                <span>Produktakte</span>
+                <strong>{`Zu ${item.completenessScore} % vollständig`}</strong>
               </div>
               <ProgressLine value={item.completenessScore} tone={missing.length ? "amber" : "teal"} />
-              <p className={`av-profile-missing ${missing.length ? "av-th-amber" : "av-th-ok"}`}>
-                {missing.length ? `Fehlt noch: ${missing.map(missingFieldLabel).join(", ")}` : "Alles Wichtige ist verbunden."}
+              <p className={`av-profile-missing ${missing.length ? "" : "av-th-ok"}`}>
+                {missing.length
+                  ? `${missing.length === 1 ? "Eine Angabe fehlt" : `${missing.length} Angaben fehlen`} noch — als Nächstes: ${missing.slice(0, 3).map(missingFieldLabel).join(", ")}.`
+                  : "Alles Wichtige ist in dieser Produktakte verbunden."}
               </p>
             </div>
             <dl className="av-metalist">
-              <MetadataRow label="Marke / Modell" value={identity} />
-              <MetadataRow label="Gekauft bei" value={item.merchant ?? "Unbekannt"} />
+              <MetadataRow label="Marke / Modell" value={identity ?? "Noch nicht angegeben"} />
+              <MetadataRow label="Gekauft bei" value={item.merchant ?? "Noch nicht angegeben"} />
               <MetadataRow label="Gekauft am" value={formatDate(item.purchaseDate)} />
-              <MetadataRow label="Preis" value={item.price == null ? "Nicht hinterlegt" : `${item.price} ${item.currency}`} />
-              <MetadataRow label="Standort" value={item.space?.name ?? item.location ?? "Unbekannt"} />
+              <MetadataRow label="Preis" value={item.price == null ? "Noch nicht angegeben" : `${item.price} ${item.currency}`} />
+              <MetadataRow label="Standort" value={item.space?.name ?? item.location ?? "Noch nicht angegeben"} />
             </dl>
           </div>
         </div>
 
         <div className="av-profile-side">
           <div className="av-profile-block" id="object-warranty">
-            <span className="av-label-sm">Objektgedächtnis</span>
-            <ObjectMemoryGraph title={item.name} category={item.category || "Produkt"} icon={<Package size={14} />} edges={profileEdges} />
-          </div>
-          <div className="av-profile-block">
             <span className="av-label-sm">Garantie</span>
             {item.warrantyUntil ? (
               <WarrantyTimeline
@@ -868,15 +848,15 @@ export function ItemDetail() {
                 </>
               ) : (
                 <>
-                  <DetailRow icon={<Store size={18} />} label="Gekauft bei" onClick={() => setOwnershipEditing(true)} value={item.merchant ?? "Unbekannt"} />
+                  <DetailRow icon={<Store size={18} />} label="Gekauft bei" onClick={() => setOwnershipEditing(true)} value={item.merchant ?? "Noch nicht angegeben"} />
                   <DetailRow icon={<CalendarClock size={18} />} label="Gekauft am" onClick={() => setOwnershipEditing(true)} value={formatDate(item.purchaseDate)} />
-                  <DetailRow icon={<CreditCard size={18} />} label="Gezahlt" onClick={() => setOwnershipEditing(true)} value={item.price == null ? "Nicht hinterlegt" : `${item.price} ${item.currency}`} />
+                  <DetailRow icon={<CreditCard size={18} />} label="Gezahlt" onClick={() => setOwnershipEditing(true)} value={item.price == null ? "Noch nicht angegeben" : `${item.price} ${item.currency}`} />
                   <DetailRow icon={<ShieldCheck size={18} />} label="Garantie bis" onClick={() => setOwnershipEditing(true)} value={formatDate(item.warrantyUntil)} />
-                  <DetailRow icon={<Package size={18} />} label="Marke / Modell" onClick={() => setOwnershipEditing(true)} value={identity} />
-                  <DetailRow icon={<ClipboardCheck size={18} />} label="Seriennummer" onClick={() => setOwnershipEditing(true)} value={item.serialNumber ?? "Fehlt"} />
-                  <DetailRow icon={<ScanBarcode size={18} />} label="Barcode / GTIN" onClick={() => setOwnershipEditing(true)} value={item.barcode ?? "Fehlt"} />
-                  <DetailRow icon={<MapPin size={18} />} label="Standort" onClick={() => setOwnershipEditing(true)} value={item.location ?? "Unbekannt"} />
-                  <DetailRow icon={<LifeBuoy size={18} />} label="Support" onClick={() => setOwnershipEditing(true)} value={item.supportContact ?? item.supportUrl ?? "Fehlt"} />
+                  <DetailRow icon={<Package size={18} />} label="Marke / Modell" onClick={() => setOwnershipEditing(true)} value={identity ?? "Noch nicht angegeben"} />
+                  <DetailRow icon={<ClipboardCheck size={18} />} label="Seriennummer" onClick={() => setOwnershipEditing(true)} value={item.serialNumber ?? "Noch nicht angegeben"} />
+                  <DetailRow icon={<ScanBarcode size={18} />} label="Barcode / GTIN" onClick={() => setOwnershipEditing(true)} value={item.barcode ?? "Noch nicht angegeben"} />
+                  <DetailRow icon={<MapPin size={18} />} label="Standort" onClick={() => setOwnershipEditing(true)} value={item.location ?? "Noch nicht angegeben"} />
+                  <DetailRow icon={<LifeBuoy size={18} />} label="Support" onClick={() => setOwnershipEditing(true)} value={item.supportContact ?? item.supportUrl ?? "Noch nicht angegeben"} />
                 </>
               )}
             </div>
@@ -1174,7 +1154,7 @@ export function ItemDetail() {
           </section>
 
           <section className="object-panel rounded-lg p-4 md:p-5" id="object-service">
-            <SectionTitle eyebrow="Reparaturen" title="Was passiert ist" icon={<Hammer size={19} />} />
+            <SectionTitle eyebrow="Service" title="Reparaturen" icon={<Hammer size={19} />} />
             <div className="mt-5 grid gap-3 rounded-lg border border-line av-surface p-3 md:grid-cols-[9rem_minmax(0,1fr)]">
               <label className="text-sm font-bold text-ink">
                 Datum
@@ -1191,7 +1171,7 @@ export function ItemDetail() {
                   value={repairDraft.problem}
                   onChange={(event) => setRepairDraft((current) => ({ ...current, problem: event.target.value }))}
                   className="mt-2 w-full rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
-                  placeholder="Display flickers, cable broken, filter changed"
+                  placeholder="z. B. Display flackert, Kabel defekt, Filter getauscht"
                 />
               </label>
               <label className="text-sm font-bold text-ink">
@@ -1212,7 +1192,7 @@ export function ItemDetail() {
                   value={repairDraft.resolution}
                   onChange={(event) => setRepairDraft((current) => ({ ...current, resolution: event.target.value }))}
                   className="mt-2 w-full rounded-lg border border-line p-3 text-sm font-semibold outline-none focus:border-leaf"
-                  placeholder="What fixed it, who helped, what to remember"
+                  placeholder="Was geholfen hat, wer beteiligt war, was du dir merken willst"
                 />
               </label>
               <label className="text-sm font-bold text-ink">
@@ -1246,8 +1226,8 @@ export function ItemDetail() {
               {item.activities?.length ? (
                 item.activities.map((activity) => (
                   <div className="rounded-lg border border-line av-surface p-4" key={activity.id}>
-                    <p className="text-xs font-black uppercase text-muted">{activity.type}</p>
-                    <p className="mt-1 text-sm font-black text-ink">{activity.message}</p>
+                    <p className="text-xs font-black uppercase text-muted">{activityTypeLabel(activity.type)}</p>
+                    <p className="mt-1 text-sm font-black text-ink">{activityMessageLabel(activity.message)}</p>
                     <p className="mt-2 text-xs font-semibold text-muted">{formatDate(activity.createdAt)}</p>
                   </div>
                 ))
@@ -1404,7 +1384,7 @@ export function ItemDetail() {
 
           <section className="object-panel rounded-lg p-4">
             <div className="flex items-start justify-between gap-3">
-              <SectionTitle eyebrow="Nächster fehlender Punkt" title="Seriennummer" icon={<Wrench size={19} />} />
+              <SectionTitle eyebrow="Identifikation" title="Seriennummer" icon={<Wrench size={19} />} />
               <button
                 className="profile-secondary-action is-muted"
                 onClick={() => {
@@ -1434,7 +1414,16 @@ export function ItemDetail() {
                 </div>
               </>
             ) : (
-              <DetailRow icon={<ClipboardCheck size={18} />} label="Seriennummer" onClick={() => setSerialEditing(true)} value={item.serialNumber ?? "Fehlt"} />
+              <button
+                className="mt-4 grid w-full gap-2 rounded-lg border border-line av-surface p-3 text-left transition hover:bg-leaf/5 focus:outline-none focus:ring-2 focus:ring-leaf/30"
+                onClick={() => setSerialEditing(true)}
+                type="button"
+              >
+                <span className="text-xs font-black uppercase text-muted">Seriennummer</span>
+                <span className={`break-all text-sm ${item.serialNumber ? "font-black text-ink" : "font-semibold text-muted"}`}>
+                  {item.serialNumber ?? "Noch nicht angegeben"}
+                </span>
+              </button>
             )}
           </section>
 
@@ -1510,9 +1499,9 @@ export function ItemDetail() {
           </section>
 
           <section className="object-panel rounded-lg p-4">
-            <SectionTitle eyebrow="Care" title="Offene Punkte zu diesem Objekt" icon={<ShieldCheck size={19} />} />
+            <SectionTitle eyebrow="Care" title="Erinnerungen zu diesem Produkt" icon={<ShieldCheck size={19} />} />
             <p className="mt-3 text-sm font-semibold leading-6 text-muted">
-              Starte hier eine produktgebundene Erinnerung. Beleg, Garantie und Produktkontext bleiben mit dem Care-Punkt verbunden.
+              Starte hier eine produktgebundene Erinnerung. Beleg, Garantie und Produktkontext bleiben mit ihr verbunden.
             </p>
             <div className="mt-4 flex gap-2">
               <input
@@ -1531,9 +1520,9 @@ export function ItemDetail() {
           </section>
 
           <section className="object-panel rounded-lg p-4">
-            <SectionTitle eyebrow="Endgültig" title="Objekt löschen" icon={<Trash2 size={19} />} />
+            <SectionTitle eyebrow="Endgültig" title="Produktakte löschen" icon={<Trash2 size={19} />} />
             <p className="mt-3 text-sm font-semibold text-muted">
-              Entfernt dieses Objekt mit allen Belegen und Dokumenten endgültig. Erinnerungen und Reparaturen werden mit gelöscht; verbundene Geräte bleiben erhalten und werden nur getrennt.
+              Entfernt diese Produktakte mit allen Belegen und Dokumenten endgültig. Erinnerungen und Reparaturen werden mit gelöscht; verbundene Geräte bleiben erhalten und werden nur getrennt.
             </p>
             {confirmingDelete ? (
               <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -1555,7 +1544,7 @@ export function ItemDetail() {
                 onClick={() => setConfirmingDelete(true)}
                 type="button"
               >
-                <Trash2 size={15} /> Objekt löschen…
+                <Trash2 size={15} /> Produktakte löschen…
               </button>
             )}
           </section>
@@ -1563,6 +1552,30 @@ export function ItemDetail() {
       </section>
     </main>
   );
+}
+
+/* Backend activity entries are stored in English; the record view speaks
+   the product language of the app. Unknown entries stay untouched. */
+const activityTypeLabels: Record<string, string> = {
+  CREATED: "Angelegt",
+  UPDATED: "Aktualisiert",
+  DOCUMENT_ADDED: "Dokument gespeichert",
+  DOCUMENT_REMOVED: "Dokument entfernt",
+  REPAIR_ADDED: "Reparatur ergänzt",
+  REMINDER_CREATED: "Erinnerung angelegt"
+};
+
+const activityMessageLabels: Record<string, string> = {
+  "Item profile created.": "Produktakte angelegt.",
+  "Item updated.": "Produktakte aktualisiert."
+};
+
+function activityTypeLabel(type: string) {
+  return activityTypeLabels[type.toUpperCase()] ?? type;
+}
+
+function activityMessageLabel(message: string) {
+  return activityMessageLabels[message] ?? message;
 }
 
 function warrantyDaysLeft(value?: string | null): number | null {
@@ -1591,6 +1604,7 @@ function hasDocumentType(documents: { type: string }[], type: string) {
 }
 
 function formatDate(value?: string | null) {
+  if (!value) return "Noch nicht angegeben";
   return isoDate(value);
 }
 
@@ -1641,14 +1655,14 @@ function visibilityLabel(value?: string | null) {
 
 function itemTypeLabel(value?: string | null) {
   const labels: Record<string, string> = {
-    THING: "Objekt",
+    THING: "Produkt",
     ELECTRONIC: "Elektronik",
     FURNITURE: "Möbel",
-    INFRASTRUCTURE: "Infrastruktur",
+    INFRASTRUCTURE: "Haus & Infrastruktur",
     VEHICLE: "Fahrzeug",
     COLLECTIBLE: "Sammlung"
   };
-  return value ? labels[value] ?? value : "Objekt";
+  return value ? labels[value] ?? value : "Produkt";
 }
 
 function PassportLink({ icon, label, saved = false, url }: { icon: ReactNode; label: string; saved?: boolean; url?: string | null }) {
@@ -1658,7 +1672,7 @@ function PassportLink({ icon, label, saved = false, url }: { icon: ReactNode; la
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md av-accent-soft text-leaf">{icon}</span>
       <span className="min-w-0 flex-1">
         <span className="block text-xs font-black uppercase text-muted">{label}</span>
-        <span className="mt-1 block truncate text-sm font-black text-ink">{isSaved ? "Gespeichert" : "Fehlt"}</span>
+        <span className={`mt-1 block truncate text-sm ${isSaved ? "font-black text-ink" : "font-semibold text-muted"}`}>{isSaved ? "Gespeichert" : "Noch nicht hinterlegt"}</span>
       </span>
       {url ? <ExternalLink className="shrink-0 text-leaf" size={16} /> : null}
     </>
@@ -2227,11 +2241,12 @@ function EditableDetailField({
 }
 
 function DetailRow({ icon, label, onClick, value }: { icon: ReactNode; label: string; onClick: () => void; value: string }) {
+  const pending = value === "Noch nicht angegeben" || value === "Datum unbekannt";
   const content = (
     <>
       <span className="grid h-10 w-10 place-items-center rounded-md av-accent-soft text-leaf">{icon}</span>
       <span className="text-xs font-black uppercase text-muted">{label}</span>
-      <span className="min-w-0 break-words text-base font-black text-ink">{value}</span>
+      <span className={`min-w-0 break-words text-base ${pending ? "font-semibold text-muted" : "font-black text-ink"}`}>{value}</span>
     </>
   );
 

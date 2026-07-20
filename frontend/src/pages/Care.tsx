@@ -2,19 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
-  AlertCircle,
   ArrowLeft,
-  CalendarClock,
   CheckCircle2,
-  ChevronRight,
-  Clock3,
-  FileText,
   PackageCheck,
   PauseCircle,
-  Plus,
-  ReceiptText,
-  ScanBarcode,
-  ShieldCheck
+  Plus
 } from "lucide-react";
 import { api, dateInputValue } from "../lib/api";
 import type { Item, Loop } from "../lib/types";
@@ -28,13 +20,12 @@ import {
   AppSideColumn,
   CareTimeline,
   EmptyState,
-  IconTile,
   MetadataRow,
   ObjectMemoryGraph,
-  OpenLoopRow,
   SecondaryAction
 } from "../components/app/AppKit";
-import type { CareStep, GraphEdge, StatusTone } from "../components/app/AppKit";
+import type { CareStep, GraphEdge } from "../components/app/AppKit";
+import { CareAgenda, CareMonthCalendar, buildCareEvents } from "../components/CareCalendar";
 
 type CareStatus = "loading" | "ready" | "error";
 
@@ -80,22 +71,79 @@ export function Care() {
     );
   }
 
-  return <CareOverview basePath={careBasePath} status={status} loops={loops} onRetry={loadLoops} />;
+  return <CareOverview basePath={careBasePath} status={status} loops={loops} onRetry={loadLoops} onLoopsChange={setLoops} />;
 }
 
-function CareOverview({ basePath, status, loops, onRetry }: { basePath: string; status: CareStatus; loops: Loop[]; onRetry: () => void }) {
+function CareOverview({ basePath, status, loops, onRetry, onLoopsChange }: {
+  basePath: string;
+  status: CareStatus;
+  loops: Loop[];
+  onRetry: () => void;
+  onLoopsChange: Dispatch<SetStateAction<Loop[]>>;
+}) {
   const loading = status === "loading";
   const openLoops = useMemo(() => sortOpenLoops(loops), [loops]);
-  const focus = openLoops[0];
-  const dueSoon = openLoops.filter((loop) => isWithinDays(loop.dueDate ?? loop.reminderAt, 7));
-  const snoozed = openLoops.filter((loop) => loop.status === "SNOOZED");
+  const itemBasePath = basePath.startsWith("/app") ? "/app/dinge" : "/items";
+  const [items, setItems] = useState<Item[]>([]);
+  const [view, setView] = useState<"month" | "agenda">(() =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches ? "agenda" : "month"
+  );
+  const [selectedDay, setSelectedDay] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  });
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api<Item[]>("/api/items").then(setItems).catch(() => setItems([]));
+  }, []);
+
+  const events = useMemo(
+    () => buildCareEvents(openLoops, items, basePath, itemBasePath),
+    [openLoops, items, basePath, itemBasePath]
+  );
+  const overdueCount = events.filter((event) => event.overdue).length;
+
+  async function completeLoop(loop: Loop) {
+    setBusyId(loop.id);
+    setActionError(null);
+    try {
+      const result = await api<{ loop: Loop }>(`/api/loops/${loop.id}/complete`, { method: "POST" });
+      onLoopsChange((current) => current.map((entry) => (entry.id === result.loop.id ? result.loop : entry)));
+    } catch (error) {
+      setActionError(errorText(error));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function snoozeLoop(loop: Loop) {
+    setBusyId(loop.id);
+    setActionError(null);
+    try {
+      const updated = await api<Loop>(`/api/loops/${loop.id}/snooze`, {
+        method: "POST",
+        body: JSON.stringify({ reminderAt: daysFromNow(2) })
+      });
+      onLoopsChange((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
+    } catch (error) {
+      setActionError(errorText(error));
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <AppPage>
       <AppPageHeader
         kicker="Erinnerungen & Fristen"
         title="Erinnerungen"
-        subtitle="Garantie-Enden, Rückgaben und Fristen bleiben sichtbar, bis sie erledigt sind."
+        subtitle={
+          openLoops.length
+            ? `${openLoops.length} ${openLoops.length === 1 ? "offener Eintrag" : "offene Einträge"}${overdueCount ? `, davon ${overdueCount} überfällig` : ""}. Kalender und Agenda zeigen dieselben echten Fristen.`
+            : "Garantie-Enden, Rückgaben und Fristen bleiben sichtbar, bis sie erledigt sind."
+        }
         actions={
           <ActionButton to="/app/capture/loop" icon={<Plus size={15} />}>
             Erinnerung hinzufügen
@@ -103,56 +151,42 @@ function CareOverview({ basePath, status, loops, onRetry }: { basePath: string; 
         }
       />
 
-      <div className="av-stat-grid">
-        <CareStatCard icon={<AlertCircle size={16} />} tone="teal" label="Offen" value={openLoops.length} />
-        <CareStatCard icon={<CalendarClock size={16} />} tone="amber" label="Nächste 7 Tage" value={dueSoon.length} />
-        <CareStatCard icon={<PauseCircle size={16} />} tone="neutral" label="Pausiert" value={snoozed.length} />
-      </div>
+      {loading ? (
+        <div className="av-loop-list">
+          <div className="av-skeleton-row" />
+          <div className="av-skeleton-row" />
+          <div className="av-skeleton-row" />
+        </div>
+      ) : status === "error" ? (
+        <CareLoadError onRetry={onRetry} />
+      ) : openLoops.length === 0 && events.length === 0 ? (
+        <CareEmpty />
+      ) : (
+        <>
+          <div className="care-view-switch" role="group" aria-label="Ansicht wählen">
+            <button aria-pressed={view === "month"} className={view === "month" ? "is-active" : ""} onClick={() => setView("month")} type="button">
+              Monat
+            </button>
+            <button aria-pressed={view === "agenda"} className={view === "agenda" ? "is-active" : ""} onClick={() => setView("agenda")} type="button">
+              Agenda
+            </button>
+          </div>
 
-      {focus ? (
-        <AppSection title="Nächster offener Punkt" slim>
-          <Link className="av-focus-row" to={`${basePath}/${focus.id}`}>
-            <IconTile tone={loopTone(focus)}>
-              <CareTypeIcon loop={focus} />
-            </IconTile>
-            <div className="av-focus-copy">
-              <strong>{focus.title}</strong>
-              <p>{careReason(focus)}</p>
+          {actionError ? <p className="av-msg is-error" role="status">{actionError}</p> : null}
+
+          {view === "month" ? (
+            <div className="care-layout">
+              <CareMonthCalendar events={events} onSelectDay={setSelectedDay} selectedDay={selectedDay} />
+              <aside className="care-side-agenda" aria-label="Nächste Einträge">
+                <h3>Als Nächstes</h3>
+                <CareAgenda busyId={busyId} events={events.slice(0, 12)} onComplete={completeLoop} onSnooze={snoozeLoop} />
+              </aside>
             </div>
-            <span className="av-focus-go">
-              Öffnen <ChevronRight size={15} />
-            </span>
-          </Link>
-        </AppSection>
-      ) : null}
-
-      <AppSection title="Offene Punkte">
-        {loading ? (
-          <div className="av-loop-list">
-            <div className="av-skeleton-row" />
-            <div className="av-skeleton-row" />
-            <div className="av-skeleton-row" />
-          </div>
-        ) : status === "error" ? (
-          <CareLoadError onRetry={onRetry} />
-        ) : openLoops.length === 0 ? (
-          <CareEmpty />
-        ) : (
-          <div className="av-loop-list">
-            {openLoops.map((loop) => (
-              <OpenLoopRow
-                key={loop.id}
-                to={`${basePath}/${loop.id}`}
-                tone={loopTone(loop)}
-                icon={<CareTypeIcon loop={loop} />}
-                title={loop.title}
-                product={`${loop.item?.name ?? careSourceLabel(loop.sourceType)} · ${careDateLabel(loop.dueDate ?? loop.reminderAt)}`}
-                signal={careStateLabel(loop)}
-              />
-            ))}
-          </div>
-        )}
-      </AppSection>
+          ) : (
+            <CareAgenda busyId={busyId} events={events} onComplete={completeLoop} onSnooze={snoozeLoop} />
+          )}
+        </>
+      )}
     </AppPage>
   );
 }
@@ -394,18 +428,6 @@ function CareEmpty() {
   );
 }
 
-function CareStatCard({ icon, tone, label, value }: { icon: ReactNode; tone: StatusTone; label: string; value: number }) {
-  return (
-    <div className="av-stat-card">
-      <IconTile tone={tone}>{icon}</IconTile>
-      <div className="av-stat-copy">
-        <small>{label}</small>
-        <strong>{value}</strong>
-      </div>
-    </div>
-  );
-}
-
 /* Lifecycle steps for the CareTimeline — opened → context → reminder → due → resolved. */
 function buildCareSteps(loop: Loop, item: Item | null, isDone: boolean, overdue: boolean): CareStep[] {
   const steps: CareStep[] = [];
@@ -444,19 +466,6 @@ function careGraphEdges(item: Item): GraphEdge[] {
     },
     { tone: item.serialNumber ? "green" : "red", label: item.serialNumber ? "Seriennummer ✓" : "Seriennummer fehlt" }
   ];
-}
-
-function loopTone(loop: Loop): StatusTone {
-  if (loop.status === "SNOOZED") return "neutral";
-  if (dateScore(loop.dueDate ?? loop.reminderAt) < Date.now()) return "red";
-  if (isWithinDays(loop.dueDate ?? loop.reminderAt, 7)) return "amber";
-  return "teal";
-}
-
-function CareTypeIcon({ loop }: { loop: Loop }) {
-  if (loop.sourceType === "RECEIPT") return <FileText size={17} />;
-  if (loop.itemId) return <PackageCheck size={17} />;
-  return <CalendarClock size={17} />;
 }
 
 function sortOpenLoops(loops: Loop[]) {

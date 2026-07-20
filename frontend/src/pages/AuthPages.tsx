@@ -822,7 +822,7 @@ export function AccountSettingsPage() {
         </div>
         {billingUsage ? (
           <div className="account-usage" aria-label="Aktuelle Nutzung deines Plans">
-            <UsageBar label="Objekte" entry={billingUsage.usage.items} />
+            <UsageBar label="Produkte" entry={billingUsage.usage.items} />
             <UsageBar label="Speicher" entry={billingUsage.usage.storageMb} unit="MB" />
             <UsageBar label="Erinnerungen" entry={billingUsage.usage.reminders} />
             <UsageBar label="AI-Aktionen diesen Monat" entry={billingUsage.usage.aiActionsPerMonth} />
@@ -1107,34 +1107,44 @@ export function AccountSettingsPage() {
         </form>
         <AuthMessage error={passwordError} success={passwordMessage || null} />
         <div className="account-provider-list">
-          <ProviderStatus icon={<Mail size={16} />} label="E-Mail & Passwort" status={auth.config.mode === "supabase" ? "Supabase Auth aktiv" : auth.config.mode === "mock" ? "Expliziter Dev-Modus" : "Setup fehlt"}>
+          <ProviderStatus icon={<Mail size={16} />} label="E-Mail & Passwort" status={auth.config.mode === "supabase" ? "Aktiv" : auth.config.mode === "mock" ? "Dev-Modus aktiv" : "Setup fehlt"}>
             <span className="account-provider-note">Über Passwortfeld bearbeitbar</span>
           </ProviderStatus>
           <ProviderStatus label="E-Mail bestätigt" status={auth.profile?.emailVerified ? "Ja" : "Noch offen"} />
-          <ProviderStatus icon={<GoogleIcon />} label="Google" status={auth.config.providers.google.configured ? "Aktiviert" : "Nicht konfiguriert"}>
-            <button className="account-provider-action" disabled={!auth.config.providers.google.configured || connectingProvider === "google"} onClick={() => void connectProvider("google")} type="button">
-              <Link2 size={14} />
-              {connectingProvider === "google" ? "Verbinde..." : "Verbinden"}
-            </button>
-          </ProviderStatus>
-          <ProviderStatus icon={<UserRound size={16} />} label="Apple" status={auth.config.providers.apple.configured ? "Aktiviert" : "Nicht konfiguriert"}>
-            <button className="account-provider-action" disabled={!auth.config.providers.apple.configured || connectingProvider === "apple"} onClick={() => void connectProvider("apple")} type="button">
-              <Link2 size={14} />
-              {connectingProvider === "apple" ? "Verbinde..." : "Verbinden"}
-            </button>
-          </ProviderStatus>
-          <ProviderStatus icon={<Smartphone size={16} />} label="SMS / Twilio" status={auth.config.phoneProvider.configured ? "Aktiviert" : "Vorbereitet"}>
-            <button className="account-provider-action" disabled type="button">
-              <ShieldCheck size={14} />
-              {auth.config.phoneProvider.configured ? "Login aktiv" : "Setup"}
-            </button>
-          </ProviderStatus>
-          <ProviderStatus icon={<Fingerprint size={16} />} label="Passkey" status={auth.config.passkeyProvider.configured ? "Aktiviert" : "Vorbereitet"}>
-            <button className="account-provider-action" disabled={!auth.config.passkeyProvider.configured || isRegisteringPasskey} onClick={() => void setupPasskey()} type="button">
-              <Fingerprint size={14} />
-              {isRegisteringPasskey ? "Prüft..." : "Einrichten"}
-            </button>
-          </ProviderStatus>
+          {/* During the invite-only beta unconfigured login providers stay
+              hidden: they are engineering scaffolding, not a user promise. */}
+          {auth.config.providers.google.configured || !betaFeatures.emailPasswordOnly ? (
+            <ProviderStatus icon={<GoogleIcon />} label="Google" status={auth.config.providers.google.configured ? "Aktiviert" : "Nicht konfiguriert"}>
+              <button className="account-provider-action" disabled={!auth.config.providers.google.configured || connectingProvider === "google"} onClick={() => void connectProvider("google")} type="button">
+                <Link2 size={14} />
+                {connectingProvider === "google" ? "Verbinde..." : "Verbinden"}
+              </button>
+            </ProviderStatus>
+          ) : null}
+          {auth.config.providers.apple.configured || !betaFeatures.emailPasswordOnly ? (
+            <ProviderStatus icon={<UserRound size={16} />} label="Apple" status={auth.config.providers.apple.configured ? "Aktiviert" : "Nicht konfiguriert"}>
+              <button className="account-provider-action" disabled={!auth.config.providers.apple.configured || connectingProvider === "apple"} onClick={() => void connectProvider("apple")} type="button">
+                <Link2 size={14} />
+                {connectingProvider === "apple" ? "Verbinde..." : "Verbinden"}
+              </button>
+            </ProviderStatus>
+          ) : null}
+          {auth.config.phoneProvider.configured || !betaFeatures.emailPasswordOnly ? (
+            <ProviderStatus icon={<Smartphone size={16} />} label="SMS-Login" status={auth.config.phoneProvider.configured ? "Aktiviert" : "Nicht verfügbar"}>
+              <button className="account-provider-action" disabled type="button">
+                <ShieldCheck size={14} />
+                {auth.config.phoneProvider.configured ? "Login aktiv" : "Setup"}
+              </button>
+            </ProviderStatus>
+          ) : null}
+          {auth.config.passkeyProvider.configured || !betaFeatures.emailPasswordOnly ? (
+            <ProviderStatus icon={<Fingerprint size={16} />} label="Passkey" status={auth.config.passkeyProvider.configured ? "Aktiviert" : "Nicht verfügbar"}>
+              <button className="account-provider-action" disabled={!auth.config.passkeyProvider.configured || isRegisteringPasskey} onClick={() => void setupPasskey()} type="button">
+                <Fingerprint size={14} />
+                {isRegisteringPasskey ? "Prüft..." : "Einrichten"}
+              </button>
+            </ProviderStatus>
+          ) : null}
         </div>
         <AuthMessage error={providerError || (passkeyMessageActive ? auth.error : null)} success={providerMessage || (passkeySaved ? "Passkey wurde gespeichert." : null)} />
       </section>
@@ -1143,8 +1153,8 @@ export function AccountSettingsPage() {
         <div className="account-panel-head">
           <div>
             <span>Sitzung</span>
-            <h2>Abmelden & Konto</h2>
-            <p>Abmelden beendet die lokale Sitzung. Die Kontolöschung ist im Privacy Center verfügbar.</p>
+            <h2>Abmelden</h2>
+            <p>Abmelden beendet nur die lokale Sitzung. Deine Produktakten bleiben unverändert.</p>
           </div>
         </div>
         <div className="account-action-row">
@@ -1152,9 +1162,21 @@ export function AccountSettingsPage() {
             <LogOut size={16} />
             Abmelden
           </button>
-          <Link className="profile-secondary-action is-muted" to="/app/ich/privacy">
+        </div>
+      </section>
+
+      <section className="account-panel account-danger-panel">
+        <div className="account-panel-head">
+          <div>
+            <span>Gefahrenbereich</span>
+            <h2>Account löschen</h2>
+            <p>Entfernt Konto, Produktakten und Dokumente endgültig. Die Löschung startest du im Privacy Center und bestätigst sie dort.</p>
+          </div>
+        </div>
+        <div className="account-action-row">
+          <Link className="account-danger-action" to="/app/ich/privacy">
             <Trash2 size={16} />
-            Account löschen
+            Zum Privacy Center
           </Link>
         </div>
       </section>
@@ -1324,7 +1346,7 @@ function AuthForm({ mode }: { mode: AuthMode }) {
       <AuthIntro
         eyebrow="Privater Zugang"
         title={mode === "login" ? "Willkommen zurück" : "Account erstellen"}
-        body={mode === "login" ? `Dein privater Speicher für Objekte, Nachweise und offene Punkte. Fragen? ${auth.config.supportEmail}` : phoneAuthAvailable ? "Mit E-Mail oder Telefon registrieren. Avareno bleibt privat, ruhig und ohne öffentliche Profile." : "Mit E-Mail registrieren. Avareno bleibt privat, ruhig und ohne öffentliche Profile."}
+        body={mode === "login" ? `Dein privates Archiv für Produkte, Belege und Garantien. Fragen? ${auth.config.supportEmail}` : phoneAuthAvailable ? "Mit E-Mail oder Telefon registrieren. Avareno bleibt privat, ruhig und ohne öffentliche Profile." : "Mit E-Mail registrieren. Avareno bleibt privat, ruhig und ohne öffentliche Profile."}
       />
 
       {!auth.config.ready ? <AuthSetupNotice missing={auth.config.setupMissing} /> : null}

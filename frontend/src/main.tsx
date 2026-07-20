@@ -8,6 +8,7 @@ import { LanguageProvider } from "./lib/language";
 import { ThemeProvider } from "./lib/theme";
 import { RouteError } from "./components/RouteError";
 import "./styles.css";
+import "./milky-archive.css";
 
 /* Route components are code-split: each page loads on demand so the
    initial bundle only carries the app shell, providers and error
@@ -39,6 +40,7 @@ const CheckoutPage = lazy(() => import("./pages/CheckoutPage").then((m) => ({ de
 const ImpressumPage = lazy(() => import("./pages/MarketingPages").then((m) => ({ default: m.ImpressumPage })));
 const DatenschutzPage = lazy(() => import("./pages/MarketingPages").then((m) => ({ default: m.DatenschutzPage })));
 const CookiesPage = lazy(() => import("./pages/MarketingPages").then((m) => ({ default: m.CookiesPage })));
+const TermsPage = lazy(() => import("./pages/MarketingPages").then((m) => ({ default: m.TermsPage })));
 const LoginPage = lazy(() => import("./pages/AuthPages").then((m) => ({ default: m.LoginPage })));
 const SignupPage = lazy(() => import("./pages/AuthPages").then((m) => ({ default: m.SignupPage })));
 const ForgotPasswordPage = lazy(() => import("./pages/AuthPages").then((m) => ({ default: m.ForgotPasswordPage })));
@@ -65,6 +67,7 @@ const router = createBrowserRouter([
       { path: "impressum", element: <ImpressumPage /> },
       { path: "datenschutz", element: <DatenschutzPage /> },
       { path: "cookies", element: <CookiesPage /> },
+      { path: "nutzungsbedingungen", element: <TermsPage /> },
       { path: "login", element: <LoginPage /> },
       { path: "signup", element: <SignupPage /> },
       { path: "forgot-password", element: <ForgotPasswordPage /> },

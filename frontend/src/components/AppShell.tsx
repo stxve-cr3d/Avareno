@@ -8,10 +8,13 @@ import { betaFeatures } from "../lib/betaFeatures";
 import { CommandPalette } from "./CommandPalette";
 
 const nav = [
-  { to: "/app", label: "Übersicht", icon: Home },
-  { to: "/app/dinge", label: "Meine Produkte", icon: Package, activePaths: ["/app/dinge", "/app/items"] },
+  { to: "/app", label: "Zuhause", icon: Home },
+  { to: "/app/dinge", label: "Dinge", icon: Package, activePaths: ["/app/dinge", "/app/items"] },
   { to: "/app/reports/home-binder", label: "Dokumente", icon: FileText },
-  { to: "/app/care", label: "Erinnerungen", icon: BellRing }
+  /* Visible label speaks the German product vocabulary; the /care route
+     stays unchanged (App-Experience-Overhaul §6). */
+  { to: "/app/care", label: "Erinnerungen", icon: BellRing },
+  { to: "/app/ich", label: "Profil", icon: UserRound, activePaths: ["/app/ich", "/app/profile"] }
 ];
 
 const captureOptions = [
@@ -40,7 +43,7 @@ export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const auth = useAuth();
-  const isMarketingSurface = ["/", "/pricing", "/impressum", "/datenschutz", "/cookies"].includes(location.pathname) || location.pathname.startsWith("/checkout/");
+  const isMarketingSurface = ["/", "/pricing", "/impressum", "/datenschutz", "/cookies", "/nutzungsbedingungen"].includes(location.pathname) || location.pathname.startsWith("/checkout/");
   const isAuthSurface = ["/login", "/signup", "/forgot-password", "/reset-password", "/auth/callback", "/auth/verify-email", "/onboarding"].includes(location.pathname);
   const isProtectedSurface = !isMarketingSurface && !isAuthSurface;
 
@@ -230,7 +233,6 @@ export function AppShell() {
     location.pathname.startsWith("/app/home/") ||
     location.pathname === "/app/home-graph" ||
     location.pathname.startsWith("/app/home-graph/");
-  const currentSection = currentSectionLabel(location.pathname);
 
   return (
     <div className="avareno-app-shell min-h-screen">
@@ -266,7 +268,6 @@ export function AppShell() {
           </nav>
 
           <div className="avareno-app-actions">
-            <span className="avareno-current-section">{currentSection}</span>
             <button className="avareno-app-search" onClick={() => setPaletteOpen(true)} type="button" aria-label="Suche (⌘K)" title="Suche · ⌘K">
               <Search size={17} />
             </button>
@@ -398,17 +399,6 @@ export function AppShell() {
       ) : null}
     </div>
   );
-}
-
-function currentSectionLabel(pathname: string) {
-  if (pathname === "/app") return "Übersicht";
-  if (pathname.startsWith("/app/dinge") || pathname.startsWith("/app/items")) return "Meine Produkte";
-  if (pathname.startsWith("/app/care")) return "Erinnerungen";
-  if (pathname.startsWith("/app/capture")) return "Erfassen";
-  if (pathname.startsWith("/app/reports/home-binder")) return "Dokumente";
-  if (pathname.startsWith("/app/search")) return "Suche";
-  if (pathname.startsWith("/app/ich") || pathname.startsWith("/app/profile")) return "Profil";
-  return "Avareno";
 }
 
 function ProfileAvatar({ name, src }: { name: string; src?: string | null }) {
