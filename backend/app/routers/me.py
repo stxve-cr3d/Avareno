@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
 from app.db import db, row_to_dict
@@ -12,11 +12,141 @@ from app.utils import now_iso
 
 router = APIRouter()
 
+# Meaningful organisation events for the activity view. Derived exclusively
+# from data the user already owns — no new tables, no page views, no logins.
+# XP actions are limited to enrich-style events that are not already covered
+# by Item/Document/Loop timestamps, so a day never double-counts one action.
+_ACTIVITY_XP_ACTIONS = ("add_serial_number", "add_repair_log")
+
 
 @router.get("")
 def me() -> dict:
     with db() as conn:
         return get_default_user(conn)
+
+
+@router.get("/activity")
+def activity(days: int = Query(default=365, ge=7, le=730)) -> dict:
+    """Per-day counts of meaningful organisation actions for the current user.
+
+    Sources: products created, non-vault documents saved, reminders/loops
+    completed, and enrich actions from the existing XP ledger. All queries are
+    scoped to the authenticated user; nothing is persisted.
+    """
+    with db() as conn:
+        user = get_default_user(conn)
+        user_id = user["id"]
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+        event_days: list[str] = []
+        by_type = {"productsCreated": 0, "documentsSaved": 0, "remindersCompleted": 0, "detailsAdded": 0}
+        day_types: dict[str, dict[str, int]] = {}
+
+        def collect(key: str, sql: str, params: tuple) -> None:
+            for row in conn.execute(sql, params).fetchall():
+                day = str(row["day"] or "")[:10]
+                if day:
+                    event_days.append(day)
+                    by_type[key] += 1
+                    bucket = day_types.setdefault(day, {})
+                    bucket[key] = bucket.get(key, 0) + 1
+
+        collect(
+            "productsCreated",
+            'SELECT createdAt AS day FROM "Item" WHERE userId = ? AND createdAt >= ?',
+            (user_id, cutoff),
+        )
+        collect(
+            "documentsSaved",
+            'SELECT createdAt AS day FROM "Document" WHERE userId = ? AND vaultId IS NULL AND createdAt >= ?',
+            (user_id, cutoff),
+        )
+        collect(
+            "remindersCompleted",
+            'SELECT updatedAt AS day FROM "Loop" WHERE userId = ? AND status = ? AND updatedAt >= ?',
+            (user_id, "DONE", cutoff),
+        )
+        collect(
+            "detailsAdded",
+            f'SELECT createdAt AS day FROM "XpTransaction" WHERE userId = ? AND action IN ({",".join("?" for _ in _ACTIVITY_XP_ACTIONS)}) AND createdAt >= ?',
+            (user_id, *(_ACTIVITY_XP_ACTIONS), cutoff),
+        )
+
+        counts: dict[str, int] = {}
+        for day in event_days:
+            counts[day] = counts.get(day, 0) + 1
+
+        # Streaks run over the full history, not only the requested window,
+        # so a 30-day view still reports the true current streak.
+        all_days = _all_activity_days(conn, user_id)
+        current_streak = _current_streak_from_days(all_days)
+        longest_streak = _longest_streak_from_days(all_days)
+
+        return {
+            "rangeDays": days,
+            # Per-day type buckets let the client explain each cell
+            # ("1 Produkt angelegt, 1 Dokument gespeichert") without a
+            # second request. Additive to the existing shape.
+            "days": [
+                {"date": day, "count": counts[day], "types": day_types.get(day, {})}
+                for day in sorted(counts)
+            ],
+            "totalActions": len(event_days),
+            "activeDays": len(counts),
+            "currentStreakDays": current_streak,
+            "longestStreakDays": longest_streak,
+            "byType": by_type,
+        }
+
+
+def _all_activity_days(conn, user_id: str) -> set[str]:
+    placeholders = ",".join("?" for _ in _ACTIVITY_XP_ACTIONS)
+    rows = conn.execute(
+        f'''SELECT substr(createdAt, 1, 10) AS day FROM "Item" WHERE userId = ?
+            UNION
+            SELECT substr(createdAt, 1, 10) AS day FROM "Document" WHERE userId = ? AND vaultId IS NULL
+            UNION
+            SELECT substr(updatedAt, 1, 10) AS day FROM "Loop" WHERE userId = ? AND status = 'DONE'
+            UNION
+            SELECT substr(createdAt, 1, 10) AS day FROM "XpTransaction" WHERE userId = ? AND action IN ({placeholders})''',
+        (user_id, user_id, user_id, user_id, *(_ACTIVITY_XP_ACTIONS)),
+    )
+    return {str(row["day"]) for row in rows.fetchall() if row["day"]}
+
+
+def _current_streak_from_days(active_days: set[str]) -> int:
+    if not active_days:
+        return 0
+    today = datetime.now(timezone.utc).date()
+    if today.isoformat() in active_days:
+        cursor = today
+    elif (today - timedelta(days=1)).isoformat() in active_days:
+        cursor = today - timedelta(days=1)
+    else:
+        return 0
+    streak = 0
+    while cursor.isoformat() in active_days:
+        streak += 1
+        cursor -= timedelta(days=1)
+    return streak
+
+
+def _longest_streak_from_days(active_days: set[str]) -> int:
+    longest = 0
+    for day in active_days:
+        try:
+            date = datetime.fromisoformat(day).date()
+        except ValueError:
+            continue
+        if (date - timedelta(days=1)).isoformat() in active_days:
+            continue
+        length = 1
+        cursor = date + timedelta(days=1)
+        while cursor.isoformat() in active_days:
+            length += 1
+            cursor += timedelta(days=1)
+        longest = max(longest, length)
+    return longest
 
 
 class ActivationUpdate(BaseModel):

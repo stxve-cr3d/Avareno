@@ -1,228 +1,220 @@
 # Invite-only beta: target deployment verification
 
-Date: 2026-07-17
+Date: 2026-07-18
 
-Repository commit: `a12753ed2da2ae64c2332b8ef82d3a06dd94dcbb` (`main`)
+Repository commit: `1ffb7910fbb79fc2b196c109bc5ccebbb854d445`
+(`beta-release-2026-07-17`)
 
-Result: **NO-GO**
+Result: **CONDITIONAL GO**
 
-## 1. Safe-abort decision and target project
+## 1. Verified target and safety boundary
 
-No hosted Supabase target was changed or tested. The intended beta project is
-not unambiguously configured in this workspace:
+- Linked project ref: `gstxywgpmegqazztrppi`.
+- Dashboard name: `Avareno Beta`.
+- Region: `eu-central-1`.
+- Project status: `ACTIVE_HEALTHY`.
+- The project was newly created on 2026-07-17 and contained zero Auth users,
+  public rows and Storage objects before controlled QA.
+- The normal Avareno project was identified first and was not mutated. The CLI
+  was explicitly relinked before any beta command.
+- No production or real user data, private invoices, credentials or secrets
+  were used or printed.
 
-- `supabase/config.toml` contains only the local CLI id `avareno`.
-- `supabase/.temp/project-ref` is absent.
-- The scoped repository, attached instructions and current process environment
-  contain no non-placeholder `*.supabase.co` host or project ref.
-- The Supabase CLI has no access token/profile in this environment.
-- `supabase projects list` cannot authenticate.
-- `supabase migration list --linked` and `supabase db push --linked --dry-run`
-  both stop because no project ref is linked.
+## 2. Repository state
 
-This is the required fail-closed outcome. A project was not guessed from a URL,
-name or previous local state. No production system was contacted.
+- `git diff --check` passed before deployment.
+- Existing unrelated Finder/design deletions and untracked design/QA artifacts
+  were preserved and never reset.
+- No commit or push was performed.
+- The magic-byte remediation created uncommitted migration
+  `20260718001016_beta_server_only_private_storage_writes.sql` and extended the
+  controlled QA. This must be committed separately before a release pipeline
+  can reproduce the deployed schema.
 
-## 2. Repository and working tree
+## 3. Applied migrations
 
-- The pre-existing working tree is extensively dirty and contains unrelated
-  modified, deleted and untracked work.
-- It was inspected and preserved. No reset, commit or push was performed.
-- The local release pass added only verification/security artifacts: a
-  function-grant migration, a fail-closed remote mode for the beta QA script,
-  invite-only expectations in the existing browser QA scripts, checklist/report
-  updates and this report.
-
-## 3. Migration state
-
-The controlled local Supabase instance contains these migrations in order:
+Remote and local history match for all five versions:
 
 1. `20260717061246_beta_authorization_rls.sql`
 2. `20260717061534_beta_private_storage.sql`
 3. `20260717063836_beta_service_role_account_deletion.sql`
 4. `20260717101259_beta_function_execute_grants.sql`
+5. `20260718001016_beta_server_only_private_storage_writes.sql`
 
-The fourth migration was added after the metadata audit proved that PostgreSQL's
-default `PUBLIC` role could still execute all six helper functions. It revokes
-that implicit access, preserves `authenticated` execution, and leaves the one
-reviewed `SECURITY DEFINER` function with an empty `search_path`.
+The initial dry run listed exactly the four expected release migrations. After
+a controlled direct-upload test proved that Storage accepted invalid PDF magic
+bytes, a fifth versioned migration removed direct client writes to private
+document buckets. Its first push attempt failed on an optional policy comment;
+the transaction and migration history were verified as fully rolled back. The
+comment was removed, a clean one-migration dry run was repeated, and the
+corrected migration applied successfully.
 
-Remote migration history: **not available**.
+`supabase db lint --linked --level error --fail-on error` passed after the final
+migration. CLI warnings concerned only unavailable local Docker catalog caching,
+not remote migration execution.
 
-Remote migrations applied in this pass: **none**.
-
-## 4. Local database and Storage verification
-
-These results are real executions against the controlled local Supabase stack,
-not claims about the hosted beta project:
+## 4. Remote database authorization
 
 - 30/30 public tables have RLS enabled and forced.
-- Policy-shape audit found zero SELECT/DELETE policies without `USING`, zero
-  INSERT policies without `WITH CHECK`, and zero incomplete UPDATE/ALL
-  policies.
+- All 30 tables have SELECT/INSERT/UPDATE/DELETE policy coverage.
+- 150 public policies contain zero missing `USING`, missing INSERT
+  `WITH CHECK`, or incomplete UPDATE/ALL shapes.
 - No public-schema views are exposed.
-- All six public authorization helpers reject `anon` execution and allow
-  `authenticated` execution after the new migration.
-- The only `SECURITY DEFINER` helper exposes an active-Auth-subject boolean and
-  has `search_path=""`.
-- Supabase security advisors: no local findings.
-- Supabase schema lint: no local errors.
-- `documents`, `receipts`, `support-files`, and `object-images` are private.
-  `avatars` is intentionally public and limited to PNG/JPEG at 2 MiB.
-- Private document buckets allow PDF/JPEG/PNG and cap objects at 10 MiB.
-- `storage.objects` has separate SELECT/INSERT/UPDATE/DELETE policies plus the
-  restrictive active-subject policy.
+- No `anon` public-table grants were found.
+- Six reviewed public helper functions are executable by `authenticated` and
+  not by `anon`.
+- `beta_auth_user_active()` is the only `SECURITY DEFINER` helper, returns only
+  an active-subject boolean and has `search_path=""`.
+- Security Advisor reports the expected warning that authenticated users can
+  execute that reviewed helper; no other security finding was reported.
+- Performance Advisor reported no findings.
 
-Hosted RLS, grants, policies, views, RPCs, bucket settings and Storage policies
-remain **unverified**.
+## 5. Remote Storage configuration
 
-## 5. Feature configuration
+- Private: `documents`, `receipts`, `object-images`, `support-files`.
+- Public: `avatars` only, capped at 2 MiB and PNG/JPEG.
+- Every private bucket is capped at 10 MiB. Document buckets allow PDF, JPEG
+  and PNG; `object-images` allows JPEG/PNG.
+- The Free-plan global limit is fixed by Supabase at 50 MB; the stricter 10 MiB
+  limit is enforced per bucket and by the backend.
+- `storage.objects` has RLS enabled.
+- Final policies: three avatar write policies, one owner-scoped private SELECT
+  policy and one restrictive active-subject policy.
+- Direct private client upload/update/delete is denied. Private document bytes
+  flow through the authenticated backend, which validates extension, declared
+  MIME and magic bytes before persistence.
+- User B and anon cannot list/read/sign/change/delete User A resources. Denied
+  operations produce no mutation.
 
-The versioned local/backend/frontend configuration has the expected release
-posture:
+## 6. Effective Auth configuration
 
-- enabled: invite-only mode, email/password for provisioned users, document
-  uploads;
-- disabled: open signup, anonymous Auth, OAuth/social providers, Receipt
-  Extraction, OCR/document processing, Household sharing, public document
-  links, inline preview and Billing;
-- upload limit: 10 MiB;
-- backend startup refuses invite-only mode when API authentication is optional.
+Verified in the Beta dashboard and independently through `/auth/v1/settings`:
 
-The actual hosted Auth settings and deployed backend/frontend environment
-variables were not accessible and therefore are **open gates**.
+- public signup disabled (`disable_signup=true`);
+- email/password enabled;
+- email confirmation enabled;
+- anonymous sign-in disabled;
+- phone disabled;
+- all social/OAuth providers disabled;
+- no custom OAuth/OIDC provider configured.
 
-## 6. Controlled regression results
+Open dashboard gates:
 
-`qa-beta-security.mjs` passed 56/56 checks locally after the final migration:
+- Site URL is still `http://localhost:3000`;
+- redirect allowlist is empty;
+- custom SMTP is not configured, so default templates/provider remain active;
+- invitation delivery and reset-password delivery were not tested against a
+  controlled mailbox.
 
-- User A and User B can create and use only their own profile, Household,
-  Space, Item, Document and private object.
-- Foreign `householdId`, `spaceId`, `parentId`, `itemId`, ownership changes and
-  Household self-membership are denied.
-- User B and anon cannot list/read User A files.
-- User B cannot create a signed URL, overwrite or delete User A's file.
-- Denied deletes have no side effect.
-- Complete User A deletion removes database rows, Storage objects, local files
-  and the Auth user while preserving User B.
-- User A's old token is rejected by Auth and cannot mutate database or Storage.
-- Public signup is rejected.
+## 7. Beta feature posture
 
-The QA script now accepts hosted credentials only through the process
-environment and only when the HTTPS host exactly matches
-`AVARENO_QA_EXPECTED_PROJECT_REF` and `AVARENO_QA_TARGET_ENV=beta`. A mismatched
-project-ref guard was executed and passed before any network request.
+The versioned backend/frontend configuration and the explicit Beta frontend
+build have this posture:
 
-Hosted two-user isolation, Storage isolation, deletion and old-token results:
-**not executed**.
+- enabled: invite-only, email/password, document uploads;
+- disabled: Receipt Extraction, document processing/OCR, OAuth, Household
+  sharing, public document links, inline preview and Billing;
+- backend upload limit: 10 MiB;
+- static `/uploads` serving: disabled in the tested backend configuration.
 
-## 7. Upload and processing verification
+The controlled backend started with remote Beta Auth and proved Receipt
+Extraction, extracted-data mutation and public signed links return disabled
+responses. The final deployed backend environment itself is not available in
+this workspace and remains a manual deployment gate.
 
-The focused backend suite passed 17/17 tests and covers:
+## 8. Two-user, anon and relationship QA
 
-- valid PDF, JPEG and PNG;
-- unsupported extension;
-- file over 10 MiB;
-- empty file;
-- mismatched extension, MIME type and magic bytes;
-- signed-download integrity and document deletion;
-- Receipt Extraction and document-feature gates before database, Storage or
-  provider access;
-- two-user relationship authorization and complete account deletion.
+`qa-beta-security.mjs` passed 71/71 checks against the linked Beta project:
 
-The local Storage regression separately proves own upload/download/update/delete,
-foreign path denial, foreign download denial and foreign delete denial.
+- User A and User B can create and see only their own profile, Household,
+  Space, Item and Document metadata.
+- Foreign `householdId`, `spaceId`, `parentId`, `itemId`, ownership reassignment
+  and Household self-membership are denied.
+- Foreign document metadata is hidden.
+- Anonymous database and private Storage access is denied.
+- Foreign direct paths, reads, signed URLs, replacement and deletion are denied.
+- Disabled document/extraction requests do not mutate data.
+- User B remains unchanged after all negative tests and User A deletion.
 
-Important open target gate: Supabase bucket MIME/size policies do not themselves
-inspect file magic bytes. The application upload API does. If direct browser
-upload to Supabase Storage is enabled in the hosted beta, it must either be
-removed as a client path or brokered through equivalent server-side byte
-validation before this upload gate can be closed.
+## 9. Upload verification
 
-Hosted upload cases and hosted upload kill-switch: **not executed**.
+- Valid PDF: passed through the authenticated backend.
+- Valid JPEG: passed.
+- Valid PNG: passed.
+- File over 10 MiB: rejected with HTTP 413.
+- Wrong extension: rejected.
+- Wrong MIME type: rejected.
+- Wrong magic bytes: rejected.
+- Direct private Storage upload initially demonstrated the bypass with one
+  controlled object, which was immediately removed.
+- After remediation, the identical direct invalid upload returned HTTP 400 and
+  created zero objects.
+- Foreign path, foreign download, foreign replacement and foreign delete were
+  denied without side effects.
 
-## 8. Auth-flow verification
+## 10. Account deletion and old token
 
-Local Auth proves closed signup, admin provisioning and password login. The
-invite-only Landing QA passes 50/50 checks, and the controlled Onboarding QA
-passes its complete desktop/mobile flow including signup-to-login redirect,
-reload persistence and duplicate-mutation prevention.
+The real backend deletion orchestrator ran against controlled Beta Auth,
+PostgREST and Storage:
 
-This does not replace the required hosted email flow. The following were not
-executed against a controlled beta mailbox: invitation delivery, invite
-acceptance, password setup, logout/login, forgot password, reset link,
-post-reset login, session reload and OAuth unreachability.
+- User A product and three local documents were created;
+- User A database rows, Storage prefix, local files and Auth user were removed;
+- the User A Storage prefix and public profile were verified empty;
+- User B data remained intact;
+- User A's old JWT was rejected by Auth and the backend and could not mutate
+  PostgREST or Storage.
 
-## 9. Final local commands and results
+After QA, the target contained zero Auth users, zero Storage objects and zero
+estimated public rows.
 
-- `npm run verify` — PASS: backend/frontend/mobile typechecks, 47 backend tests,
-  production build (1,739 modules).
-- Focused security/upload/backend suite — PASS: 17 tests.
-- `node qa-beta-security.mjs` — PASS locally: 56 checks.
-- Remote project-ref mismatch guard — PASS.
-- Supabase local security advisors — PASS, no findings.
-- Supabase local schema lint — PASS, no errors.
-- Landing QA — PASS, 50/50.
-- Onboarding QA — PASS.
-- Explicit invite-only/Supabase production build — PASS; only a non-security
-  chunk-size warning remains.
-- Browser bundle service-role/secret scan — PASS, 74 generated files scanned.
-- Frontend source service-role/secret scan — PASS.
-- `git diff --check` — PASS.
-- Cleanup audit — PASS: zero controlled Auth users, public test profiles and
-  Storage objects remained; the local Supabase stack was stopped and temporary
-  logs were removed.
+## 11. Local release verification
 
-No command line in this report contains a real token, key, password or private
-user value.
+- `npm run verify`: PASS.
+- Backend tests: 47 passed.
+- Backend, frontend and mobile typechecks: PASS.
+- Production build: PASS, 1,739 modules.
+- Explicit Beta Supabase frontend build: PASS.
+- Landing QA: PASS, 50/50.
+- Onboarding QA: PASS at desktop/mobile.
+- Remote `qa-beta-security.mjs`: PASS, 71/71.
+- Bundle scan: 74 files; service-role value absent; secret-key prefix absent.
+- `git diff --check`: PASS.
 
-## 10. Required hosted-project gates
+## 12. Commands executed without sensitive values
 
-Perform these steps only after a human identifies the dedicated beta project by
-both dashboard name and project ref:
+- `git status --short --branch`, `git diff --check`
+- `supabase projects list --output-format json`
+- `supabase migration list --linked`
+- `supabase db push --linked --dry-run`, `supabase db push --linked`
+- `supabase db lint --linked --level error --fail-on error`
+- `supabase db query --linked <metadata-only SQL>`
+- `supabase db advisors --linked --type security|performance`
+- controlled Auth/PostgREST/Storage requests through in-process credentials
+- `node qa-beta-security.mjs` through a redacted environment wrapper
+- `npm run verify`
+- `node frontend/scripts/qa-landing.mjs`
+- `node frontend/scripts/qa-onboarding.mjs`
+- explicit Beta production build and byte-for-byte secret-presence scan
 
-1. Authenticate the CLI interactively, run `npx supabase projects list`, and
-   confirm the exact beta ref. Then run
-   `npx supabase link --project-ref <BETA_PROJECT_REF>` and verify that
-   `supabase/.temp/project-ref` contains the same ref.
-2. Run `npx supabase migration list --linked`, followed by
-   `npx supabase db push --linked --dry-run`. Review that only the four listed
-   migrations are pending, then apply them with `npx supabase db push --linked`.
-3. Run linked database advisors/lint and the same metadata queries for RLS,
-   policies, grants, views, RPCs and `SECURITY DEFINER` settings.
-4. In **Authentication > URL Configuration**, set the exact HTTPS beta Site
-   URL and allow only the exact beta `/auth/callback` and `/reset-password`
-   redirects. Remove wildcards, localhost and obsolete previews.
-5. In **Authentication > Providers/Sign In**, disable public signup,
-   anonymous, phone, Web3 and every OAuth/social provider; keep email/password
-   for invited users. In **Authentication > Email/SMTP**, configure the verified
-   sender. In **Email Templates**, verify Invite User and Reset Password.
-6. In **Storage > Settings**, set the global maximum to 10 MiB. In
-   **Storage > Buckets**, verify private access, per-bucket 10 MiB and the
-   PDF/JPEG/PNG allowlist for all document buckets.
-7. Verify the deployed backend/frontend flags listed in section 5 and exercise
-   the upload kill-switch once with a controlled file.
-8. Inject the three QA credentials from a local secret manager (never shell
-   output), set the expected ref and `AVARENO_QA_TARGET_ENV=beta`, then run
-   `node qa-beta-security.mjs`.
-9. Use two controlled beta mailboxes to complete the full invite, reset,
-   reload, OAuth-negative, upload, two-user, deletion and old-token flow.
-10. Confirm no controlled users, rows or Storage objects remain.
+## 13. Mandatory manual gates before invitations
 
-The Site URL/redirect requirements follow Supabase's URL Configuration model;
-private buckets require authenticated download or a policy-authorized signed
-URL, and custom SMTP is required for dependable non-toy email delivery.
+1. Deploy the exact Beta frontend/backend origin and set that HTTPS origin as
+   Auth Site URL.
+2. Add only the exact Beta `/auth/callback` and `/reset-password` redirect URLs;
+   do not add wildcards, localhost or unrelated previews.
+3. Configure verified custom SMTP, sender/reply-to, SPF/DKIM/DMARC and review
+   Invite User and Reset Password templates.
+4. With controlled mailboxes, execute invitation delivery, invite acceptance,
+   password setup, login, logout, forgot password, reset link, post-reset login
+   and session persistence after reload. Reconfirm OAuth remains unreachable.
+5. Verify the deployed backend environment uses all restricted flags from the
+   release checklist, requires Auth, keeps the service role server-only, exposes
+   no static uploads and passes the upload kill-switch test.
+6. Commit the fifth migration, QA update and reports in a separately authorized
+   change so repository history reproduces the deployed Beta schema.
+7. Record owners/acceptance for malware-scanning risk, backup retention/deletion
+   propagation, Supabase/SMTP DPA/AVV and legal/privacy review.
 
-## 11. Open release risks
+Until these gates are closed, invitations must not be sent.
 
-- The beta project ref and hosted environment are unknown in this workspace.
-- No remote migrations were compared or applied.
-- No hosted Auth, SMTP, redirect, provider, bucket or feature-flag settings were
-  verified.
-- No hosted two-user, upload, invite, deletion or old-token test was run.
-- Direct hosted Storage upload still needs an explicit magic-byte decision.
-
-Because the concrete-project isolation, deletion, old-token and real email Auth
-gates are mandatory for `GO`, the release is not currently approvable.
-
-**NO-GO – kritische Blocker verbleiben**
+**CONDITIONAL GO – nur nach konkret benannten manuellen Gates**

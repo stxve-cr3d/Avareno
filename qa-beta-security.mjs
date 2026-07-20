@@ -9,6 +9,7 @@ import { join } from "node:path";
 
 const checks = [];
 const createdAuthUsers = [];
+const createdStorageObjects = [];
 let runtime;
 
 function check(name, condition) {
@@ -92,11 +93,11 @@ async function apiRequest(path, { key, token = key, method = "GET", body, header
   return { status: response.status, data };
 }
 
-async function storageRequest(path, { token, method = "GET", bytes, headers = {} }) {
+async function storageRequest(path, { key = runtime.anonKey, token = key, method = "GET", bytes, headers = {} }) {
   const response = await fetch(`${runtime.apiUrl}${path}`, {
     method,
     headers: {
-      apikey: runtime.anonKey,
+      apikey: key,
       Authorization: `Bearer ${token}`,
       ...headers
     },
@@ -275,6 +276,77 @@ async function runIntegratedAccountDeletion(userA, userB, pdfBytes) {
     const upload = await backendRequest(baseUrl, "/api/documents/upload", userA.token, { method: "POST", body: form });
     check("integrated deletion has a private local document", upload.status === 201 && upload.data?.fileName === "controlled-delete.pdf");
 
+    check(
+      "User A downloads own server-validated document",
+      (await backendRequest(baseUrl, `/api/documents/${upload.data.id}/download`, userA.token)).status === 200
+    );
+    check(
+      "User B cannot download User A server document",
+      (await backendRequest(baseUrl, `/api/documents/${upload.data.id}/download`, userB.token)).status === 404
+    );
+    check(
+      "User B cannot delete User A server document",
+      (await backendRequest(baseUrl, `/api/documents/${upload.data.id}`, userB.token, { method: "DELETE" })).status === 404
+    );
+    check(
+      "public document links are disabled",
+      (await backendRequest(baseUrl, `/api/documents/${upload.data.id}/signed-download`, userA.token, { method: "POST" })).status === 503
+    );
+    check(
+      "Receipt Extraction is disabled before document processing",
+      (await backendRequest(baseUrl, "/api/extract/receipt", userA.token, {
+        method: "POST",
+        body: JSON.stringify({ documentId: upload.data.id }),
+        headers: { "Content-Type": "application/json" }
+      })).status === 503
+    );
+    check(
+      "document processing is disabled before mutation",
+      (await backendRequest(baseUrl, `/api/documents/${upload.data.id}/extracted-data`, userA.token, {
+        method: "PATCH",
+        body: JSON.stringify({ extractedText: "must not persist" }),
+        headers: { "Content-Type": "application/json" }
+      })).status === 503
+    );
+
+    for (const [fileName, mimeType, bytes] of [
+      ["controlled-valid.jpg", "image/jpeg", new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x51, 0x41])],
+      ["controlled-valid.png", "image/png", new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x51, 0x41])]
+    ]) {
+      const validForm = new FormData();
+      validForm.append("type", "OTHER");
+      validForm.append("itemId", itemA.data.id);
+      validForm.append("file", new Blob([bytes], { type: mimeType }), fileName);
+      check(
+        `server upload accepts valid ${fileName.split(".").pop()?.toUpperCase()}`,
+        (await backendRequest(baseUrl, "/api/documents/upload", userA.token, { method: "POST", body: validForm })).status === 201
+      );
+    }
+
+    for (const [label, fileName, mimeType, bytes] of [
+      ["wrong extension", "controlled.txt", "text/plain", new TextEncoder().encode("plain text")],
+      ["wrong MIME type", "controlled.pdf", "image/png", new TextEncoder().encode("%PDF-1.7 controlled")],
+      ["wrong magic bytes", "controlled.pdf", "application/pdf", new TextEncoder().encode("not a PDF")]
+    ]) {
+      const invalidForm = new FormData();
+      invalidForm.append("type", "OTHER");
+      invalidForm.append("itemId", itemA.data.id);
+      invalidForm.append("file", new Blob([bytes], { type: mimeType }), fileName);
+      check(
+        `server upload rejects ${label}`,
+        (await backendRequest(baseUrl, "/api/documents/upload", userA.token, { method: "POST", body: invalidForm })).status === 400
+      );
+    }
+
+    const oversizedForm = new FormData();
+    oversizedForm.append("type", "OTHER");
+    oversizedForm.append("itemId", itemA.data.id);
+    oversizedForm.append("file", new Blob([new Uint8Array(10 * 1024 * 1024 + 1)], { type: "application/pdf" }), "controlled-oversized.pdf");
+    check(
+      "server upload rejects file over 10 MiB",
+      (await backendRequest(baseUrl, "/api/documents/upload", userA.token, { method: "POST", body: oversizedForm })).status === 413
+    );
+
     const deleted = await backendRequest(baseUrl, "/api/privacy/deletion/request", userA.token, { method: "POST" });
     if (!(deleted.status === 200 && deleted.data?.deleted === true)) {
       const reason = typeof deleted.data?.detail === "string" ? deleted.data.detail : "unavailable";
@@ -282,7 +354,7 @@ async function runIntegratedAccountDeletion(userA, userB, pdfBytes) {
     }
     check(
       "account endpoint deletes database, Storage, local files and Auth",
-      deleted.data?.authUserDeleted === true && deleted.data?.localFileCount === 1
+      deleted.data?.authUserDeleted === true && deleted.data?.localFileCount === 3
     );
 
     const oldBackendToken = await backendRequest(baseUrl, "/api/items", userA.token);
@@ -302,7 +374,7 @@ async function main() {
   check("open signup disabled in local config", /\[auth\][\s\S]*?enable_signup = false/.test(config));
   check("email/password provider active for invited users", /\[auth\.email\][\s\S]*?enable_signup = true/.test(config));
   check("OAuth provider disabled in local config", /\[auth\.external\.apple\][\s\S]*?enabled = false/.test(config));
-  check("Storage global limit is 10 MiB", /\[storage\][\s\S]*?file_size_limit = "10MiB"/.test(config));
+  check("versioned Storage target limit is 10 MiB", /\[storage\][\s\S]*?file_size_limit = "10MiB"/.test(config));
 
   const publicSignup = await apiRequest("/auth/v1/signup", {
     key: runtime.anonKey,
@@ -423,14 +495,27 @@ async function main() {
   const storageUrlPath = `/storage/v1/object/documents/${storagePath}`;
   const pdfV1 = new TextEncoder().encode("%PDF-1.4 controlled beta A");
   const pdfV2 = new TextEncoder().encode("%PDF-1.4 controlled beta A updated");
-  check("User A uploads own private file", (await storageRequest(storageUrlPath, {
+  check("direct client private upload is disabled", (await storageRequest(storageUrlPath, {
     token: userA.token, method: "POST", bytes: pdfV1, headers: { "Content-Type": "application/pdf" }
-  })).status === 200);
+  })).status >= 400);
+  check("foreign direct Storage path is disabled", (await storageRequest(storageUrlPath, {
+    token: userB.token, method: "POST", bytes: pdfV1, headers: { "Content-Type": "application/pdf" }
+  })).status >= 400);
+
+  const serviceUpload = await storageRequest(storageUrlPath, {
+    key: runtime.serviceRoleKey,
+    token: runtime.serviceRoleKey,
+    method: "POST",
+    bytes: pdfV1,
+    headers: { "Content-Type": "application/pdf" }
+  });
+  check("server provisions controlled private Storage object", serviceUpload.status === 200);
+  createdStorageObjects.push({ bucket: "documents", path: storagePath });
 
   const ownList = await apiRequest("/storage/v1/object/list/documents", {
     key: runtime.anonKey, token: userA.token, method: "POST", body: { prefix: userA.id, limit: 100, offset: 0 }
   });
-  check("User A lists own private file", ownList.status === 200 && ownList.data?.some((entry) => entry.name === storagePath.split("/")[1]));
+  check("raw client Storage listing does not expose server-managed files", ownList.status === 200 && ownList.data?.length === 0);
 
   const foreignList = await apiRequest("/storage/v1/object/list/documents", {
     key: runtime.anonKey, token: userB.token, method: "POST", body: { prefix: userA.id, limit: 100, offset: 0 }
@@ -438,7 +523,7 @@ async function main() {
   check("User B cannot list User A files", foreignList.status === 200 && foreignList.data?.length === 0);
 
   const ownDownload = await storageRequest(`/storage/v1/object/authenticated/documents/${storagePath}`, { token: userA.token });
-  check("User A reads own private file", ownDownload.status === 200 && ownDownload.bytes.length === pdfV1.length);
+  check("raw client Storage download requires server mediation", ownDownload.status >= 400);
   check("User B cannot read User A file", (await storageRequest(`/storage/v1/object/authenticated/documents/${storagePath}`, { token: userB.token })).status >= 400);
   check("anonymous cannot read private file", (await storageRequest(`/storage/v1/object/authenticated/documents/${storagePath}`, { token: runtime.anonKey })).status >= 400);
 
@@ -450,9 +535,9 @@ async function main() {
   check("User B cannot change User A file", (await storageRequest(storageUrlPath, {
     token: userB.token, method: "PUT", bytes: pdfV2, headers: { "Content-Type": "application/pdf", "x-upsert": "true" }
   })).status >= 400);
-  check("User A changes own private file", (await storageRequest(storageUrlPath, {
+  check("User A cannot bypass server validation with direct replacement", (await storageRequest(storageUrlPath, {
     token: userA.token, method: "PUT", bytes: pdfV2, headers: { "Content-Type": "application/pdf", "x-upsert": "true" }
-  })).status === 200);
+  })).status >= 400);
 
   const foreignDelete = await apiRequest("/storage/v1/object/documents", {
     key: runtime.anonKey, token: userB.token, method: "DELETE", body: { prefixes: [storagePath] }
@@ -461,18 +546,29 @@ async function main() {
     "User B cannot delete User A file",
     foreignDelete.status >= 400 || (foreignDelete.status === 200 && Array.isArray(foreignDelete.data) && foreignDelete.data.length === 0)
   );
-  const afterForeignDelete = await storageRequest(`/storage/v1/object/authenticated/documents/${storagePath}`, { token: userA.token });
-  check("denied Storage delete has no side effect", afterForeignDelete.status === 200);
+  const afterForeignDelete = await storageRequest(`/storage/v1/object/authenticated/documents/${storagePath}`, {
+    key: runtime.serviceRoleKey,
+    token: runtime.serviceRoleKey
+  });
+  check("denied Storage delete has no side effect", afterForeignDelete.status === 200 && afterForeignDelete.bytes.length === pdfV1.length);
 
   const ownDelete = await apiRequest("/storage/v1/object/documents", {
     key: runtime.anonKey, token: userA.token, method: "DELETE", body: { prefixes: [storagePath] }
   });
-  check("User A deletes own private file", ownDelete.status === 200);
+  check("direct client private delete is disabled", ownDelete.status >= 400 || (ownDelete.status === 200 && Array.isArray(ownDelete.data) && ownDelete.data.length === 0));
+  check("server deletes controlled private Storage object", (await apiRequest("/storage/v1/object/documents", {
+    key: runtime.serviceRoleKey, method: "DELETE", body: { prefixes: [storagePath] }
+  })).status === 200);
 
   const deletionStoragePath = `${userA.id}/${generatedFileName()}`;
   check("account deletion has a controlled private Storage object", (await storageRequest(`/storage/v1/object/documents/${deletionStoragePath}`, {
-    token: userA.token, method: "POST", bytes: pdfV1, headers: { "Content-Type": "application/pdf" }
+    key: runtime.serviceRoleKey,
+    token: runtime.serviceRoleKey,
+    method: "POST",
+    bytes: pdfV1,
+    headers: { "Content-Type": "application/pdf" }
   })).status === 200);
+  createdStorageObjects.push({ bucket: "documents", path: deletionStoragePath });
 
   // Run the real backend deletion orchestrator against the controlled local
   // Supabase instance, including Storage API cleanup and Auth deletion last.
@@ -517,6 +613,17 @@ try {
   process.exitCode = 1;
 } finally {
   if (runtime) {
+    for (const object of createdStorageObjects) {
+      try {
+        await apiRequest(`/storage/v1/object/${object.bucket}`, {
+          key: runtime.serviceRoleKey,
+          method: "DELETE",
+          body: { prefixes: [object.path] }
+        });
+      } catch {
+        process.stderr.write("WARN controlled Storage cleanup requires manual review\n");
+      }
+    }
     for (const id of [...createdAuthUsers]) {
       try {
         await serviceDelete("HouseholdMember", "userId", id);

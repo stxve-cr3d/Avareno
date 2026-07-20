@@ -3,7 +3,10 @@
 --
 -- The executable, versioned closed-beta Storage source of truth is:
 --   supabase/migrations/20260717061534_beta_private_storage.sql
+--   supabase/migrations/20260718001016_beta_server_only_private_storage_writes.sql
 --
--- Bucket limits are also defined in supabase/config.toml. Apply migrations
--- through the Supabase CLI and run qa-beta-security.mjs against the intended
--- local/staging project before admitting beta users.
+-- Private document writes are server-mediated because Storage policies cannot
+-- inspect file magic bytes. Bucket limits are also defined in
+-- supabase/config.toml. Apply migrations through the Supabase CLI and run
+-- qa-beta-security.mjs against the intended local/staging project before
+-- admitting beta users.

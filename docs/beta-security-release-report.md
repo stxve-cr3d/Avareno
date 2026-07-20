@@ -64,12 +64,18 @@ No request body controls the authenticated user id.
   reviewed authorization helpers only to `authenticated`; the lone
   `SECURITY DEFINER` helper retains an empty `search_path` and exposes only an
   active-subject boolean.
+- `20260718001016_beta_server_only_private_storage_writes.sql` removes direct
+  authenticated insert/update/delete policies from private document buckets.
+  Browser clients cannot bypass the backend's magic-byte validation; avatar
+  writes remain independently owner/path scoped.
 - `supabase/config.toml` disables public signup, anonymous Auth, OAuth, SMS and
   unnecessary local services; private buckets use a 10 MiB limit and the beta
   MIME allowlist.
 - The real local regression proves User B and anon cannot list, read, sign,
   update or delete User A's private object. A denied Storage delete has no side
   effect.
+- The target regression additionally proves private Storage writes are
+  server-mediated and direct client uploads create no object.
 
 ## 5. Beta feature flags
 
@@ -104,6 +110,9 @@ frontend mirrors these values but is not the authority.
   extension; the sanitized original basename remains display metadata only.
 - Partial files are staged and removed on failed metadata insertion.
 - No automatic OCR, AI processing or preview generation starts after upload.
+- Direct browser writes to private document buckets are disabled because bucket
+  policies cannot inspect object bytes. The frontend already routes private
+  documents through `/api/documents/upload`; only avatars use direct Storage.
 - Malware scanning is not implemented and remains an explicitly accepted risk
   only for the small known invite cohort.
 
@@ -137,7 +146,9 @@ Auth/backend/PostgREST/Storage, and confirms User B is unchanged.
   - Mobile TypeScript: PASS
   - Backend tests: 47 passed
   - Frontend production build: PASS (1,739 modules transformed)
-- `npx supabase db reset --local`: PASS with all three migrations.
+- `npx supabase db reset --local`: PASS with the original release migrations;
+  target evidence including the server-only Storage migration is recorded in
+  `docs/beta-target-deployment-verification-report.md`.
 - `node qa-beta-security.mjs`: PASS, 56 controlled checks with real local User A,
   User B and anonymous Auth/Database/Storage contexts.
 - Receipt beta test: PASS; same generic 503 for controlled ids, zero DB and
@@ -172,7 +183,7 @@ Security implementation:
 - `frontend/src/lib/betaFeatures.ts`, `authClient.ts`, `authProvider.tsx`
 - `frontend/src/pages/AuthPages.tsx`, `CaptureReceipt.tsx`, `ItemDetail.tsx`,
   `Rewards.tsx`, and frontend env example
-- `supabase/config.toml`, `supabase/seed.sql` and the three migrations
+- `supabase/config.toml`, `supabase/seed.sql` and the versioned beta migrations
 - `qa-beta-security.mjs`
 - `docs/beta-release-supabase-checklist.md`, this report, Auth/RLS/Storage,
   AI and compliance status documents
@@ -183,9 +194,8 @@ this security pass. No commit or push was made.
 
 ## 11. Remaining risks
 
-- The exact intended beta Supabase project has not been mutated or tested from
-  this local-only task. Configuration drift remains possible until migrations,
-  dashboard settings and the same controlled QA are applied there.
+- Concrete target deployment evidence is maintained separately in
+  `docs/beta-target-deployment-verification-report.md`.
 - Malware scanning is absent. Magic-byte validation is not malware detection.
 - Backup retention, deletion propagation and restore exclusions are not yet a
   finalized operational/legal policy.
@@ -200,7 +210,7 @@ this security pass. No commit or push was made.
 
 Before sending any tester invitation:
 
-1. Apply all three migrations to the explicitly selected beta project and run
+1. Apply all versioned migrations to the explicitly selected beta project and run
    Supabase Database/Security advisors.
 2. Complete every applicable item in
    `docs/beta-release-supabase-checklist.md`: public signup/anon/OAuth/SMS off,
