@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 const BASE = process.env.QA_BASE ?? "http://127.0.0.1:4174";
 const API = process.env.QA_API ?? "http://127.0.0.1:4010";
-const OUT = resolve(dirname(fileURLToPath(import.meta.url)), "../../docs/design/qa-2026-07-onboarding");
+const OUT = resolve(dirname(fileURLToPath(import.meta.url)), "../../docs/design/qa-milky-archive-final");
 mkdirSync(OUT, { recursive: true });
 
 const failures = [];
@@ -70,11 +70,11 @@ async function run() {
   check("provisioned beta login reaches onboarding", page.url().endsWith("/onboarding"));
   check("German onboarding title is exact", await visible(page.getByRole("heading", { name: "Lege deine erste Produktakte an." })));
   check("German primary action is exact", await visible(page.getByRole("button", { name: "Erstes Produkt hinzufügen" })));
-  await page.screenshot({ path: `${OUT}/01-onboarding-de.png`, fullPage: true });
+  await page.screenshot({ path: `${OUT}/22-onboarding.png`, fullPage: true });
 
   await page.getByRole("button", { name: "Zunächst zur Übersicht" }).click();
   await page.waitForURL("**/app");
-  check("skip reaches empty overview", await visible(page.getByText("Noch keine Produkte gespeichert.")));
+  check("skip reaches empty overview", await visible(page.getByRole("heading", { name: "Noch keine Produkte gespeichert" })));
   await page.reload({ waitUntil: "networkidle" });
   check("skip persists after reload", new URL(page.url()).pathname === "/app");
 
@@ -100,7 +100,7 @@ async function run() {
   check("duplicate double click creates one request", productRequests.length === 1, `${productRequests.length} POST requests`);
   check("success title is exact", await visible(page.getByRole("heading", { name: "Your product is saved." })));
   check("success shows real product", await visible(page.getByText("QA Akku-Bohrschrauber")));
-  await page.screenshot({ path: `${OUT}/02-product-success-en.png`, fullPage: true });
+  await page.screenshot({ path: `${OUT}/qa-product-success-en.png`, fullPage: true });
 
   const productId = new URL(page.url()).pathname.split("/").pop();
   const activationA = await (await fetch(`${API}/api/me/activation`)).json();
@@ -132,7 +132,7 @@ async function run() {
   check("document retry double click sends one new request", documentRequests.length === 2, `${documentRequests.length} total requests incl. failed attempt`);
   check("document success notice is visible", await visible(page.getByText("Document saved.")));
   check("detail shows uploaded filename", await visible(page.getByText("qa-receipt.pdf")));
-  await page.screenshot({ path: `${OUT}/03-detail-with-document.png`, fullPage: true });
+  await page.screenshot({ path: `${OUT}/26-product-detail.png`, fullPage: true });
 
   const activationB = await (await fetch(`${API}/api/me/activation`)).json();
   check("activation B is server-side true", activationB.activationB === true);
@@ -188,7 +188,23 @@ async function run() {
   }
 }
 
-run().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+run()
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(() => {
+    /* Teardown is explicit (browser.close above) and the process normally
+       exits on its own. This unref'd watchdog only fires if a stray handle
+       (observed once: wedged Chromium child on macOS) keeps the loop alive;
+       it then reports the culprit handles and exits with the recorded code
+       so a hang can never mask the real results. */
+    const watchdog = setTimeout(() => {
+      console.error(
+        "WARN qa-onboarding: event loop still alive 15s after teardown; open handles:",
+        process.getActiveResourcesInfo()
+      );
+      process.exit(process.exitCode ?? 0);
+    }, 15000);
+    watchdog.unref();
+  });
