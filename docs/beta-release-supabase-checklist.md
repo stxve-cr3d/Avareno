@@ -14,6 +14,7 @@ real user data.
   - `20260717061534_beta_private_storage.sql`
   - `20260717063836_beta_service_role_account_deletion.sql`
   - `20260717101259_beta_function_execute_grants.sql`
+  - `20260718001016_beta_server_only_private_storage_writes.sql`
 - [ ] Run Supabase Database and Security advisors and resolve new critical or
   high findings before inviting testers.
 - [ ] Do not apply `docs/supabase-rls-foundation.sql` or
@@ -126,10 +127,15 @@ database policies remain the authority.
   still denied.
 - [ ] Bucket limits are 10 MiB for private files (2 MiB for avatars).
 - [ ] Allowed private upload MIME types are PDF, JPEG and PNG only.
-- [ ] Object names follow `<auth.uid()>/<server-generated-id>.<extension>`.
-- [ ] Policies check both the first folder segment and `owner_id` for writes.
+- [ ] Private document writes are accepted only through the authenticated
+  backend after extension, MIME and magic-byte validation; browser clients have
+  no direct private-bucket insert/update/delete policy.
+- [ ] Server-managed object names follow
+  `<auth.uid()>/<server-generated-id>.<extension>` when Supabase Storage is used.
 - [ ] Anonymous access to private files fails.
 - [ ] User B cannot list, read, sign, update or delete User A's object.
+- [ ] User A cannot bypass backend validation with a direct private-bucket
+  upload, replacement or delete.
 - [ ] Account deletion removes objects through the Storage API and verifies the
   user prefix is empty; do not delete rows directly from `storage.objects`.
 
@@ -194,3 +200,33 @@ git diff --check
 
 Release must remain blocked until every unchecked item that applies to the
 target beta environment has an owner, evidence and explicit approval.
+
+---
+
+## RC-Verifikationsstand 2026-07-20 (lokal, Design Freeze V1)
+
+Lokal ausgeführt und grün: Typechecks (Backend/Frontend/Mobile), Produktions-
+Build, 49 Backendtests (inkl. Security-Controls und Activity), Onboarding-,
+Landing-, Dashboard-, App-Experience-, Milky- und Manifest-QA (kritische
+Suiten doppelt), Kontrast-Scan Light+Dark, Reduced-Motion- und 200-%-Zoom-
+Prüfung. Aktivitäts- und Meilensteinlogik gegen echte lokale API-Daten
+verifiziert (Erzeugung, Duplikatschutz, Löschpropagation, keine PII im
+Payload).
+
+**Lokales Gate geschlossen (2026-07-20, später am selben Tag):** Docker-Daemon
+29.6.1 gestartet, Supabase CLI 2.109.1, `npx supabase start` +
+`npx supabase db reset --local` — alle 5 Migrationen fehlerfrei auf frischer
+Instanz, `seed.sql` bewusst leer. Live-Schema-Audit: 30/30 Tabellen mit RLS,
+150 public-Policies (0 für anon), restriktive Storage-Policy + server-only
+Private-Writes, anon ohne Tabellen-Grants, 0 PUBLIC-EXECUTE, einzige
+DEFINER-Funktion mit leerem `search_path`. `node qa-beta-security.mjs`
+zweimal ausgeführt: je 71/71 Checks, Exit 0, Läufe identisch, danach 0
+Testnutzer/-items/-Auth-User/-Storage-Objekte. Abgedeckt: A/B/anon-Isolation,
+alle fremden Objektbeziehungen, Nicht-Mutation abgelehnter Operationen,
+Storage-Isolation inkl. Signed URLs, Upload-Härtung (MIME/Endung/Magic-Bytes/
+10-MiB/Server-Key), Kill-Switches (503 vor jeder Wirkung), integrierte
+Account-Löschung inkl. altem JWT gegen Auth, REST, Storage und Backend.
+Ergebnisdetails: `docs/beta-release-candidate-report.md` (Urteil `RC READY`).
+
+Die Remote-Punkte dieser Checkliste bleiben unverändert offen und sind vor
+den ersten Einladungen gegen das dedizierte Beta-Projekt abzuarbeiten.
